@@ -126,7 +126,9 @@ test("rejects invalid, oversized and excess supporting files in the browser", as
   page,
 }) => {
   await page.goto("/apply");
-  await page.waitForLoadState("networkidle");
+  await expect(
+    page.locator('input[name="cf-turnstile-response"]'),
+  ).toHaveCount(1, { timeout: 10_000 });
   const input = page.getByLabel("Choose supporting documents");
   await input.setInputFiles({
     name: "malware.exe",

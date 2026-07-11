@@ -16,3 +16,11 @@ export function databaseUrlFor(name: string) {
 export function e2eDatabaseUrl() {
   return databaseUrlFor(E2E_DATABASE_NAME);
 }
+
+export function e2eRuntimeDatabaseUrl() {
+  const source = process.env.DATABASE_URL;
+  if (!source) throw new Error("DATABASE_URL is required for Playwright tests.");
+  const url = new URL(source);
+  url.pathname = `/${E2E_DATABASE_NAME}`;
+  return url.toString();
+}

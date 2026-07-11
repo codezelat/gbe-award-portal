@@ -1,8 +1,13 @@
 import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_R2_PREFIX, e2eDatabaseUrl } from "./tests/e2e/database";
+import {
+  E2E_R2_PREFIX,
+  e2eDatabaseUrl,
+  e2eRuntimeDatabaseUrl,
+} from "./tests/e2e/database";
 
 const testDatabaseUrl = e2eDatabaseUrl();
+const testRuntimeDatabaseUrl = e2eRuntimeDatabaseUrl();
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -17,7 +22,7 @@ export default defineConfig({
     env: {
       ...process.env,
       APP_ENV: "local",
-      DATABASE_URL: testDatabaseUrl,
+      DATABASE_URL: testRuntimeDatabaseUrl,
       DATABASE_URL_DIRECT: testDatabaseUrl,
       NEXT_PUBLIC_APP_URL: "http://localhost:3100",
       BETTER_AUTH_URL: "http://localhost:3100",

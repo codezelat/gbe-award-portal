@@ -10,6 +10,7 @@ import {
   E2E_APPLICATION_REFERENCE,
   databaseUrlFor,
   e2eDatabaseUrl,
+  e2eRuntimeDatabaseUrl,
 } from "./database";
 
 export default async function setup() {
@@ -78,6 +79,19 @@ export default async function setup() {
       form_schema_version, now(), now()
     from fixture
   `;
+  const runtimeRole = new URL(e2eRuntimeDatabaseUrl()).username;
+  if (!/^[a-z_][a-z0-9_]*$/i.test(runtimeRole))
+    throw new Error("The Playwright runtime database role is invalid.");
+  await seeded.unsafe(
+    `GRANT CONNECT ON DATABASE "${E2E_DATABASE_NAME}" TO "${runtimeRole}"`,
+  );
+  await seeded.unsafe(`GRANT USAGE ON SCHEMA public TO "${runtimeRole}"`);
+  await seeded.unsafe(
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${runtimeRole}"`,
+  );
+  await seeded.unsafe(
+    `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "${runtimeRole}"`,
+  );
   await seeded.end();
 
   execFileSync(
