@@ -15,11 +15,14 @@ import {
   emailOutbox,
   payments,
   profiles,
+  awardCycles,
+  cycleSequences,
 } from "@/lib/db/schema";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { enforceRateLimit } from "@/server/security/rate-limit";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
 
 const statusSchema = z.object({
@@ -57,6 +60,7 @@ async function assertApplicationAccess(
     throw new Error("Application not found or not assigned to you.");
 }
 export async function changeStatusAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (
     !hasPermission(membership, "applications.change_status") &&
@@ -99,6 +103,7 @@ export async function changeStatusAction(formData: FormData) {
   revalidatePath("/admin/applications");
 }
 export async function issuePortalAccessAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (!hasPermission(membership, "applications.approve"))
     throw new Error("Approval permission is required.");
@@ -183,6 +188,7 @@ export async function addInternalNoteAction(formData: FormData) {
   revalidatePath(`/admin/applications/${input.applicationId}`);
 }
 export async function updatePaymentAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (
     !hasPermission(membership, "payments.verify") &&
@@ -192,11 +198,37 @@ export async function updatePaymentAction(formData: FormData) {
   const input = z
     .object({
       applicationId: z.uuid(),
-      status: z.enum(["under_review", "verified", "rejected", "waived"]),
+      status: z.enum([
+        "under_review",
+        "verified",
+        "rejected",
+        "waived",
+        "refunded",
+      ]),
       note: z.string().trim().max(2000).optional(),
+      payerName: z.string().trim().max(180).optional(),
+      bankReference: z.string().trim().max(160).optional(),
+      amount: z
+        .union([
+          z.literal(""),
+          z.string().regex(/^\d{1,9}(?:\.\d{1,2})?$/, "Enter a valid amount."),
+        ])
+        .optional(),
+      currency: z
+        .union([z.literal(""), z.string().trim().length(3)])
+        .optional(),
+      paidAt: z.string().optional(),
     })
     .parse(Object.fromEntries(formData));
   await assertApplicationAccess(profile.id, membership, input.applicationId);
+  if (
+    ["waived", "refunded"].includes(input.status) &&
+    membership.role !== "super_admin" &&
+    !hasPermission(membership, "payments.override")
+  )
+    throw new Error(
+      "Elevated payment-override permission is required for this decision.",
+    );
   await enforceRateLimit(`payment-status:${profile.id}`, 60, 3600);
   const db = getDb();
   const [before] = await db
@@ -205,10 +237,36 @@ export async function updatePaymentAction(formData: FormData) {
     .where(eq(payments.applicationId, input.applicationId))
     .limit(1);
   if (!before) throw new Error("Payment record not found.");
-  if (before.status === input.status)
-    throw new Error("The payment is already in that status.");
-  if (input.status === "rejected" && (!input.note || input.note.length < 8))
-    throw new Error("Explain why the proof was rejected.");
+  const statusChanged = before.status !== input.status;
+  if (
+    ["rejected", "waived", "refunded"].includes(input.status) &&
+    (!input.note || input.note.length < 8)
+  )
+    throw new Error("A meaningful reason is required for this decision.");
+  const amountMinor =
+    input.amount === undefined
+      ? before.amountMinor
+      : input.amount
+        ? Math.round(Number.parseFloat(input.amount) * 100)
+        : null;
+  const paidAt =
+    input.paidAt === undefined
+      ? before.paidAt
+      : input.paidAt
+        ? new Date(input.paidAt)
+        : null;
+  const payerName =
+    input.payerName === undefined ? before.payerName : input.payerName || null;
+  const bankReference =
+    input.bankReference === undefined
+      ? before.bankReference
+      : input.bankReference || null;
+  const currency =
+    input.currency === undefined
+      ? before.currency
+      : input.currency?.toUpperCase() || null;
+  if (paidAt && Number.isNaN(paidAt.getTime()))
+    throw new Error("Enter a valid payment date.");
   const now = new Date();
   await db.transaction(async (tx) => {
     const [application] = await tx
@@ -216,18 +274,51 @@ export async function updatePaymentAction(formData: FormData) {
         email: applications.emailNormalised,
         reference: applications.reference,
         ownerProfileId: applications.ownerProfileId,
+        cycleId: applications.cycleId,
+        cycleYear: awardCycles.year,
       })
       .from(applications)
+      .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
       .where(eq(applications.id, input.applicationId))
       .limit(1);
     if (!application) throw new Error("Application not found.");
+    let receiptReference = before.receiptReference;
+    if (
+      statusChanged &&
+      ["verified", "waived"].includes(input.status) &&
+      !receiptReference
+    ) {
+      await tx
+        .insert(cycleSequences)
+        .values({ cycleId: application.cycleId, nextReceiptNumber: 2 })
+        .onConflictDoUpdate({
+          target: cycleSequences.cycleId,
+          set: {
+            nextReceiptNumber: sql`${cycleSequences.nextReceiptNumber}+1`,
+            updatedAt: now,
+          },
+        });
+      const [sequence] = await tx
+        .select({ next: cycleSequences.nextReceiptNumber })
+        .from(cycleSequences)
+        .where(eq(cycleSequences.cycleId, application.cycleId));
+      receiptReference = `RCT-${application.cycleYear}-${String(Math.max(1, sequence.next - 1)).padStart(6, "0")}`;
+    }
     const paymentUpdated = await tx
       .update(payments)
       .set({
         status: input.status,
         financeNote: input.note,
-        verifiedBy: input.status === "verified" ? profile.id : null,
-        verifiedAt: input.status === "verified" ? now : null,
+        payerName,
+        bankReference,
+        amountMinor,
+        currency,
+        paidAt,
+        receiptReference,
+        verifiedBy: ["verified", "waived"].includes(input.status)
+          ? profile.id
+          : null,
+        verifiedAt: ["verified", "waived"].includes(input.status) ? now : null,
         rejectedReason: input.status === "rejected" ? input.note : null,
         updatedAt: now,
       })
@@ -264,23 +355,34 @@ export async function updatePaymentAction(formData: FormData) {
       entityId: before.id,
       applicationId: input.applicationId,
       beforeRedacted: { status: before.status },
-      afterRedacted: { status: input.status },
+      afterRedacted: {
+        status: input.status,
+        payerName,
+        bankReference,
+        amountMinor,
+        currency,
+        paidAt: paidAt?.toISOString() ?? null,
+        receiptReference,
+      },
       reason: input.note,
       requestId: crypto.randomUUID(),
     });
-    await tx.insert(emailOutbox).values({
-      templateKey: `payment_${input.status}`,
-      recipientEmail: application.email,
-      recipientProfileId: application.ownerProfileId,
-      applicationId: input.applicationId,
-      payload: {
-        reference: application.reference,
-        status: input.status.replaceAll("_", " "),
-        message: input.note,
-        url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/portal/payment`,
-      },
-      idempotencyKey: `payment_status:${before.id}:${input.status}:${now.toISOString()}`,
-    });
+    if (statusChanged)
+      await tx.insert(emailOutbox).values({
+        templateKey: `payment_${input.status}`,
+        recipientEmail: application.email,
+        recipientProfileId: application.ownerProfileId,
+        applicationId: input.applicationId,
+        payload: {
+          reference: application.reference,
+          paymentReference: before.paymentReference,
+          receiptReference,
+          status: input.status.replaceAll("_", " "),
+          message: input.note,
+          url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/portal/payment`,
+        },
+        idempotencyKey: `payment_status:${before.id}:${input.status}:${now.toISOString()}`,
+      });
   });
   revalidatePath(`/admin/applications/${input.applicationId}`);
 }
@@ -294,6 +396,7 @@ const editableApplicationFields = [
 ] as const;
 
 export async function requestChangesAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (
     !hasPermission(membership, "applications.change_status") &&
@@ -368,6 +471,7 @@ export async function requestChangesAction(formData: FormData) {
 }
 
 export async function editApplicationAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (
     !hasPermission(membership, "applications.edit") &&
@@ -583,6 +687,7 @@ export async function editApplicationAction(formData: FormData) {
 }
 
 export async function sendStaffMessageAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   await requireFeatureFlag("applicant_messages_enabled");
   const { profile, membership } = await requireStaff();
   if (!hasPermission(membership, "messages.send"))

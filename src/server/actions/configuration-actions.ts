@@ -88,7 +88,17 @@ export async function saveCategoryAction(formData: FormData) {
         .regex(/^[a-z0-9-]+$/)
         .max(180),
       shortDescription: z.string().trim().max(500).optional(),
+      internalNotes: z.string().trim().max(2000).optional(),
       displayOrder: z.coerce.number().int().min(0).max(10000),
+      capacity: z
+        .union([
+          z.literal(""),
+          z.coerce.number().int().positive().max(1_000_000),
+        ])
+        .optional(),
+      feeOverrideMinor: z
+        .union([z.literal(""), z.coerce.number().int().nonnegative()])
+        .optional(),
       isActive: z.string().optional(),
     })
     .parse(Object.fromEntries(formData));
@@ -98,16 +108,21 @@ export async function saveCategoryAction(formData: FormData) {
     name: input.name,
     slug: input.slug,
     shortDescription: input.shortDescription || null,
+    internalNotes: input.internalNotes || null,
     displayOrder: input.displayOrder,
+    capacity: input.capacity === "" ? null : input.capacity,
+    feeOverrideMinor:
+      input.feeOverrideMinor === "" ? null : input.feeOverrideMinor,
     isActive: input.isActive === "on",
     updatedAt: new Date(),
   };
   const db = getDb();
   let id = input.id;
+  let beforeSnapshot: Record<string, unknown> | null = null;
   await db.transaction(async (tx) => {
     if (id) {
       const [before] = await tx
-        .select({ cycleId: awardCategories.cycleId })
+        .select()
         .from(awardCategories)
         .where(eq(awardCategories.id, id))
         .limit(1);
@@ -116,6 +131,17 @@ export async function saveCategoryAction(formData: FormData) {
         throw new Error(
           "An existing category cannot be moved to another award cycle.",
         );
+      beforeSnapshot = {
+        code: before.code,
+        name: before.name,
+        slug: before.slug,
+        shortDescription: before.shortDescription,
+        internalNotes: before.internalNotes,
+        displayOrder: before.displayOrder,
+        isActive: before.isActive,
+        capacity: before.capacity,
+        feeOverrideMinor: before.feeOverrideMinor,
+      };
       await tx
         .update(awardCategories)
         .set(values)
@@ -133,10 +159,17 @@ export async function saveCategoryAction(formData: FormData) {
       action: "award category saved",
       entityType: "award_category",
       entityId: id,
+      beforeRedacted: beforeSnapshot,
       afterRedacted: {
         code: input.code,
         name: input.name,
+        slug: input.slug,
+        shortDescription: input.shortDescription || null,
+        internalNotes: input.internalNotes || null,
+        displayOrder: input.displayOrder,
         isActive: values.isActive,
+        capacity: values.capacity,
+        feeOverrideMinor: values.feeOverrideMinor,
       },
       metadataRedacted: {},
       requestId: crypto.randomUUID(),
@@ -261,8 +294,34 @@ export async function saveCycleAction(formData: FormData) {
       action: "award cycle saved",
       entityType: "award_cycle",
       entityId: input.id,
-      beforeRedacted: { status: before.status },
-      afterRedacted: { status: input.status, name: input.name },
+      beforeRedacted: {
+        status: before.status,
+        name: before.name,
+        heading: before.heading,
+        opensAt: before.opensAt.toISOString(),
+        closesAt: before.closesAt.toISOString(),
+        resultsReleaseAt: before.resultsReleaseAt?.toISOString() ?? null,
+        supportEmail: before.supportEmail,
+        nominationFeeMinor: before.nominationFeeMinor,
+        currency: before.currency,
+        declarationVersion: before.declarationVersion,
+        termsVersion: before.termsVersion,
+        privacyVersion: before.privacyVersion,
+      },
+      afterRedacted: {
+        status: input.status,
+        name: input.name,
+        heading: input.heading,
+        opensAt: opensAt.toISOString(),
+        closesAt: closesAt.toISOString(),
+        resultsReleaseAt: resultsReleaseAt?.toISOString() ?? null,
+        supportEmail: input.supportEmail,
+        nominationFeeMinor: input.nominationFeeMinor ?? null,
+        currency: input.currency?.toUpperCase() || null,
+        declarationVersion: input.declarationVersion,
+        termsVersion: input.termsVersion,
+        privacyVersion: input.privacyVersion,
+      },
       metadataRedacted: {},
       requestId: crypto.randomUUID(),
     });
@@ -279,6 +338,7 @@ const allowedSettings = new Set([
   "invitation_reminder_hours",
   "superseded_file_retention_hours",
   "feature_flags",
+  "email_templates",
   "brand_asset_keys",
   "legal_terms",
   "privacy_notice",
@@ -311,21 +371,43 @@ export async function saveSettingAction(formData: FormData) {
       })
       .strict()
       .parse(value);
-  await getDb()
-    .insert(systemSettings)
-    .values({ key, value, updatedBy: profile.id })
-    .onConflictDoUpdate({
-      target: systemSettings.key,
-      set: { value, updatedBy: profile.id, updatedAt: new Date() },
+  if (key === "email_templates")
+    value = z
+      .record(
+        z.string().min(1).max(100),
+        z
+          .object({
+            title: z.string().trim().min(2).max(180).optional(),
+            message: z.string().trim().min(2).max(1000).optional(),
+            actionLabel: z.string().trim().min(2).max(80).optional(),
+          })
+          .strict(),
+      )
+      .parse(value);
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    const [before] = await tx
+      .select({ value: systemSettings.value })
+      .from(systemSettings)
+      .where(eq(systemSettings.key, key))
+      .limit(1);
+    await tx
+      .insert(systemSettings)
+      .values({ key, value, updatedBy: profile.id })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value, updatedBy: profile.id, updatedAt: new Date() },
+      });
+    await tx.insert(auditLogs).values({
+      actorProfileId: profile.id,
+      actorType: "staff",
+      action: "system setting saved",
+      entityType: "system_setting",
+      beforeRedacted: { key, value: before?.value ?? null },
+      afterRedacted: { key, value },
+      metadataRedacted: {},
+      requestId: crypto.randomUUID(),
     });
-  await getDb().insert(auditLogs).values({
-    actorProfileId: profile.id,
-    actorType: "staff",
-    action: "system setting saved",
-    entityType: "system_setting",
-    afterRedacted: { key },
-    metadataRedacted: {},
-    requestId: crypto.randomUUID(),
   });
   revalidatePath("/admin/settings");
 }

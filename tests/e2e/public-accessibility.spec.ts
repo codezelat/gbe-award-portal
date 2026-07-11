@@ -4,6 +4,10 @@ import AxeBuilder from "@axe-core/playwright";
 test("public nomination route exposes the exact accessible single-page form", async ({
   page,
 }) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push(message.text());
+  });
   await page.goto("/apply");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   for (const label of [
@@ -23,6 +27,7 @@ test("public nomination route exposes the exact accessible single-page form", as
   await expect(page.locator('a[href="/signup"]')).toHaveCount(0);
   const results = await new AxeBuilder({ page }).exclude("iframe").analyze();
   expect(results.violations).toEqual([]);
+  expect(browserErrors).toEqual([]);
 });
 
 test("public and authentication routes have no horizontal overflow", async ({

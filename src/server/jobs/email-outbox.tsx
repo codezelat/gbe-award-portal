@@ -8,61 +8,12 @@ import { env, requireProvider } from "@/lib/env";
 import { NominationReceivedEmail } from "@/emails/templates/nomination-received";
 import { PortalNotificationEmail } from "@/emails/templates/portal-notification";
 import { getFeatureFlags } from "@/server/services/feature-flags";
-const templateDefaults: Record<
-  string,
-  { title: string; message: string; actionLabel?: string }
-> = {
-  password_reset: {
-    title: "Reset your GBE Awards portal password",
-    message:
-      "Use the secure link below to choose a new password. If you did not request this, you can ignore this email.",
-    actionLabel: "Reset password",
-  },
-  email_verification: {
-    title: "Verify your GBE Awards portal email",
-    message:
-      "Use the secure link below to verify this email address before signing in.",
-    actionLabel: "Verify email address",
-  },
-  applicant_invitation: {
-    title: "Activate your GBE Awards portal access",
-    message:
-      "Your nomination has been approved for secure portal access. Activate your invitation before it expires.",
-    actionLabel: "Activate portal access",
-  },
-  staff_invitation: {
-    title: "GBE Awards staff invitation",
-    message:
-      "You have been invited to the administration portal. Multi-factor authentication is mandatory.",
-    actionLabel: "Accept staff invitation",
-  },
-  application_changes_requested: {
-    title: "Action required for your GBE Awards nomination",
-    message:
-      "The GBE Awards team needs additional information. Sign in to review the exact request and deadline.",
-    actionLabel: "Review requested updates",
-  },
-  payment_verified: {
-    title: "Payment proof verified",
-    message:
-      "Your payment evidence has been verified by the GBE Awards finance team.",
-    actionLabel: "View payment status",
-  },
-  payment_rejected: {
-    title: "Replacement payment proof required",
-    message:
-      "Your payment evidence could not be verified. Sign in to review the reason and upload a replacement.",
-    actionLabel: "Review payment request",
-  },
-  account_security_change: {
-    title: "Your GBE Awards account security changed",
-    message: "A security change was made to your portal account.",
-  },
-};
+import { getEmailTemplateCopies } from "@/server/services/email-template-service";
 export async function processEmailOutbox(limit = 25) {
   requireProvider("email");
   const db = getDb();
   const flags = await getFeatureFlags();
+  const templateDefaults = await getEmailTemplateCopies();
   await db
     .update(emailOutbox)
     .set({ status: "queued" })

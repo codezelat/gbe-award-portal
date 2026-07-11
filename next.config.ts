@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/api/portal/applications/*/summary": [
+      "./node_modules/@expo-google-fonts/noto-sans/**/*.ttf",
+    ],
+  },
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
   async headers() {
     return [

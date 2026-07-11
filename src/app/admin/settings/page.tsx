@@ -16,6 +16,7 @@ const supported = [
   "invitation_reminder_hours",
   "superseded_file_retention_hours",
   "feature_flags",
+  "email_templates",
   "brand_asset_keys",
   "legal_terms",
   "privacy_notice",

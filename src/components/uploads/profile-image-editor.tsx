@@ -82,7 +82,10 @@ export function ProfileImageEditor({
     if (!window.confirm("Remove the current profile image?")) return;
     const response = await fetch("/api/uploads/profile", { method: "DELETE" });
     const result = await response.json();
-    if (!result.ok) { setError(result.message); return; }
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
     window.location.reload();
   }
   return (
@@ -123,7 +126,7 @@ export function ProfileImageEditor({
           type="file"
           accept="image/jpeg,image/png,image/webp"
           className="sr-only"
-            onChange={(event) => chooseFile(event.target.files?.[0])}
+          onChange={(event) => chooseFile(event.target.files?.[0])}
         />
       </label>
       {source ? (

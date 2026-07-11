@@ -51,16 +51,14 @@ export async function GET(
     }),
     { expiresIn: 180 },
   );
-  await getDb()
-    .insert(auditLogs)
-    .values({
-      actorProfileId: profile.id,
-      actorType: "staff",
-      action: "export downloaded",
-      entityType: "export",
-      entityId: row.export.id,
-      metadataRedacted: {},
-      requestId: crypto.randomUUID(),
-    });
+  await getDb().insert(auditLogs).values({
+    actorProfileId: profile.id,
+    actorType: "staff",
+    action: "export downloaded",
+    entityType: "export",
+    entityId: row.export.id,
+    metadataRedacted: {},
+    requestId: crypto.randomUUID(),
+  });
   return NextResponse.redirect(url, 302);
 }

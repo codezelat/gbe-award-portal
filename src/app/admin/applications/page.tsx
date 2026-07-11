@@ -19,7 +19,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { Download, Search } from "lucide-react";
+import { Download } from "lucide-react";
 import { getDb } from "@/lib/db";
 import {
   applicationFiles,
@@ -33,18 +33,30 @@ import { Input } from "@/components/ui/input";
 import { formatInTimeZone } from "date-fns-tz";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { ApplicationsTable } from "@/components/admin/applications-table";
+import { DebouncedApplicationSearch } from "@/components/admin/debounced-application-search";
 function encodeCursor(value: { key: string; id: string }) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
 }
 function decodeCursor(value: string) {
   try {
-    const parsed=JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as {key?:unknown;id?:unknown};
-    return typeof parsed.key === "string" && typeof parsed.id === "string" && isUuid(parsed.id) ? {key:parsed.key,id:parsed.id} : null;
-  } catch { return null; }
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as { key?: unknown; id?: unknown };
+    return typeof parsed.key === "string" &&
+      typeof parsed.id === "string" &&
+      isUuid(parsed.id)
+      ? { key: parsed.key, id: parsed.id }
+      : null;
+  } catch {
+    return null;
+  }
 }
-const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const isUuid=(value:string)=>uuidPattern.test(value);
-const isDate=(value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(new Date(`${value}T00:00:00Z`).valueOf());
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuid = (value: string) => uuidPattern.test(value);
+const isDate = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  !Number.isNaN(new Date(`${value}T00:00:00Z`).valueOf());
 export default async function ApplicationsPage({
   searchParams,
 }: {
@@ -53,12 +65,15 @@ export default async function ApplicationsPage({
   const params = await searchParams;
   const rawPreferredCycle = (await cookies()).get("gbe_admin_cycle")?.value;
   const preferredCycle =
-    rawPreferredCycle &&
-    isUuid(rawPreferredCycle)
+    rawPreferredCycle && isUuid(rawPreferredCycle)
       ? rawPreferredCycle
       : undefined;
   const { profile: staffProfile, membership } = await requireStaff();
-  const cursorHistory = (params.cursors?.split(",").filter((value)=>value.length<500).slice(0,50) ?? []);
+  const cursorHistory =
+    params.cursors
+      ?.split(",")
+      .filter((value) => value.length < 500)
+      .slice(0, 50) ?? [];
   const currentCursor = cursorHistory.at(-1);
   const page = cursorHistory.length + 1;
   const pageSize = [25, 50, 100].includes(Number(params.pageSize))
@@ -92,7 +107,7 @@ export default async function ApplicationsPage({
     filters.push(isNull(applications.deletedAt));
   if (!hasPermission(membership, "applications.view_all"))
     filters.push(eq(applications.assignedReviewerId, staffProfile.id));
-  const search=params.search?.trim().slice(0,320);
+  const search = params.search?.trim().slice(0, 320);
   if (search)
     filters.push(
       or(
@@ -102,21 +117,34 @@ export default async function ApplicationsPage({
         ilike(applications.phoneDisplay, `%${search}%`),
       )!,
     );
-  if (params.status && applications.workflowStatus.enumValues.includes(params.status as never))
+  if (
+    params.status &&
+    applications.workflowStatus.enumValues.includes(params.status as never)
+  )
     filters.push(
       eq(
         applications.workflowStatus,
         params.status as (typeof applications.workflowStatus.enumValues)[number],
       ),
     );
-  if (params.paymentStatus && applications.paymentStatus.enumValues.includes(params.paymentStatus as never))
+  if (
+    params.paymentStatus &&
+    applications.paymentStatus.enumValues.includes(
+      params.paymentStatus as never,
+    )
+  )
     filters.push(
       eq(
         applications.paymentStatus,
         params.paymentStatus as (typeof applications.paymentStatus.enumValues)[number],
       ),
     );
-  if (params.accountStatus && applications.accountAccessStatus.enumValues.includes(params.accountStatus as never))
+  if (
+    params.accountStatus &&
+    applications.accountAccessStatus.enumValues.includes(
+      params.accountStatus as never,
+    )
+  )
     filters.push(
       eq(
         applications.accountAccessStatus,
@@ -125,7 +153,8 @@ export default async function ApplicationsPage({
     );
   if (params.category && isUuid(params.category))
     filters.push(eq(applications.categoryId, params.category));
-  const activeCycleFilter = params.cycle && isUuid(params.cycle) ? params.cycle : preferredCycle;
+  const activeCycleFilter =
+    params.cycle && isUuid(params.cycle) ? params.cycle : preferredCycle;
   if (activeCycleFilter)
     filters.push(eq(applications.cycleId, activeCycleFilter));
   if (params.reviewer && isUuid(params.reviewer))
@@ -152,27 +181,33 @@ export default async function ApplicationsPage({
         getDb()
           .select({ value: sql`1` })
           .from(applicationFiles)
-          .where(eq(applicationFiles.applicationId, applications.id)),
+          .where(
+            and(
+              eq(applicationFiles.applicationId, applications.id),
+              eq(applicationFiles.kind, "supporting_document"),
+              eq(applicationFiles.isCurrent, true),
+            ),
+          ),
       ),
     );
   if (currentCursor) {
     const cursor = decodeCursor(currentCursor);
     if (cursor) {
-    cursorApplied = true;
-    const key = ["submitted", "activity"].includes(sort)
-      ? new Date(cursor.key)
-      : cursor.key;
-    const keyComparison =
-      sortDirection === "asc"
-        ? sql`${sortColumn} > ${key}`
-        : sql`${sortColumn} < ${key}`;
-    const idComparison =
-      sortDirection === "asc"
-        ? gt(applications.id, cursor.id)
-        : lt(applications.id, cursor.id);
-    filters.push(
-      or(keyComparison, and(sql`${sortColumn} = ${key}`, idComparison))!,
-    );
+      cursorApplied = true;
+      const key = ["submitted", "activity"].includes(sort)
+        ? new Date(cursor.key)
+        : cursor.key;
+      const keyComparison =
+        sortDirection === "asc"
+          ? sql`${sortColumn} > ${key}`
+          : sql`${sortColumn} < ${key}`;
+      const idComparison =
+        sortDirection === "asc"
+          ? gt(applications.id, cursor.id)
+          : lt(applications.id, cursor.id);
+      filters.push(
+        or(keyComparison, and(sql`${sortColumn} = ${key}`, idComparison))!,
+      );
     }
   }
   const where = filters.length ? and(...filters) : undefined;
@@ -261,15 +296,7 @@ export default async function ApplicationsPage({
         </Button>
       </div>
       <form className="glass-shell mb-4 flex flex-wrap gap-3 rounded-lg p-4">
-        <div className="relative min-w-64 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            name="search"
-            defaultValue={params.search}
-            placeholder="Search reference, nominee, email or phone"
-            className="h-11 bg-white pl-10"
-          />
-        </div>
+        <DebouncedApplicationSearch defaultValue={params.search} />
         <select
           name="status"
           defaultValue={params.status ?? ""}

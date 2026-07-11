@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { LockKeyhole } from "lucide-react";
+import { Download, LockKeyhole } from "lucide-react";
 import { getDb } from "@/lib/db";
 import {
   applicationChangeRequests,
@@ -71,7 +71,18 @@ export default async function ApplicationDetail({
           <p className="font-mono text-sm text-antique-gold">{app.reference}</p>
           <h1 className="page-heading mt-1">Your nomination</h1>
         </div>
-        <StatusBadge status={visibleStatus} />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={visibleStatus} />
+          <Button
+            variant="outline"
+            render={
+              <a href={`/api/portal/applications/${app.id}/summary`} download />
+            }
+          >
+            <Download data-icon="inline-start" />
+            Download summary
+          </Button>
+        </div>
       </div>
       {changeRequest ? (
         <section className="glass-feature mt-7 rounded-xl border-[#ebcfc5] p-6 md:p-8">

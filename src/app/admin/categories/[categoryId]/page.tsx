@@ -87,6 +87,35 @@ export default async function EditCategory({
             className="bg-white"
           />
         </label>
+        <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
+          Internal notes
+          <Textarea
+            name="internalNotes"
+            defaultValue={category.internalNotes ?? ""}
+            maxLength={2000}
+            className="bg-white"
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium">
+          Optional capacity
+          <Input
+            name="capacity"
+            type="number"
+            min={1}
+            defaultValue={category.capacity ?? ""}
+            className="h-11 bg-white"
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium">
+          Optional fee override (minor units)
+          <Input
+            name="feeOverrideMinor"
+            type="number"
+            min={0}
+            defaultValue={category.feeOverrideMinor ?? ""}
+            className="h-11 bg-white"
+          />
+        </label>
         <label className="flex flex-col gap-2 text-sm font-medium">
           Display order
           <Input

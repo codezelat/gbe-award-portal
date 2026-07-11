@@ -59,19 +59,17 @@ export async function createOrRefreshApplicantInvitation(
           idempotencyKey: `existing_account_linked:${applicationId}:${owner.id}`,
         })
         .onConflictDoNothing();
-      await tx
-        .insert(auditLogs)
-        .values({
-          actorProfileId,
-          actorType: "staff",
-          action: "approved application linked to existing account",
-          entityType: "application",
-          entityId: applicationId,
-          applicationId,
-          afterRedacted: { ownerProfileId: owner.id },
-          metadataRedacted: {},
-          requestId: crypto.randomUUID(),
-        });
+      await tx.insert(auditLogs).values({
+        actorProfileId,
+        actorType: "staff",
+        action: "approved application linked to existing account",
+        entityType: "application",
+        entityId: applicationId,
+        applicationId,
+        afterRedacted: { ownerProfileId: owner.id },
+        metadataRedacted: {},
+        requestId: crypto.randomUUID(),
+      });
     });
     return { linked: true };
   }
@@ -116,19 +114,17 @@ export async function createOrRefreshApplicantInvitation(
           idempotencyKey: `existing_account_linked:${applicationId}:${existingProfile.profile.id}`,
         })
         .onConflictDoNothing();
-      await tx
-        .insert(auditLogs)
-        .values({
-          actorProfileId,
-          actorType: "staff",
-          action: "approved application linked to existing account",
-          entityType: "application",
-          entityId: applicationId,
-          applicationId,
-          afterRedacted: { ownerProfileId: existingProfile.profile.id },
-          metadataRedacted: {},
-          requestId: crypto.randomUUID(),
-        });
+      await tx.insert(auditLogs).values({
+        actorProfileId,
+        actorType: "staff",
+        action: "approved application linked to existing account",
+        entityType: "application",
+        entityId: applicationId,
+        applicationId,
+        afterRedacted: { ownerProfileId: existingProfile.profile.id },
+        metadataRedacted: {},
+        requestId: crypto.randomUUID(),
+      });
     });
     return { linked: true };
   }

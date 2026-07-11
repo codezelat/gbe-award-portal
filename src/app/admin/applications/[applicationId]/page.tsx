@@ -13,6 +13,7 @@ import {
   applications,
   auditLogs,
   awardCategories,
+  awardCycles,
   files,
   payments,
   profiles,
@@ -33,6 +34,7 @@ import {
   updatePaymentAction,
 } from "@/server/actions/application-actions";
 import { bulkAssignReviewerAction } from "@/server/actions/bulk-actions";
+import { reassignApplicationOwnerAction } from "@/server/actions/applicant-admin-actions";
 import {
   transitionMap,
   type WorkflowStatus,
@@ -68,6 +70,7 @@ export default async function AdminApplicationDetail({
     changeRequests,
     audits,
     reviewers,
+    cycle,
   ] = await Promise.all([
     db
       .select()
@@ -131,7 +134,15 @@ export default async function AdminApplicationDetail({
       .from(profiles)
       .where(eq(profiles.accountKind, "staff"))
       .orderBy(profiles.displayName),
+    db
+      .select()
+      .from(awardCycles)
+      .where(eq(awardCycles.id, application.cycleId))
+      .limit(1)
+      .then((rows) => rows[0]),
   ]);
+  const original = (versions.find((item) => item.version === 1)?.payload ??
+    {}) as Record<string, unknown>;
   const fields = [
     ["Nominee / organisation", application.nomineeName],
     ["Designation", application.designation || "Not provided"],
@@ -164,7 +175,7 @@ export default async function AdminApplicationDetail({
   });
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="glass-shell sticky top-0 z-20 -mx-3 flex flex-wrap items-end justify-between gap-4 rounded-lg px-3 py-3">
         <div>
           <p className="font-mono text-sm text-antique-gold">
             {application.reference ?? "Provisional upload"}
@@ -196,6 +207,68 @@ export default async function AdminApplicationDetail({
             </p>
           </section>
           <section className="surface rounded-lg p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="section-title">Current and original values</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Cycle: {cycle?.name ?? "Unknown cycle"} · Submission version{" "}
+                  {application.currentVersion}
+                </p>
+              </div>
+              <StatusBadge status={cycle?.status ?? "unknown"} />
+            </div>
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-sm">
+                <thead className="text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="border-b px-3 py-2">Field</th>
+                    <th className="border-b px-3 py-2">Current</th>
+                    <th className="border-b px-3 py-2">Original version 1</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    [
+                      "Nominee / organisation",
+                      "nomineeName",
+                      application.nomineeName,
+                    ],
+                    ["Designation", "designation", application.designation],
+                    ["Industry", "industrySector", application.industrySector],
+                    ["Website", "businessWebsite", application.businessWebsite],
+                    ["Email", "email", application.emailDisplay],
+                    ["Telephone", "phone", application.phoneDisplay],
+                    [
+                      "Category",
+                      "categoryName",
+                      application.categoryNameSnapshot,
+                    ],
+                  ].map(([label, key, current]) => {
+                    const initial = original[String(key)];
+                    const changed =
+                      String(initial ?? "") !== String(current ?? "");
+                    return (
+                      <tr
+                        key={String(key)}
+                        className={changed ? "bg-gold-wash/50" : ""}
+                      >
+                        <th className="border-b px-3 py-3 font-medium">
+                          {label}
+                        </th>
+                        <td className="border-b px-3 py-3">
+                          {String(current || "Not provided")}
+                        </td>
+                        <td className="border-b px-3 py-3 text-muted-foreground">
+                          {String(initial || "Not provided")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section className="surface rounded-lg p-6">
             <h2 className="section-title">Applicant and account access</h2>
             <dl className="mt-5 grid gap-4 md:grid-cols-2">
               <div>
@@ -215,6 +288,51 @@ export default async function AdminApplicationDetail({
                 </dd>
               </div>
             </dl>
+            {membership.role === "super_admin" ? (
+              <details className="mt-5 border-t pt-4">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Link or reassign applicant account
+                </summary>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Enter an existing active applicant login email. This elevated
+                  correction requires your current password and is fully
+                  audited.
+                </p>
+                <form
+                  action={reassignApplicationOwnerAction}
+                  className="mt-4 grid gap-3"
+                >
+                  <input
+                    type="hidden"
+                    name="applicationId"
+                    value={application.id}
+                  />
+                  <Input
+                    name="applicantEmail"
+                    type="email"
+                    required
+                    placeholder="Existing applicant login email"
+                    className="h-11 bg-white"
+                  />
+                  <Textarea
+                    name="reason"
+                    required
+                    minLength={12}
+                    placeholder="Mandatory account-link correction reason"
+                    className="bg-white"
+                  />
+                  <Input
+                    name="reauthPassword"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    placeholder="Confirm your current password"
+                    className="h-11 bg-white"
+                  />
+                  <Button variant="outline">Save audited account link</Button>
+                </form>
+              </details>
+            ) : null}
           </section>
           {hasPermission(membership, "applications.edit") ? (
             <details className="surface rounded-lg p-6">
@@ -340,7 +458,22 @@ export default async function AdminApplicationDetail({
             </details>
           ) : null}
           <section className="surface rounded-lg p-6">
-            <h2 className="section-title">Documents</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="section-title">Documents</h2>
+              {hasPermission(membership, "files.manage") ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={
+                    <a
+                      href={`/admin/files?search=${encodeURIComponent(application.reference ?? application.nomineeName)}`}
+                    />
+                  }
+                >
+                  Manage files
+                </Button>
+              ) : null}
+            </div>
             <div className="mt-5 flex flex-col gap-3">
               {linkedFiles.length ? (
                 linkedFiles.map(({ link, file }) => (
@@ -759,6 +892,14 @@ export default async function AdminApplicationDetail({
                 Current: {payment?.status.replaceAll("_", " ") ?? "Missing"}
               </p>
               {payment ? (
+                <p className="mt-1 font-mono text-xs text-muted-foreground">
+                  {payment.paymentReference ?? "Payment reference pending"}
+                  {payment.receiptReference
+                    ? ` · ${payment.receiptReference}`
+                    : ""}
+                </p>
+              ) : null}
+              {payment ? (
                 <form
                   action={updatePaymentAction}
                   className="mt-4 flex flex-col gap-3"
@@ -770,13 +911,72 @@ export default async function AdminApplicationDetail({
                   />
                   <select
                     name="status"
+                    defaultValue={payment.status}
                     className="h-11 rounded-md border bg-white px-3"
                   >
                     <option value="under_review">Under review</option>
                     <option value="verified">Verified</option>
                     <option value="rejected">Rejected</option>
-                    <option value="waived">Waived</option>
+                    {membership.role === "super_admin" ||
+                    hasPermission(membership, "payments.override") ? (
+                      <>
+                        <option value="waived">Waived</option>
+                        <option value="refunded">Refunded / reversed</option>
+                      </>
+                    ) : null}
                   </select>
+                  <Input
+                    name="payerName"
+                    defaultValue={payment.payerName ?? ""}
+                    placeholder="Payer name"
+                    maxLength={180}
+                    className="h-11 bg-white"
+                  />
+                  <Input
+                    name="bankReference"
+                    defaultValue={payment.bankReference ?? ""}
+                    placeholder="Bank reference"
+                    maxLength={160}
+                    className="h-11 bg-white"
+                  />
+                  <div className="grid grid-cols-[1fr_100px] gap-2">
+                    <Input
+                      name="amount"
+                      inputMode="decimal"
+                      defaultValue={
+                        payment.amountMinor === null
+                          ? ""
+                          : (payment.amountMinor / 100).toFixed(2)
+                      }
+                      placeholder="Amount"
+                      className="h-11 bg-white"
+                    />
+                    <Input
+                      name="currency"
+                      defaultValue={payment.currency ?? ""}
+                      placeholder="LKR"
+                      minLength={3}
+                      maxLength={3}
+                      className="h-11 bg-white uppercase"
+                    />
+                  </div>
+                  <label className="flex flex-col gap-2 text-sm font-medium">
+                    Paid date and time
+                    <Input
+                      name="paidAt"
+                      type="datetime-local"
+                      defaultValue={
+                        payment.paidAt
+                          ? formatInTimeZone(
+                              payment.paidAt,
+                              "Asia/Colombo",
+                              "yyyy-MM-dd'T'HH:mm",
+                            )
+                          : ""
+                      }
+                      className="h-11 bg-white"
+                    />
+                  </label>
                   <Textarea
                     name="note"
                     placeholder="Finance note or applicant-facing rejection reason"

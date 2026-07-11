@@ -6,6 +6,7 @@ import { requirePortalSession } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
 import { applicationMessages, auditLogs, profiles } from "@/lib/db/schema";
 import { enforceRateLimit } from "@/server/security/rate-limit";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import {
   getFeatureFlags,
   requireFeatureFlag,
@@ -72,6 +73,7 @@ export async function updateProfileAction(formData: FormData) {
   revalidatePath("/portal/profile");
 }
 export async function sendApplicantMessageAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   await requireFeatureFlag("applicant_messages_enabled");
   const { profile } = await requirePortalSession();
   const input = z
@@ -132,6 +134,7 @@ export async function sendApplicantMessageAction(formData: FormData) {
 }
 
 export async function submitRequestedChangesAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile } = await requirePortalSession();
   const input = z
     .object({

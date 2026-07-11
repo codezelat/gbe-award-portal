@@ -10,6 +10,7 @@ import {
   exportsTable,
   files,
   invitations,
+  rateLimitBuckets,
   systemSettings,
   uploadSessions,
   verification,
@@ -237,6 +238,10 @@ export async function cleanupRetention() {
     .delete(verification)
     .where(lt(verification.expiresAt, now))
     .returning({ id: verification.id });
+  const removedRateLimits = await db
+    .delete(rateLimitBuckets)
+    .where(lt(rateLimitBuckets.resetAt, new Date(now.getTime() - 24 * 3600000)))
+    .returning({ key: rateLimitBuckets.key });
   const oldFiles = await db
     .select()
     .from(files)
@@ -281,7 +286,12 @@ export async function cleanupRetention() {
     throw new Error(
       `${deletionFailures} retained file object(s) could not be deleted from R2; rows remain retriable.`,
     );
-  if (expired.length || removedVerifications.length || deletedFiles)
+  if (
+    expired.length ||
+    removedVerifications.length ||
+    removedRateLimits.length ||
+    deletedFiles
+  )
     await db.insert(auditLogs).values({
       actorType: "system",
       action: "retention cleanup completed",
@@ -289,6 +299,7 @@ export async function cleanupRetention() {
       afterRedacted: {
         expiredInvitations: expired.length,
         removedVerifications: removedVerifications.length,
+        removedRateLimits: removedRateLimits.length,
         deletedFiles,
       },
       metadataRedacted: {},
@@ -298,6 +309,7 @@ export async function cleanupRetention() {
     remindersQueued: expiring.length,
     expiredInvitations: expired.length,
     removedVerifications: removedVerifications.length,
+    removedRateLimits: removedRateLimits.length,
     deletedFiles,
   };
 }

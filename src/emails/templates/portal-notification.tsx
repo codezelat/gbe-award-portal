@@ -1,2 +1,20 @@
-import {Text} from "@react-email/components";import {EmailLayout} from "@/emails/components/email-layout";
-export function PortalNotificationEmail({title,name,message,action}:{title:string;name:string;message:string;action?:{label:string;url:string}}){return <EmailLayout preview={title} title={title} action={action}><Text>Dear {name},</Text><Text style={{lineHeight:1.7}}>{message}</Text></EmailLayout>}
+import { Text } from "@react-email/components";
+import { EmailLayout } from "@/emails/components/email-layout";
+export function PortalNotificationEmail({
+  title,
+  name,
+  message,
+  action,
+}: {
+  title: string;
+  name: string;
+  message: string;
+  action?: { label: string; url: string };
+}) {
+  return (
+    <EmailLayout preview={title} title={title} action={action}>
+      <Text>Dear {name},</Text>
+      <Text style={{ lineHeight: 1.7 }}>{message}</Text>
+    </EmailLayout>
+  );
+}

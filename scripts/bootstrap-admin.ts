@@ -52,26 +52,22 @@ try {
         isActive: true,
       })
       .returning({ id: profiles.id });
-    await tx
-      .insert(staffMemberships)
-      .values({
-        profileId: profile.id,
-        role: "super_admin",
-        canViewAllApplications: true,
-        mfaRequired: true,
-        createdBy: profile.id,
-      });
-    await tx
-      .insert(auditLogs)
-      .values({
-        actorProfileId: profile.id,
-        actorType: "staff",
-        action: "initial super administrator bootstrapped",
-        entityType: "profile",
-        entityId: profile.id,
-        metadataRedacted: {},
-        requestId: crypto.randomUUID(),
-      });
+    await tx.insert(staffMemberships).values({
+      profileId: profile.id,
+      role: "super_admin",
+      canViewAllApplications: true,
+      mfaRequired: true,
+      createdBy: profile.id,
+    });
+    await tx.insert(auditLogs).values({
+      actorProfileId: profile.id,
+      actorType: "staff",
+      action: "initial super administrator bootstrapped",
+      entityType: "profile",
+      entityId: profile.id,
+      metadataRedacted: {},
+      requestId: crypto.randomUUID(),
+    });
   });
 } catch (error) {
   await db.delete(user).where(eq(user.id, created.user.id));

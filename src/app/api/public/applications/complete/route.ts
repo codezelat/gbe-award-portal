@@ -25,6 +25,7 @@ import {
 } from "@/lib/validation/application";
 import { assertSameOrigin } from "@/server/security/request";
 import { enforceRateLimit } from "@/server/security/rate-limit";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import { z } from "zod";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
 
@@ -36,6 +37,7 @@ const inputSchema = z.object({
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export async function POST(request: Request) {
+  scheduleEmailOutboxProcessing();
   const requestId = crypto.randomUUID();
   try {
     await assertSameOrigin();
@@ -147,20 +149,34 @@ export async function POST(request: Request) {
       }
       await tx
         .insert(cycleSequences)
-        .values({ cycleId: row.cycle.id, nextApplicationNumber: 2 })
+        .values({
+          cycleId: row.cycle.id,
+          nextApplicationNumber: 2,
+          nextPaymentNumber: 2,
+        })
         .onConflictDoUpdate({
           target: cycleSequences.cycleId,
           set: {
             nextApplicationNumber: sql`${cycleSequences.nextApplicationNumber}+1`,
+            nextPaymentNumber: sql`${cycleSequences.nextPaymentNumber}+1`,
             updatedAt: new Date(),
           },
         });
       const [sequence] = await tx
-        .select({ next: cycleSequences.nextApplicationNumber })
+        .select({
+          nextApplication: cycleSequences.nextApplicationNumber,
+          nextPayment: cycleSequences.nextPaymentNumber,
+        })
         .from(cycleSequences)
         .where(eq(cycleSequences.cycleId, row.cycle.id));
-      const number = Math.max(1, sequence.next - 1);
+      const number = Math.max(1, sequence.nextApplication - 1);
+      const paymentNumber = Math.max(1, sequence.nextPayment - 1);
       const reference = `GBE-${row.cycle.year}-${String(number).padStart(6, "0")}`;
+      const paymentReference = `PAY-${row.cycle.year}-${String(paymentNumber).padStart(6, "0")}`;
+      await tx
+        .update(payments)
+        .set({ paymentReference, updatedAt: new Date() })
+        .where(eq(payments.applicationId, row.application.id));
       for (const item of readyFiles) {
         const [stored] = await tx
           .insert(files)
@@ -253,7 +269,7 @@ export async function POST(request: Request) {
         entityType: "application",
         entityId: row.application.id,
         applicationId: row.application.id,
-        afterRedacted: { reference },
+        afterRedacted: { reference, paymentReference },
         metadataRedacted: { fileCount: readyFiles.length },
         requestId,
       });
@@ -261,7 +277,11 @@ export async function POST(request: Request) {
         templateKey: "nomination_received",
         recipientEmail: row.application.emailNormalised,
         applicationId: row.application.id,
-        payload: { reference, nomineeName: row.application.nomineeName },
+        payload: {
+          reference,
+          paymentReference,
+          nomineeName: row.application.nomineeName,
+        },
         idempotencyKey: `nomination_received:${row.application.id}:1`,
       });
       await tx.insert(emailOutbox).values({

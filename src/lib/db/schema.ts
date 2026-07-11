@@ -457,6 +457,8 @@ export const payments = pgTable(
     ),
     payerName: text("payer_name"),
     bankReference: text("bank_reference"),
+    paymentReference: text("payment_reference").unique(),
+    receiptReference: text("receipt_reference").unique(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     submittedNote: text("submitted_note"),
     financeNote: text("finance_note"),
@@ -754,4 +756,17 @@ export const jobRuns = pgTable(
     index("job_runs_key_started_idx").on(t.jobKey, t.startedAt),
     index("job_runs_status_started_idx").on(t.status, t.startedAt),
   ],
+);
+
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull().default(1),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("rate_limit_buckets_reset_idx").on(t.resetAt)],
 );

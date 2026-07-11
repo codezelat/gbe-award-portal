@@ -9,5 +9,7 @@ function createDb() {
   return drizzle(new Pool({ connectionString: env.DATABASE_URL! }), { schema });
 }
 let database: ReturnType<typeof createDb> | undefined;
-export function getDb() { return database ??= createDb(); }
+export function getDb() {
+  return (database ??= createDb());
+}
 export type Database = ReturnType<typeof createDb>;

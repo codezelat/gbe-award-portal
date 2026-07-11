@@ -1,6 +1,7 @@
 "use server";
 import { createHash, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { and, count, eq, ne } from "drizzle-orm";
@@ -25,6 +26,7 @@ function assertManage(membership: { role: string; permissions: unknown }) {
     throw new Error("Staff management permission is required.");
 }
 export async function inviteStaffAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile: actor, membership } = await requireStaff();
   assertManage(membership);
   const input = z

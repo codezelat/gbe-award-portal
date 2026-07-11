@@ -1,3 +1,25 @@
-export const transitionMap={uploading:["submitted"],submitted:["under_review","changes_requested","approved","rejected","withdrawn"],under_review:["changes_requested","approved","rejected"],changes_requested:["resubmitted","withdrawn"],resubmitted:["under_review","changes_requested","approved","rejected"],approved:["entry_confirmed","withdrawn","rejected"],entry_confirmed:["shortlisted","not_selected","withdrawn"],shortlisted:["winner","not_selected"],winner:["archived"],not_selected:["archived"],rejected:["archived"],withdrawn:["archived"],archived:[]} as const;
-export type WorkflowStatus=keyof typeof transitionMap;
-export function canTransition(from:WorkflowStatus,to:WorkflowStatus){return (transitionMap[from] as readonly string[]).includes(to);}
+export const transitionMap = {
+  uploading: ["submitted"],
+  submitted: [
+    "under_review",
+    "changes_requested",
+    "approved",
+    "rejected",
+    "withdrawn",
+  ],
+  under_review: ["changes_requested", "approved", "rejected"],
+  changes_requested: ["resubmitted", "withdrawn"],
+  resubmitted: ["under_review", "changes_requested", "approved", "rejected"],
+  approved: ["entry_confirmed", "withdrawn", "rejected"],
+  entry_confirmed: ["shortlisted", "not_selected", "withdrawn"],
+  shortlisted: ["winner", "not_selected"],
+  winner: ["archived"],
+  not_selected: ["archived"],
+  rejected: ["archived"],
+  withdrawn: ["archived"],
+  archived: [],
+} as const;
+export type WorkflowStatus = keyof typeof transitionMap;
+export function canTransition(from: WorkflowStatus, to: WorkflowStatus) {
+  return (transitionMap[from] as readonly string[]).includes(to);
+}

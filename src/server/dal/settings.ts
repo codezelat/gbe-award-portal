@@ -1,1 +1,13 @@
-import "server-only";import {eq} from "drizzle-orm";import {getDb} from "@/lib/db";import {systemSettings} from "@/lib/db/schema";export async function getPublicSetting(key:"legal_terms"|"privacy_notice"){if(!process.env.DATABASE_URL)return null;const [row]=await getDb().select({value:systemSettings.value}).from(systemSettings).where(eq(systemSettings.key,key)).limit(1);return typeof row?.value==="string"?row.value:null;}
+import "server-only";
+import { eq } from "drizzle-orm";
+import { getDb } from "@/lib/db";
+import { systemSettings } from "@/lib/db/schema";
+export async function getPublicSetting(key: "legal_terms" | "privacy_notice") {
+  if (!process.env.DATABASE_URL) return null;
+  const [row] = await getDb()
+    .select({ value: systemSettings.value })
+    .from(systemSettings)
+    .where(eq(systemSettings.key, key))
+    .limit(1);
+  return typeof row?.value === "string" ? row.value : null;
+}

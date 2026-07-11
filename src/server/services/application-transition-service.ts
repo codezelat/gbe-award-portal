@@ -69,6 +69,7 @@ export async function changeApplicationStatusWithTx(
     .where(eq(applications.id, input.applicationId))
     .limit(1);
   if (!current) throw new Error("Application not found.");
+  if (current.status === input.to) return;
   if (!canTransition(current.status, input.to))
     throw new Error(
       `The application cannot move from ${current.status} to ${input.to}.`,

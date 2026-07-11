@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   flexRender,
@@ -47,6 +48,7 @@ export function ApplicationsTable({
   reviewers: Array<{ id: string; name: string }>;
   exportBase: string;
 }) {
+  const router = useRouter();
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const columns = useMemo<ColumnDef<ApplicationTableRow>[]>(
     () => [
@@ -177,6 +179,20 @@ export function ApplicationsTable({
             table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
+                tabIndex={0}
+                className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={(event) => {
+                  if (
+                    !(event.target as HTMLElement).closest(
+                      "a,button,input,select,textarea,label",
+                    )
+                  )
+                    router.push(`/admin/applications/${row.original.id}`);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter")
+                    router.push(`/admin/applications/${row.original.id}`);
+                }}
                 data-state={row.getIsSelected() ? "selected" : undefined}
               >
                 {row.getVisibleCells().map((cell) => (

@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 const serverSchema = z.object({
-  APP_ENV: z.enum(["local", "preview", "staging", "production"]).default("local"),
+  APP_ENV: z
+    .enum(["local", "preview", "staging", "production"])
+    .default("local"),
   APP_TIMEZONE: z.string().default("Asia/Colombo"),
   SUPPORT_EMAIL: z.email().default("info@gbeaward.com"),
   OFFICIAL_SITE_URL: z.url().default("https://gbeaward.com"),
@@ -30,7 +32,9 @@ const serverSchema = z.object({
 
 const publicSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
-  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().default("1x00000000000000000000AA"),
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z
+    .string()
+    .default("1x00000000000000000000AA"),
 });
 
 export const env = serverSchema.parse(process.env);
@@ -42,7 +46,9 @@ export const publicEnv = publicSchema.parse({
 export function requireProvider(name: "database" | "r2" | "auth" | "email") {
   const configured = {
     database: Boolean(env.DATABASE_URL),
-    r2: Boolean(env.R2_ENDPOINT && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY),
+    r2: Boolean(
+      env.R2_ENDPOINT && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY,
+    ),
     auth: Boolean(env.DATABASE_URL && env.BETTER_AUTH_SECRET),
     email: Boolean(env.RESEND_API_KEY),
   }[name];

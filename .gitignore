@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Migration SQL is source code even when a global ignore hides *.sql.
+!drizzle/migrations/*.sql

@@ -106,6 +106,28 @@ export default async function CategoriesPage() {
               placeholder="Short public description"
               className="bg-white"
             />
+            <Textarea
+              name="internalNotes"
+              maxLength={2000}
+              placeholder="Internal notes (never public)"
+              className="bg-white"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                name="capacity"
+                type="number"
+                min={1}
+                placeholder="Capacity"
+                className="h-11 bg-white"
+              />
+              <Input
+                name="feeOverrideMinor"
+                type="number"
+                min={0}
+                placeholder="Fee minor units"
+                className="h-11 bg-white"
+              />
+            </div>
             <Input
               name="displayOrder"
               type="number"

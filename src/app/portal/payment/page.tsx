@@ -6,6 +6,8 @@ import { getDb } from "@/lib/db";
 import { applications, payments } from "@/lib/db/schema";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
+import { formatInTimeZone } from "date-fns-tz";
+import { PaymentConfirmation } from "@/components/shared/payment-confirmation";
 export default async function PaymentPage() {
   const { profile } = await requirePortalSession();
   const [row] = await getDb()
@@ -72,6 +74,36 @@ export default async function PaymentPage() {
           </div>
         ) : null}
       </section>
+      {["verified", "waived"].includes(row.payment.status) &&
+      row.payment.paymentReference &&
+      row.payment.receiptReference &&
+      row.payment.verifiedAt ? (
+        <PaymentConfirmation
+          applicationReference={row.application.reference ?? "Pending"}
+          nomineeName={row.application.nomineeName}
+          paymentReference={row.payment.paymentReference}
+          receiptReference={row.payment.receiptReference}
+          amount={
+            row.payment.amountMinor === null
+              ? "Not recorded"
+              : `${row.payment.currency ?? ""} ${(row.payment.amountMinor / 100).toFixed(2)}`
+          }
+          paymentDate={
+            row.payment.paidAt
+              ? formatInTimeZone(
+                  row.payment.paidAt,
+                  "Asia/Colombo",
+                  "dd MMMM yyyy, HH:mm zzz",
+                )
+              : "Not recorded"
+          }
+          verifiedDate={formatInTimeZone(
+            row.payment.verifiedAt,
+            "Asia/Colombo",
+            "dd MMMM yyyy, HH:mm zzz",
+          )}
+        />
+      ) : null}
       <section className="surface mt-6 rounded-lg p-6">
         <div className="flex items-start gap-3">
           <FileText className="text-antique-gold" />

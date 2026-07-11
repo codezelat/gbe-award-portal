@@ -8,5 +8,8 @@ export function hasPermission(
   if (rolePermissions[membership.role]?.includes("*")) return true;
   const overrides = membership.permissions as Record<string, boolean>;
   if (overrides?.[permission] === false) return false;
-  return overrides?.[permission] === true || rolePermissions[membership.role]?.includes(permission) === true;
+  return (
+    overrides?.[permission] === true ||
+    rolePermissions[membership.role]?.includes(permission) === true
+  );
 }

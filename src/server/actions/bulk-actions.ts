@@ -8,13 +8,14 @@ import { getDb } from "@/lib/db";
 import {
   applicationMessages,
   applications,
-  applicationStatusHistory,
   auditLogs,
   emailOutbox,
   profiles,
   staffMemberships,
 } from "@/lib/db/schema";
 import { enforceRateLimit } from "@/server/security/rate-limit";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
+import { changeApplicationStatusWithTx } from "@/server/services/application-transition-service";
 
 const idsFrom = (formData: FormData) =>
   z.array(z.uuid()).min(1).max(100).parse(formData.getAll("applicationIds"));
@@ -94,6 +95,7 @@ const safeBulkStatuses = {
 } as const;
 
 export async function bulkChangeSafeStatusAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (!hasPermission(membership, "applications.change_status"))
     throw new Error("Status-change permission is required.");
@@ -136,36 +138,13 @@ export async function bulkChangeSafeStatusAction(formData: FormData) {
       throw new Error(
         `Every selected application must be in: ${rule.from.join(", ")}.`,
       );
-    const now = new Date();
     for (const row of rows) {
-      const updated = await tx
-        .update(applications)
-        .set({ workflowStatus: to, lastActivityAt: now, updatedAt: now })
-        .where(
-          and(
-            eq(applications.id, row.id),
-            eq(applications.workflowStatus, row.status),
-          ),
-        )
-        .returning({ id: applications.id });
-      if (!updated.length)
-        throw new Error(
-          "A selected application changed. Refresh and try again.",
-        );
-      await tx.insert(applicationStatusHistory).values({
+      await changeApplicationStatusWithTx(tx, {
         applicationId: row.id,
-        fromStatus: row.status,
-        toStatus: to,
-        applicantLabel: rule.applicantLabel,
-        internalReason: reason,
-        changedByProfileId: profile.id,
-      });
-      await tx.insert(emailOutbox).values({
-        templateKey: `application_${to}`,
-        recipientEmail: row.email,
-        applicationId: row.id,
-        payload: { reference: row.reference, status: rule.applicantLabel },
-        idempotencyKey: `bulk_status:${row.id}:${to}:${now.toISOString()}`,
+        to,
+        actorProfileId: profile.id,
+        reason,
+        requestId: crypto.randomUUID(),
       });
     }
     await tx.insert(auditLogs).values({
@@ -194,6 +173,7 @@ const communicationTemplates = {
 } as const;
 
 export async function bulkSendTemplateAction(formData: FormData) {
+  scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
   if (!hasPermission(membership, "messages.send"))
     throw new Error("Messaging permission is required.");

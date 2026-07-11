@@ -149,7 +149,13 @@ export async function GET(request: Request) {
           db
             .select({ value: sql`1` })
             .from(applicationFiles)
-            .where(eq(applicationFiles.applicationId, applications.id)),
+            .where(
+              and(
+                eq(applicationFiles.applicationId, applications.id),
+                eq(applicationFiles.kind, "supporting_document"),
+                eq(applicationFiles.isCurrent, true),
+              ),
+            ),
         ),
       );
     if (input.cursor) {
