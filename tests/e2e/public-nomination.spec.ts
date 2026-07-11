@@ -102,5 +102,5 @@ test("rejects invalid, oversized and excess supporting files in the browser", as
       buffer: Buffer.from("%PDF-1.4\n%%EOF"),
     })),
   );
-  await expect(page.getByText(/too many|maximum/i)).toBeVisible();
+  await expect(page.getByText("Too many files", { exact: true })).toBeVisible();
 });

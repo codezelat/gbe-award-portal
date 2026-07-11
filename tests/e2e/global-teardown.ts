@@ -4,12 +4,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
-import postgres from "postgres";
-import {
-  E2E_DATABASE_NAME,
-  E2E_R2_PREFIX,
-  databaseUrlFor,
-} from "./database";
+import { E2E_R2_PREFIX } from "./database";
 
 async function clearTestObjects() {
   if (
@@ -52,9 +47,4 @@ async function clearTestObjects() {
 
 export default async function teardown() {
   await clearTestObjects();
-  const admin = postgres(databaseUrlFor("neondb"), { max: 1 });
-  await admin.unsafe(
-    `DROP DATABASE IF EXISTS "${E2E_DATABASE_NAME}" WITH (FORCE)`,
-  );
-  await admin.end();
 }

@@ -6,7 +6,9 @@ type TurnstileResult = {
   hostname?: string;
   action?: string;
   "error-codes"?: string[];
+  metadata?: { result_with_testing_key?: boolean };
 };
+const officialAlwaysPassesSecret = "1x0000000000000000000000000000000AA";
 export async function verifyTurnstile(token: string, remoteIp?: string) {
   if (!env.TURNSTILE_SECRET_KEY)
     throw new Error("Security verification is not configured.");
@@ -28,6 +30,14 @@ export async function verifyTurnstile(token: string, remoteIp?: string) {
       "Security verification is temporarily unavailable. Please try again.",
     );
   const result = (await response.json()) as TurnstileResult;
+  if (
+    env.APP_ENV !== "production" &&
+    env.TURNSTILE_SECRET_KEY === officialAlwaysPassesSecret &&
+    result.success &&
+    result.hostname === "example.com" &&
+    result.metadata?.result_with_testing_key === true
+  )
+    return;
   const allowedHosts = env.TURNSTILE_EXPECTED_HOSTNAME.split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);

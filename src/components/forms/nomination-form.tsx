@@ -134,7 +134,7 @@ export function NominationForm({
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const form = useForm<PublicApplicationInput>({
     resolver: zodResolver(publicApplicationSchema),
-    shouldFocusError: true,
+    shouldFocusError: false,
     defaultValues: {
       nomineeName: "",
       designation: "",
@@ -343,6 +343,11 @@ export function NominationForm({
     window.setTimeout(() => errorSummaryRef.current?.focus(), 0);
   }
   function submit(event: React.FormEvent<HTMLFormElement>) {
+    setFileError(
+      payment.length === 1
+        ? undefined
+        : "Choose one payment slip or screenshot.",
+    );
     void form.handleSubmit(runSubmission, handleInvalid)(event);
   }
   const retry = () => void form.handleSubmit(runSubmission, handleInvalid)();
