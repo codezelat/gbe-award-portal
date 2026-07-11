@@ -57,6 +57,13 @@
       "when": 1783752531445,
       "tag": "0007_nervous_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783756963338,
+      "tag": "0008_rapid_kabuki",
+      "breakpoints": true
     }
   ]
 }

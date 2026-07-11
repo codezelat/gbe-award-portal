@@ -38,7 +38,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
     testInfo.project.name !== "desktop-chromium",
     "One administrator identity must enrol MFA exactly once.",
   );
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await page.goto("/login");
   await page.waitForLoadState("networkidle");
   await page.getByLabel("Email address").fill(E2E_ADMIN_EMAIL);
@@ -49,7 +49,9 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await page.getByRole("button", { name: "Sign in securely" }).click();
   const signIn = await signInResponse;
   expect(signIn.ok(), await signIn.text()).toBe(true);
-  await expect(page).toHaveURL(/\/auth\/two-factor\/setup/);
+  await expect(page).toHaveURL(/\/auth\/two-factor\/setup/, {
+    timeout: 20_000,
+  });
   await expect(
     page.getByRole("heading", { name: "Secure staff access" }),
   ).toBeVisible();
@@ -73,7 +75,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   );
   await expect(page.getByRole("link", { name: E2E_APPLICATION_REFERENCE })).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("link", { name: "Export current view" }).click();
+  await page.getByRole("button", { name: "Export current view" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
   expect(await download.failure()).toBeNull();

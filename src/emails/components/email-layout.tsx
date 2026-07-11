@@ -6,7 +6,6 @@ import {
   Heading,
   Hr,
   Html,
-  Img,
   Preview,
   Section,
   Text,
@@ -49,18 +48,23 @@ export function EmailLayout({
               borderBottom: "1px solid #e8e5dd",
             }}
           >
-            <Img
-              src={`${process.env.NEXT_PUBLIC_APP_URL ?? "https://portal.gbeawards.com"}/brand/gbe-logo-full.png`}
-              alt="GBE Awards"
-              width="44"
-              height="68"
-            />
+            <Text
+              style={{
+                color: "#9b6d20",
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.16em",
+                margin: 0,
+              }}
+            >
+              GBE AWARDS · 2026 PORTAL
+            </Text>
             <Heading
               style={{
                 fontFamily: "Georgia,serif",
                 fontSize: 34,
                 lineHeight: 1.1,
-                margin: "20px 0 0",
+                margin: "14px 0 0",
               }}
             >
               {title}

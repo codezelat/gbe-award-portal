@@ -8,6 +8,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   globalTeardown: "./tests/e2e/global-teardown.ts",
   fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: { baseURL: "http://localhost:3100", trace: "retain-on-failure" },
@@ -27,7 +28,7 @@ export default defineConfig({
       TURNSTILE_EXPECTED_HOSTNAME: "localhost,127.0.0.1",
     },
     url: "http://localhost:3100/apply",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

@@ -58,6 +58,52 @@ test("submits a valid nomination through real isolated Neon and R2", async ({
   await expect(page.getByText(/^GBE-2026-\d{6}$/)).toBeVisible();
 });
 
+test("retries only a failed upload without duplicating the application", async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route(/\.r2\.cloudflarestorage\.com\//, async (route) => {
+    attempts++;
+    if (attempts === 1) {
+      await route.fulfill({ status: 503 });
+      return;
+    }
+    const request = route.request();
+    const body = request.postDataBuffer();
+    const response = await fetch(request.url(), {
+      method: "PUT",
+      headers: request.headers(),
+      body: body ? new Uint8Array(body) : undefined,
+    });
+    await route.fulfill({ status: response.status });
+  });
+  await fillNomination(page);
+  await page.getByLabel("Choose payment proof").setInputFiles({
+    name: "payment-proof.png",
+    mimeType: "image/png",
+    buffer: paymentPng,
+  });
+  await page
+    .getByRole("checkbox", {
+      name: /I confirm that the details provided are accurate/i,
+    })
+    .check();
+  await page.waitForFunction(() =>
+    Boolean(
+      document.querySelector<HTMLInputElement>(
+        'input[name="cf-turnstile-response"]',
+      )?.value,
+    ),
+  );
+  await page.getByRole("button", { name: "Submit nomination" }).click();
+  await expect(page.getByText(/Successful files are preserved/i)).toBeVisible();
+  await page.getByRole("button", { name: "Retry failed files" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Nomination received" }),
+  ).toBeVisible({ timeout: 30_000 });
+  expect(attempts).toBe(2);
+});
+
 test("focuses a complete validation summary before any network submission", async ({
   page,
 }) => {
@@ -80,6 +126,7 @@ test("rejects invalid, oversized and excess supporting files in the browser", as
   page,
 }) => {
   await page.goto("/apply");
+  await page.waitForLoadState("networkidle");
   const input = page.getByLabel("Choose supporting documents");
   await input.setInputFiles({
     name: "malware.exe",
