@@ -15,10 +15,6 @@ export const metadata: Metadata = {
   description:
     "Submit your application for the Global Business Excellence Awards 2026 and showcase outstanding achievement, innovation and impact.",
   applicationName: brand.shortName,
-  icons: {
-    icon: [{ url: "/brand/gbe-logo.webp", type: "image/webp" }],
-    apple: [{ url: "/brand/gbe-logo-full.png", type: "image/png" }],
-  },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Apply for the GBE Awards 2026",

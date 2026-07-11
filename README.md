@@ -1,38 +1,95 @@
 # GBE Awards Portal
 
-Production portal for public nominations, approval-first applicant access, payment/document workflows and GBE Awards administration. [SPEC.md](./SPEC.md) is the product contract.
+Production application for the Global Business Excellence Awards 2026. It provides a secure public nomination flow, approval-first applicant access, payment and document operations, applicant self-service, staff administration, reporting, and audited communications.
 
-## Stack
+**Production:** [access.gbeaward.com](https://access.gbeaward.com)
 
-Next.js 16 App Router, strict TypeScript, Bun, Tailwind CSS 4, shadcn/Base UI, Neon PostgreSQL with Drizzle, Better Auth, private Cloudflare R2 uploads, Turnstile, Resend/React Email, durable rate limiting, ExcelJS, Vitest and Playwright.
+**Support:** [info@gbeaward.com](mailto:info@gbeaward.com)
 
-## Local setup
+## What is included
 
-1. Install Bun and PostgreSQL, then run `bun install`.
-2. Copy `.env.example` to `.env` and use isolated development providers. Never reuse production credentials.
-3. Create separate Neon roles/URLs: `DATABASE_URL_DIRECT` is the migration owner; `DATABASE_URL` is the least-privilege runtime role with no DDL rights.
-4. Run `bun run env:verify`, `bun run db:migrate`, then set approved `SEED_CYCLE_OPENS_AT`/`SEED_CYCLE_CLOSES_AT` and run `bun run db:seed`.
-5. For the first deployment only, set the three `BOOTSTRAP_ADMIN_*` values, run `bun run db:bootstrap-admin`, remove those values immediately, sign in and enrol MFA.
-6. Run `bun run dev`. The seeded cycle remains draft until a super administrator approves legal content, categories and activation.
+- Public single-page nominations with Cloudflare Turnstile, exact validation, direct private R2 uploads, progress, cancellation, retry, and idempotent completion.
+- Approval-first Better Auth accounts with expiring invitations, password recovery, session revocation, and mandatory staff TOTP MFA.
+- Applicant application, profile, document, payment, message, security, and PDF-summary views with server-enforced field access.
+- Administrative dashboards for applications, applicants, payments, files, communications, categories, cycles, staff, settings, exports, reports, and append-only activity history.
+- Guarded status transitions, change requests, payment-proof replacement, reviewer assignment, audited corrections, and soft deletion/restoration.
+- Signed private downloads, detected file-type checks, retention cleanup, CSV/XLSX exports, and a durable email outbox with Resend delivery webhooks.
+- One Vercel Hobby-compatible daily maintenance cron plus event-driven email processing after application responses.
 
-Runtime uploads never touch the repository, Vercel filesystem or PostgreSQL byte columns. Browsers upload directly to private R2 with object-specific ten-minute URLs; downloads use reauthorised three-minute URLs.
+## Architecture
 
-## Provider configuration
+| Area | Implementation |
+| --- | --- |
+| Web | Next.js 16 App Router, React 19, strict TypeScript |
+| UI | Tailwind CSS 4, shadcn/Base UI, responsive light-mode design |
+| Database | Neon PostgreSQL, Drizzle ORM, versioned migrations |
+| Authentication | Better Auth, invitation-only access, mandatory staff MFA |
+| Files | Private Cloudflare R2, browser-to-R2 signed uploads |
+| Abuse protection | Turnstile and atomic Neon-backed rate limiting |
+| Email | Resend, React Email, durable outbox and signed webhooks |
+| Documents | React PDF summaries and ExcelJS CSV/XLSX exports |
+| Tests | Vitest, isolated PostgreSQL integration tests, Playwright |
+| Hosting | Vercel with Cloudflare-managed DNS and providers |
 
-- R2: create separate private runtime and public brand buckets. The private bucket must have no public domain. Permit `PUT` from the exact portal origin with `content-type`; configure lifecycle rules to agree with the 24-hour provisional/export cleanup and approved superseded-file retention.
-- Turnstile: use the official test keys locally and exact comma-separated approved hostnames in `TURNSTILE_EXPECTED_HOSTNAME`. Production must not include `localhost`.
-- Resend: verify the sending domain, configure `EMAIL_FROM`, keep `info@gbeaward.com` as reply-to, and send signed webhook events to `/api/webhooks/resend`.
-- Better Auth: use a unique 32+ character secret per environment, the canonical HTTPS portal URL, secure cookies and invitation-only accounts.
-- Rate limiting: Upstash is supported when configured; otherwise the atomic Neon-backed limiter is used and expired buckets are cleaned by retention processing.
-- Vercel Hobby: set `CRON_SECRET`; `vercel.json` contains one daily maintenance cron. Normal emails are processed after the originating response, while the daily run handles retries, stale uploads, exports and retention.
+The runtime database role has data-only permissions. Migrations use a separate owner connection. File bodies never pass through PostgreSQL or persist on Vercel's filesystem.
 
-After configuring live providers, run `bun run providers:verify`. It verifies the database, performs and removes a small R2 test object, checks real browser CORS preflight, validates the configured Resend sender when the key permits domain reads, and checks rate-limit/Turnstile policy.
+## Local development
 
-## Database and backups
+Requirements: Bun, PostgreSQL access, and isolated non-production provider credentials.
 
-`drizzle/migrations` is append-only and includes constraints, operational indexes and PostgreSQL trigram search indexes. Apply migrations with `bun run db:migrate`; generate reviewed changes with `bun run db:generate`. Never run `db:push` against staging or production.
+```bash
+bun install
+cp .env.example .env
+bun run env:verify
+bun run db:migrate
+bun run dev
+```
 
-Enable Neon point-in-time restore according to the organisation’s recovery target, take a labelled branch/snapshot before migrations, and test restoration periodically. R2 lifecycle/deletion policy must be backed up or versioned according to approved privacy policy; database backups do not contain file bodies.
+Use Cloudflare's official Turnstile test keys locally. Do not reuse production Neon, R2, Resend, Better Auth, or signing credentials in development or preview environments.
+
+To seed a new environment, supply approved ISO timestamps before running the seed:
+
+```bash
+SEED_CYCLE_OPENS_AT=2026-01-01T00:00:00.000Z \
+SEED_CYCLE_CLOSES_AT=2026-12-31T23:59:59.999Z \
+bun run db:seed
+```
+
+The seeded cycle intentionally remains a draft. A super administrator must review the dates, legal copy, categories, fee settings, and feature flags before opening nominations.
+
+For the first staff account only, set `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, and a 16+ character `BOOTSTRAP_ADMIN_PASSWORD`, run `bun run db:bootstrap-admin`, then remove all three values immediately and enrol MFA.
+
+## Environment configuration
+
+Start from [.env.example](./.env.example). The important boundaries are:
+
+- `DATABASE_URL`: pooled, least-privilege runtime connection.
+- `DATABASE_URL_DIRECT`: migration-owner connection; never configure it in the Vercel runtime.
+- `R2_PRIVATE_BUCKET`: private uploads and exports. Do not attach a public domain.
+- `R2_OBJECT_PREFIX`: optional strict environment/test isolation inside a bucket.
+- `EMAIL_FROM`: verified Resend sender, currently `GBE Awards <info@access.gbeaward.com>`.
+- `EMAIL_REPLY_TO` and `SUPPORT_EMAIL`: inbound mailbox, `info@gbeaward.com`.
+- `RESEND_WEBHOOK_SECRET`, `BETTER_AUTH_SECRET`, `TURNSTILE_SECRET_KEY`, and `CRON_SECRET`: encrypted server-only secrets.
+
+Run the production-aware provider verifier after configuring an environment:
+
+```bash
+bun run providers:verify
+```
+
+It checks database access, restricted runtime permissions, private R2 read/write/delete and browser CORS, Resend sender configuration, rate limiting, and Turnstile hostname policy.
+
+## Database operations
+
+Migrations under `drizzle/migrations` are append-only.
+
+```bash
+bun run db:generate   # generate and review a schema migration
+bun run db:migrate    # apply reviewed migrations with the owner URL
+bun run db:studio     # local inspection only
+```
+
+Never run `db:push` against staging or production. Take a Neon branch or restore point before production schema changes and periodically prove restoration.
 
 ## Quality gates
 
@@ -40,24 +97,26 @@ Enable Neon point-in-time restore according to the organisation’s recovery tar
 bun run lint
 bun run typecheck
 bun run test
-TEST_DATABASE_ADMIN_URL=postgresql://.../postgres \
-TEST_DATABASE_URL=postgresql://.../gbe_award_portal_test_local \
-  bun run test:integration
+bun run test:integration
 bun run test:e2e
 bun run build
+bun audit
 ```
 
-`bun run check` runs lint, type checking, unit tests and the production build. Run the isolated PostgreSQL integration suite and desktop/mobile Playwright suite before release.
+The Playwright harness creates an isolated Neon test database, applies every migration, uses a dedicated R2 prefix, exercises desktop and mobile nomination flows, recovers failed uploads, validates rejected files, enrols staff MFA, searches applications, downloads a real Excel export, and removes test objects afterward.
 
-## Production release checklist
+## Deployment and operations
 
-- Apply migrations with the owner role, then confirm the application uses only the restricted runtime role.
-- Run `env:verify`, `providers:verify`, the complete quality suite and a migration dry run on staging.
-- Verify R2 CORS, private access, upload/download signatures, orphan cleanup and lifecycle rules using staging objects.
-- Verify Turnstile hostname/action checks, Resend delivery/webhook transitions and an email retry.
-- Confirm every active staff member has MFA; suspend unused accounts and revoke their sessions.
-- Exercise public submission, approval/invitation, applicant activation, requested changes, replacement payment proof, status release and filtered XLSX/CSV export.
-- Check `/api/health`, scheduled job results, failed email queues, security headers, noindex on auth/portal/admin routes and mobile/desktop layouts.
-- Verify Neon restore readiness and record the release/migration identifiers in the operational change log.
+Production deploys from `main` to Vercel. Before pushing a release:
 
-Deploy the application to Vercel behind Cloudflare using isolated preview/staging/production Neon, R2, Redis and Resend resources. Do not deploy with test Turnstile keys, bootstrap credentials, migration-owner runtime credentials or unapproved retention values.
+1. Apply backward-compatible migrations with the direct owner URL.
+2. Run all quality gates plus `env:verify` and `providers:verify`.
+3. Confirm `/api/health` is ready and the previous deployment remains available for rollback.
+4. Push `main`, wait for the Vercel deployment to become `Ready`, and verify the `access.gbeaward.com` alias.
+5. Exercise login/MFA, one private upload/download, the daily cron, and Resend delivery-webhook state.
+
+The single `/api/cron/daily` route handles email retries, abandoned uploads, expired exports, retention tasks, and stale rate-limit buckets. Operational failures are visible in the admin portal's communications and activity views.
+
+## Launch control
+
+Deployment does not automatically open nominations. Launch is an explicit super-administrator action after approved terms, privacy copy, dates, categories, fees, staff access, backup readiness, and email deliverability have been reviewed. This keeps infrastructure release separate from the business decision to accept applications.
