@@ -9,16 +9,18 @@ import { getFeatureFlags } from "@/server/services/feature-flags";
 
 export default async function MyApplications() {
   const { profile } = await requirePortalSession();
-  const flags = await getFeatureFlags();
-  const rows = await getDb()
-    .select({
-      application: applications,
-      resultsReleaseAt: awardCycles.resultsReleaseAt,
-    })
-    .from(applications)
-    .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-    .where(eq(applications.ownerProfileId, profile.id))
-    .orderBy(desc(applications.lastActivityAt));
+  const [flags, rows] = await Promise.all([
+    getFeatureFlags(),
+    getDb()
+      .select({
+        application: applications,
+        resultsReleaseAt: awardCycles.resultsReleaseAt,
+      })
+      .from(applications)
+      .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
+      .where(eq(applications.ownerProfileId, profile.id))
+      .orderBy(desc(applications.lastActivityAt)),
+  ]);
   return (
     <>
       <h1 className="page-heading">My applications</h1>

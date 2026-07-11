@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { adminNavigation, portalNavigation } from "@/config/navigation";
 import { setAdminCycleAction } from "@/server/actions/admin-preferences";
+import { AdminNavigation } from "@/components/admin/admin-navigation";
 
 export function PortalShell({
   kind,
@@ -54,16 +55,20 @@ export function PortalShell({
           aria-label={kind === "admin" ? "Administration" : "Applicant portal"}
           className="mt-5 flex flex-1 flex-col gap-1 overflow-y-auto"
         >
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex min-h-11 items-center gap-3 rounded-md px-3 text-sm text-graphite transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <Icon aria-hidden />
-              {label}
-            </Link>
-          ))}
+          {kind === "admin" ? (
+            <AdminNavigation allowedHrefs={allowedAdminHrefs} />
+          ) : (
+            nav.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex min-h-11 items-center gap-3 rounded-md px-3 text-sm text-graphite transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Icon aria-hidden />
+                {label}
+              </Link>
+            ))
+          )}
         </nav>
         <form action="/api/auth/sign-out" method="post">
           <Button variant="ghost" className="w-full justify-start">
@@ -112,16 +117,20 @@ export function PortalShell({
                   <Button size="sm">Apply</Button>
                 </form>
               ) : null}
-              {nav.map(({ href, label, icon: Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex min-h-11 items-center gap-3 rounded-md px-3 text-sm hover:bg-accent"
-                >
-                  <Icon aria-hidden />
-                  {label}
-                </Link>
-              ))}
+              {kind === "admin" ? (
+                <AdminNavigation allowedHrefs={allowedAdminHrefs} mobile />
+              ) : (
+                nav.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="flex min-h-11 items-center gap-3 rounded-md px-3 text-sm hover:bg-accent"
+                  >
+                    <Icon aria-hidden />
+                    {label}
+                  </Link>
+                ))
+              )}
               <form action="/api/auth/sign-out" method="post">
                 <Button variant="ghost" className="w-full justify-start">
                   <LogOut data-icon="inline-start" />

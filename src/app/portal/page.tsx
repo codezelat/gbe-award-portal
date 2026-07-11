@@ -26,17 +26,20 @@ import { formatInTimeZone } from "date-fns-tz";
 import { getFeatureFlags } from "@/server/services/feature-flags";
 export default async function PortalDashboard() {
   const { profile } = await requirePortalSession();
-  const flags = await getFeatureFlags();
-  const [row] = await getDb()
-    .select({
-      application: applications,
-      resultsReleaseAt: awardCycles.resultsReleaseAt,
-    })
-    .from(applications)
-    .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-    .where(eq(applications.ownerProfileId, profile.id))
-    .orderBy(desc(applications.lastActivityAt))
-    .limit(1);
+  const database = getDb();
+  const [flags, [row]] = await Promise.all([
+    getFeatureFlags(),
+    database
+      .select({
+        application: applications,
+        resultsReleaseAt: awardCycles.resultsReleaseAt,
+      })
+      .from(applications)
+      .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
+      .where(eq(applications.ownerProfileId, profile.id))
+      .orderBy(desc(applications.lastActivityAt))
+      .limit(1),
+  ]);
   if (!row)
     return (
       <div className="mx-auto max-w-2xl py-20 text-center">
@@ -61,7 +64,7 @@ export default async function PortalDashboard() {
     flags.outcome_visibility_enabled,
   );
   const journey = (
-    await getDb()
+    await database
       .select()
       .from(applicationStatusHistory)
       .where(eq(applicationStatusHistory.applicationId, application.id))

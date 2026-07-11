@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   ChevronsUpDown,
@@ -55,6 +56,18 @@ import {
 import { Turnstile } from "./turnstile";
 
 type Category = { id: string; name: string };
+type PaymentInstructions = {
+  refundableIfNotAwarded?: boolean;
+  cardPaymentUrl?: string;
+  bankTransfer?: {
+    accountName: string;
+    bankName: string;
+    accountNumber: string;
+    branchName?: string;
+    bankCode?: string;
+    branchCode?: string;
+  };
+};
 countryNames.registerLocale(englishCountryNames);
 type UploadTarget = {
   id: string;
@@ -80,6 +93,13 @@ type SubmissionStage =
   | "finalising"
   | "completion_failed"
   | "success";
+
+const FORM_STEPS = [
+  { title: "Nominee", description: "Who you are nominating" },
+  { title: "Contact", description: "Contact and category" },
+  { title: "Documents", description: "Evidence and payment proof" },
+  { title: "Confirm", description: "Review and submit" },
+] as const;
 
 function uploadFile(
   upload: SelectedUpload,
@@ -115,9 +135,15 @@ function uploadFile(
 export function NominationForm({
   categories,
   unavailable,
+  feeMinor,
+  currency,
+  paymentInstructions,
 }: {
   categories: Category[];
   unavailable?: boolean;
+  feeMinor?: number;
+  currency?: string;
+  paymentInstructions?: PaymentInstructions;
 }) {
   const [supporting, setSupporting] = useState<SelectedUpload[]>([]);
   const [payment, setPayment] = useState<SelectedUpload[]>([]);
@@ -130,8 +156,10 @@ export function NominationForm({
     crypto.randomUUID(),
   );
   const [turnstileReset, setTurnstileReset] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const form = useForm<PublicApplicationInput>({
     resolver: zodResolver(publicApplicationSchema),
     shouldFocusError: false,
@@ -166,6 +194,22 @@ export function NominationForm({
       )
     : 0;
   const busy = ["preparing", "uploading", "finalising"].includes(stage);
+  const fee = useMemo(
+    () =>
+      feeMinor !== undefined && currency
+        ? new Intl.NumberFormat("en-LK", {
+            style: "currency",
+            currency,
+            maximumFractionDigits: 0,
+          }).format(feeMinor / 100)
+        : null,
+    [currency, feeMinor],
+  );
+
+  useEffect(() => {
+    if (currentStep === 0) return;
+    stepHeadingRef.current?.focus();
+  }, [currentStep]);
 
   useEffect(() => {
     if (!busy) return;
@@ -343,6 +387,11 @@ export function NominationForm({
     window.setTimeout(() => errorSummaryRef.current?.focus(), 0);
   }
   function submit(event: React.FormEvent<HTMLFormElement>) {
+    if (currentStep < FORM_STEPS.length - 1) {
+      event.preventDefault();
+      void moveToNextStep();
+      return;
+    }
     setFileError(
       payment.length === 1
         ? undefined
@@ -350,12 +399,32 @@ export function NominationForm({
     );
     void form.handleSubmit(runSubmission, handleInvalid)(event);
   }
+
+  async function moveToNextStep() {
+    const fieldsByStep: Array<Array<keyof PublicApplicationInput>> = [
+      ["nomineeName", "designation", "industrySector", "businessWebsite"],
+      ["email", "phone", "categoryId"],
+      [],
+      ["declarationAccepted", "turnstileToken"],
+    ];
+    const valid = await form.trigger(fieldsByStep[currentStep], {
+      shouldFocus: true,
+    });
+    if (!valid) return;
+    if (currentStep === 2 && payment.length !== 1) {
+      setFileError("Choose one payment slip or screenshot.");
+      errorSummaryRef.current?.focus();
+      return;
+    }
+    setFileError(undefined);
+    setCurrentStep((step) => Math.min(step + 1, FORM_STEPS.length - 1));
+  }
   const retry = () => void form.handleSubmit(runSubmission, handleInvalid)();
   const errors = form.formState.errors;
   const hasVisibleError = Boolean(
     errors.root ||
-      Object.keys(errors).some((key) => key !== "root") ||
-      fileError,
+    Object.keys(errors).some((key) => key !== "root") ||
+    fileError,
   );
   useEffect(() => {
     if (!hasVisibleError) return;
@@ -398,6 +467,37 @@ export function NominationForm({
         errors.root || visibleErrors.length ? "form-error" : undefined
       }
     >
+      <div className="border-b border-mist bg-white/55 px-5 py-5 md:px-8">
+        <div className="mb-3 flex items-center justify-between text-xs font-medium text-muted-foreground">
+          <span aria-live="polite">
+            Step {currentStep + 1} of {FORM_STEPS.length}
+          </span>
+          <span>{FORM_STEPS[currentStep].description}</span>
+        </div>
+        <Progress
+          value={((currentStep + 1) / FORM_STEPS.length) * 100}
+          aria-label={`Nomination progress: step ${currentStep + 1} of ${FORM_STEPS.length}`}
+        />
+        <ol
+          className="mt-4 grid grid-cols-4 gap-2"
+          aria-label="Nomination steps"
+        >
+          {FORM_STEPS.map((step, index) => (
+            <li
+              key={step.title}
+              aria-current={index === currentStep ? "step" : undefined}
+              className={`truncate text-xs font-medium ${
+                index <= currentStep
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <span className="hidden sm:inline">{index + 1}. </span>
+              {step.title}
+            </li>
+          ))}
+        </ol>
+      </div>
       {errors.root || visibleErrors.length || fileError ? (
         <Alert
           variant="destructive"
@@ -431,254 +531,422 @@ export function NominationForm({
           </AlertDescription>
         </Alert>
       ) : null}
-      <FormSection number="1" title="Nominee details">
-        <FieldGroup>
-          <div className="grid gap-5 md:grid-cols-2">
+      {currentStep === 0 ? (
+        <FormSection
+          headingRef={stepHeadingRef}
+          number="1"
+          title="Nominee details"
+        >
+          <FieldGroup>
+            <div className="grid gap-5 md:grid-cols-2">
+              <ControlledInput
+                form={form}
+                name="nomineeName"
+                label="Full Name / Company Name"
+                required
+              />
+              <ControlledInput
+                form={form}
+                name="designation"
+                label="Designation"
+                description="Complete this only when nominating an individual."
+              />
+            </div>
             <ControlledInput
               form={form}
-              name="nomineeName"
-              label="Full Name / Company Name"
+              name="industrySector"
+              label="Industry / Business Sector"
               required
             />
             <ControlledInput
               form={form}
-              name="designation"
-              label="Designation"
-              description="Complete this only when nominating an individual."
+              name="businessWebsite"
+              label="Business Website"
+              description="If applicable"
+              inputMode="url"
             />
-          </div>
-          <ControlledInput
-            form={form}
-            name="industrySector"
-            label="Industry / Business Sector"
-            required
-          />
-          <ControlledInput
-            form={form}
-            name="businessWebsite"
-            label="Business Website"
-            description="If applicable"
-            inputMode="url"
-          />
-        </FieldGroup>
-      </FormSection>
-      <FormSection number="2" title="Contact details">
-        <FieldGroup>
-          <ControlledInput
-            form={form}
-            name="email"
-            label="Email Address"
-            required
-            inputMode="email"
-          />
-          <PhoneField form={form} />
-        </FieldGroup>
-      </FormSection>
-      <FormSection number="3" title="Nomination">
-        <Controller
-          control={form.control}
-          name="categoryId"
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="categoryId">
-                Award Nomination / Category{" "}
+          </FieldGroup>
+        </FormSection>
+      ) : null}
+      {currentStep === 1 ? (
+        <FormSection
+          headingRef={stepHeadingRef}
+          number="2"
+          title="Contact and category"
+        >
+          <FieldGroup>
+            <ControlledInput
+              form={form}
+              name="email"
+              label="Email Address"
+              required
+              inputMode="email"
+            />
+            <PhoneField form={form} />
+            <Controller
+              control={form.control}
+              name="categoryId"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="categoryId">
+                    Award category{" "}
+                    <span aria-hidden className="text-destructive">
+                      *
+                    </span>
+                  </FieldLabel>
+                  <CategoryCombobox
+                    categories={categories}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={unavailable || busy}
+                    invalid={fieldState.invalid}
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
+          </FieldGroup>
+        </FormSection>
+      ) : null}
+      {currentStep === 2 ? (
+        <FormSection
+          headingRef={stepHeadingRef}
+          number="3"
+          title="Documents and payment"
+        >
+          <FieldGroup>
+            <div className="rounded-md border border-champagne/50 bg-gold-wash/55 p-4 text-sm text-graphite">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-medium text-foreground">Application fee</p>
+                {fee ? (
+                  <p className="text-lg font-semibold text-foreground">{fee}</p>
+                ) : null}
+              </div>
+              <p className="mt-1 leading-6">
+                Covers nomination processing and document verification.
+                {paymentInstructions?.refundableIfNotAwarded
+                  ? " Fully refundable if the nominee is not awarded."
+                  : ""}
+              </p>
+              {paymentInstructions?.cardPaymentUrl ||
+              paymentInstructions?.bankTransfer ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-champagne/40 pt-4">
+                  {paymentInstructions.cardPaymentUrl ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      nativeButton={false}
+                      render={
+                        <a
+                          href={paymentInstructions.cardPaymentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        />
+                      }
+                    >
+                      Pay securely by card
+                    </Button>
+                  ) : null}
+                  {paymentInstructions.bankTransfer ? (
+                    <details className="group">
+                      <summary className="min-h-9 cursor-pointer content-center font-medium text-antique-gold underline-offset-4 hover:underline">
+                        View bank-transfer details
+                      </summary>
+                      <dl className="mt-3 grid gap-x-6 gap-y-2 border-l border-champagne pl-4 text-xs sm:grid-cols-2">
+                        <div>
+                          <dt className="text-muted-foreground">
+                            Account name
+                          </dt>
+                          <dd className="font-medium text-foreground">
+                            {paymentInstructions.bankTransfer.accountName}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Bank</dt>
+                          <dd className="font-medium text-foreground">
+                            {paymentInstructions.bankTransfer.bankName}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">
+                            Account number
+                          </dt>
+                          <dd className="font-mono font-medium text-foreground">
+                            {paymentInstructions.bankTransfer.accountNumber}
+                          </dd>
+                        </div>
+                        {paymentInstructions.bankTransfer.branchName ? (
+                          <div>
+                            <dt className="text-muted-foreground">Branch</dt>
+                            <dd className="font-medium text-foreground">
+                              {paymentInstructions.bankTransfer.branchName}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {paymentInstructions.bankTransfer.bankCode ? (
+                          <div>
+                            <dt className="text-muted-foreground">Bank code</dt>
+                            <dd className="font-mono font-medium text-foreground">
+                              {paymentInstructions.bankTransfer.bankCode}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {paymentInstructions.bankTransfer.branchCode ? (
+                          <div>
+                            <dt className="text-muted-foreground">
+                              Branch code
+                            </dt>
+                            <dd className="font-mono font-medium text-foreground">
+                              {paymentInstructions.bankTransfer.branchCode}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </details>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <Field>
+              <FieldLabel>Supporting documents</FieldLabel>
+              <FieldDescription>
+                Optional · add up to five files that strengthen the nomination.
+              </FieldDescription>
+              <FilePicker
+                kind="supporting_document"
+                files={supporting}
+                onChange={(files) => changeFiles("supporting_document", files)}
+                disabled={busy}
+                onRetry={retry}
+              />
+            </Field>
+            <Field data-invalid={Boolean(fileError)}>
+              <FieldLabel>
+                Payment proof{" "}
                 <span aria-hidden className="text-destructive">
                   *
                 </span>
               </FieldLabel>
-              <CategoryCombobox
-                categories={categories}
-                value={field.value}
-                onValueChange={field.onChange}
-                disabled={unavailable || busy}
-                invalid={fieldState.invalid}
+              <FieldDescription>
+                Required · add one payment slip, receipt or screenshot.
+              </FieldDescription>
+              <FilePicker
+                kind="payment_proof"
+                files={payment}
+                onChange={(files) => changeFiles("payment_proof", files)}
+                error={fileError}
+                disabled={busy}
+                onRetry={retry}
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
-          )}
-        />
-      </FormSection>
-      <FormSection number="4" title="Documents">
-        <FieldGroup>
-          <Field>
-            <FieldLabel>Supporting Documents</FieldLabel>
-            <FieldDescription>Optional · up to five files</FieldDescription>
-            <FilePicker
-              kind="supporting_document"
-              files={supporting}
-              onChange={(files) => changeFiles("supporting_document", files)}
-              disabled={busy}
-              onRetry={retry}
+          </FieldGroup>
+        </FormSection>
+      ) : null}
+      {currentStep === 3 ? (
+        <FormSection
+          headingRef={stepHeadingRef}
+          number="4"
+          title="Confirm and submit"
+        >
+          <FieldSet>
+            <FieldLegend className="sr-only">
+              Nomination declaration and security verification
+            </FieldLegend>
+            <Controller
+              control={form.control}
+              name="declarationAccepted"
+              render={({ field, fieldState }) => (
+                <Field
+                  orientation="horizontal"
+                  data-invalid={fieldState.invalid}
+                >
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={(checked) =>
+                      field.onChange(checked === true)
+                    }
+                    aria-invalid={fieldState.invalid}
+                    id="declaration"
+                    disabled={busy}
+                  />
+                  <div>
+                    <FieldLabel htmlFor="declaration" className="font-normal">
+                      I confirm that the details provided are accurate and agree
+                      to the{" "}
+                      <a
+                        href="/terms"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-antique-gold underline"
+                      >
+                        terms of the nomination process
+                      </a>
+                    </FieldLabel>
+                    <FieldError errors={[fieldState.error]} />
+                  </div>
+                </Field>
+              )}
             />
-          </Field>
-          <Field data-invalid={Boolean(fileError)}>
-            <FieldLabel>
-              Payment Slip or Screenshot{" "}
-              <span aria-hidden className="text-destructive">
-                *
-              </span>
-            </FieldLabel>
-            <FieldDescription>
-              One payment-proof file is required.
-            </FieldDescription>
-            <FilePicker
-              kind="payment_proof"
-              files={payment}
-              onChange={(files) => changeFiles("payment_proof", files)}
-              error={fileError}
-              disabled={busy}
-              onRetry={retry}
-            />
-          </Field>
-        </FieldGroup>
-      </FormSection>
-      <FormSection number="5" title="Confirmation">
-        <FieldSet>
-          <FieldLegend className="sr-only">
-            Nomination declaration and security verification
-          </FieldLegend>
-          <Controller
-            control={form.control}
-            name="declarationAccepted"
-            render={({ field, fieldState }) => (
-              <Field orientation="horizontal" data-invalid={fieldState.invalid}>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={(checked) =>
-                    field.onChange(checked === true)
-                  }
-                  aria-invalid={fieldState.invalid}
-                  id="declaration"
-                  disabled={busy}
-                />
-                <div>
-                  <FieldLabel htmlFor="declaration" className="font-normal">
-                    I confirm that the details provided are accurate and agree
-                    to the{" "}
-                    <a
-                      href="/terms"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-antique-gold underline"
-                    >
-                      terms of the nomination process
-                    </a>
-                  </FieldLabel>
+            <Controller
+              control={form.control}
+              name="turnstileToken"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <Turnstile
+                    onToken={field.onChange}
+                    resetSignal={turnstileReset}
+                  />
                   <FieldError errors={[fieldState.error]} />
-                </div>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="turnstileToken"
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <Turnstile
-                  onToken={field.onChange}
-                  resetSignal={turnstileReset}
-                />
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
-          />
-          <input
-            type="text"
-            tabIndex={-1}
-            autoComplete="off"
-            className="absolute -left-[9999px]"
-            aria-hidden
-            {...form.register("honeypot")}
-          />
-        </FieldSet>
-        {stage !== "idle" ? (
-          <div className="mt-6" aria-live="polite">
-            <div className="mb-2 flex justify-between text-sm">
-              <span>
-                {stage === "preparing"
-                  ? "Preparing secure uploads…"
-                  : stage === "uploading"
-                    ? "Uploading files…"
-                    : stage === "upload_failed"
-                      ? "Some files need to be retried"
-                      : stage === "completion_failed"
-                        ? "Final confirmation needs to be retried"
-                        : "Confirming your nomination…"}
-              </span>
-              <span>{stage === "uploading" ? `${overallProgress}%` : ""}</span>
-            </div>
-            <Progress
-              value={
-                stage === "preparing"
-                  ? 5
-                  : stage === "finalising"
-                    ? 98
-                    : overallProgress
-              }
+                </Field>
+              )}
             />
-          </div>
-        ) : null}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Button
-            type="submit"
-            disabled={busy || unavailable}
-            className="ceremonial-button h-12 flex-1 text-base font-semibold"
-          >
-            {busy ? (
-              <LoaderCircle className="animate-spin" data-icon="inline-start" />
-            ) : stage === "upload_failed" || stage === "completion_failed" ? (
-              <RotateCcw data-icon="inline-start" />
+            <input
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              className="absolute -left-[9999px]"
+              aria-hidden
+              {...form.register("honeypot")}
+            />
+          </FieldSet>
+          {stage !== "idle" ? (
+            <div className="mt-6" aria-live="polite">
+              <div className="mb-2 flex justify-between text-sm">
+                <span>
+                  {stage === "preparing"
+                    ? "Preparing secure uploads…"
+                    : stage === "uploading"
+                      ? "Uploading files…"
+                      : stage === "upload_failed"
+                        ? "Some files need to be retried"
+                        : stage === "completion_failed"
+                          ? "Final confirmation needs to be retried"
+                          : "Confirming your nomination…"}
+                </span>
+                <span>
+                  {stage === "uploading" ? `${overallProgress}%` : ""}
+                </span>
+              </div>
+              <Progress
+                value={
+                  stage === "preparing"
+                    ? 5
+                    : stage === "finalising"
+                      ? 98
+                      : overallProgress
+                }
+              />
+            </div>
+          ) : null}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            {!busy ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-12"
+                onClick={() => setCurrentStep(2)}
+              >
+                <ArrowLeft data-icon="inline-start" />
+                Back
+              </Button>
             ) : null}
-            {stage === "upload_failed"
-              ? "Retry failed files"
-              : stage === "completion_failed"
-                ? "Retry final confirmation"
-                : "Submit nomination"}
+            <Button
+              type="submit"
+              disabled={busy || unavailable}
+              className="ceremonial-button h-12 flex-1 text-base font-semibold"
+            >
+              {busy ? (
+                <LoaderCircle
+                  className="animate-spin"
+                  data-icon="inline-start"
+                />
+              ) : stage === "upload_failed" || stage === "completion_failed" ? (
+                <RotateCcw data-icon="inline-start" />
+              ) : null}
+              {stage === "upload_failed"
+                ? "Retry failed files"
+                : stage === "completion_failed"
+                  ? "Retry final confirmation"
+                  : "Submit nomination"}
+              <ArrowRight data-icon="inline-end" />
+            </Button>
+            {stage === "uploading" ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12"
+                onClick={() => abortRef.current?.abort()}
+              >
+                <X data-icon="inline-start" />
+                Cancel uploads
+              </Button>
+            ) : null}
+            {stage === "completion_failed" ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12"
+                onClick={beginFreshUploadSession}
+              >
+                Start a fresh upload
+              </Button>
+            ) : null}
+          </div>
+          <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+            <LockKeyhole aria-hidden /> Your information and files are
+            transferred securely.
+          </p>
+        </FormSection>
+      ) : null}
+      {!busy && currentStep < FORM_STEPS.length - 1 ? (
+        <div className="flex flex-col-reverse gap-3 border-t border-mist bg-white/45 px-5 py-5 sm:flex-row sm:justify-between md:px-8">
+          {currentStep > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11"
+              onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
+            >
+              <ArrowLeft data-icon="inline-start" />
+              Back
+            </Button>
+          ) : (
+            <span />
+          )}
+          <Button
+            type="button"
+            className="h-11"
+            disabled={unavailable}
+            onClick={() => void moveToNextStep()}
+          >
+            Continue
             <ArrowRight data-icon="inline-end" />
           </Button>
-          {stage === "uploading" ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12"
-              onClick={() => abortRef.current?.abort()}
-            >
-              <X data-icon="inline-start" />
-              Cancel uploads
-            </Button>
-          ) : null}
-          {stage === "completion_failed" ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12"
-              onClick={beginFreshUploadSession}
-            >
-              Start a fresh upload
-            </Button>
-          ) : null}
         </div>
-        <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
-          <LockKeyhole aria-hidden /> Your information and files are transferred
-          securely.
-        </p>
-      </FormSection>
+      ) : null}
     </form>
   );
 }
 
 function FormSection({
+  headingRef,
   number,
   title,
   children,
 }: {
+  headingRef?: React.Ref<HTMLHeadingElement>;
   number: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="border-b border-mist px-5 py-7 last:border-b-0 md:px-8 md:py-9">
-      <h2 className="section-title mb-6">
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="section-title mb-6 outline-none"
+      >
         <span className="mr-2 text-antique-gold">{number}.</span>
         {title}
       </h2>
@@ -762,7 +1030,7 @@ function PhoneField({
             </span>
           </FieldLabel>
           <FieldDescription>
-            Choose the country and enter a valid international number.
+            Choose the country, then enter the number without its country code.
           </FieldDescription>
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-2">
             <select
@@ -789,12 +1057,34 @@ function PhoneField({
               ))}
             </select>
             <Input
-              {...field}
               id="phone"
               type="tel"
               inputMode="tel"
-              value={typeof field.value === "string" ? field.value : ""}
-              placeholder={`+${getCountryCallingCode(country)}`}
+              name={field.name}
+              ref={field.ref}
+              onBlur={field.onBlur}
+              value={
+                typeof field.value === "string" &&
+                field.value.startsWith(`+${getCountryCallingCode(country)}`)
+                  ? field.value.slice(
+                      `+${getCountryCallingCode(country)}`.length,
+                    )
+                  : typeof field.value === "string"
+                    ? field.value
+                    : ""
+              }
+              onChange={(event) => {
+                const raw = event.target.value.trim();
+                if (raw.startsWith("+")) {
+                  field.onChange(raw);
+                  return;
+                }
+                const local = raw.replace(/^0+/, "");
+                field.onChange(
+                  local ? `+${getCountryCallingCode(country)}${local}` : "",
+                );
+              }}
+              placeholder="77 123 4567"
               aria-invalid={fieldState.invalid}
               className="h-[50px] bg-white"
             />

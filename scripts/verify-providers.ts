@@ -6,7 +6,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { sql } from "drizzle-orm";
-import { Redis } from "@upstash/redis";
 import { Resend } from "resend";
 import { env, publicEnv, requireProvider } from "../src/lib/env";
 import { getDb } from "../src/lib/db";
@@ -15,6 +14,25 @@ import { getR2 } from "../src/lib/r2/client";
 for (const provider of ["database", "r2", "auth", "email"] as const)
   requireProvider(provider);
 await getDb().execute(sql`select 1 as ok`);
+const rateLimitTable = await getDb().execute(sql<{
+  tableName: string | null;
+  canUse: boolean;
+}>`
+  select
+    to_regclass('public.rate_limit_buckets')::text as "tableName",
+    has_table_privilege(
+      current_user,
+      'public.rate_limit_buckets',
+      'SELECT,INSERT,UPDATE'
+    ) as "canUse"
+`);
+if (
+  rateLimitTable.rows[0]?.tableName !== "rate_limit_buckets" ||
+  rateLimitTable.rows[0]?.canUse !== true
+)
+  throw new Error(
+    "The runtime database role cannot use the durable rate-limit table.",
+  );
 const r2 = getR2();
 await r2.send(
   new ListObjectsV2Command({ Bucket: env.R2_PRIVATE_BUCKET, MaxKeys: 1 }),
@@ -73,11 +91,6 @@ if (domains.error) {
   throw new Error(
     `Resend sending domain ${senderDomain ?? "unknown"} is not verified.`,
   );
-if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
-  await new Redis({
-    url: env.UPSTASH_REDIS_REST_URL,
-    token: env.UPSTASH_REDIS_REST_TOKEN,
-  }).ping();
 if (
   env.APP_ENV === "production" &&
   env.TURNSTILE_EXPECTED_HOSTNAME.split(",")

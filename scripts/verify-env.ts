@@ -22,8 +22,6 @@ const schema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(1),
   EMAIL_REPLY_TO: z.email(),
-  UPSTASH_REDIS_REST_URL: z.url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   CRON_SECRET: z.string().min(24),
 });
 const result = schema.safeParse(process.env);
@@ -76,15 +74,6 @@ if (result.data.APP_ENV === "production") {
     );
     process.exit(1);
   }
-}
-if (
-  Boolean(result.data.UPSTASH_REDIS_REST_URL) !==
-  Boolean(result.data.UPSTASH_REDIS_REST_TOKEN)
-) {
-  console.error(
-    "- Configure both Upstash values or neither; Neon provides the durable fallback.",
-  );
-  process.exit(1);
 }
 console.log(
   `Environment verified for ${result.data.APP_ENV} (${url.hostname}).`,

@@ -25,8 +25,43 @@ describe("PostgreSQL migration and integrity contract", () => {
       "email_outbox",
       "audit_logs",
       "job_runs",
+      "rate_limit_buckets",
     ])
       expect(names.has(name)).toBe(true);
+  });
+
+  it("increments durable rate-limit buckets atomically and resets expired windows", async () => {
+    const key = `integration-rate-limit-${crypto.randomUUID()}`;
+    const increment = () => sql<{ count: number }[]>`
+      insert into rate_limit_buckets (key, count, reset_at, updated_at)
+      values (${key}, 1, now() + interval '10 minutes', now())
+      on conflict (key) do update set
+        count = case
+          when rate_limit_buckets.reset_at <= now() then 1
+          else rate_limit_buckets.count + 1
+        end,
+        reset_at = case
+          when rate_limit_buckets.reset_at <= now()
+          then now() + interval '10 minutes'
+          else rate_limit_buckets.reset_at
+        end,
+        updated_at = now()
+      returning count
+    `;
+
+    await Promise.all(Array.from({ length: 6 }, increment));
+    const [active] = await sql<
+      { count: number }[]
+    >`select count from rate_limit_buckets where key = ${key}`;
+    expect(active.count).toBe(6);
+
+    await sql`
+      update rate_limit_buckets
+      set reset_at = now() - interval '1 second'
+      where key = ${key}
+    `;
+    const [reset] = await increment();
+    expect(reset.count).toBe(1);
   });
 
   it("rejects invalid award-cycle windows", async () => {

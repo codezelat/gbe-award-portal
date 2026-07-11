@@ -1,6 +1,4 @@
 import "server-only";
-import { Redis } from "@upstash/redis";
-import { Ratelimit } from "@upstash/ratelimit";
 import { sql } from "drizzle-orm";
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db";
@@ -11,19 +9,6 @@ export async function enforceRateLimit(
   limit = 5,
   windowSeconds = 600,
 ) {
-  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
-    const limiter = new Ratelimit({
-      redis: new Redis({
-        url: env.UPSTASH_REDIS_REST_URL,
-        token: env.UPSTASH_REDIS_REST_TOKEN,
-      }),
-      limiter: Ratelimit.slidingWindow(limit, `${windowSeconds} s`),
-      prefix: "gbe-portal",
-    });
-    if (!(await limiter.limit(key)).success)
-      throw new Error("Too many attempts. Please wait before trying again.");
-    return;
-  }
   if (env.DATABASE_URL) {
     const result = await getDb().execute(sql<{
       count: number;

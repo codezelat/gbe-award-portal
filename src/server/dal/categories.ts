@@ -14,6 +14,8 @@ export async function getOpenCycleCategories() {
       heading: awardCycles.heading,
       introCopy: awardCycles.introCopy,
       supportEmail: awardCycles.supportEmail,
+      nominationFeeMinor: awardCycles.nominationFeeMinor,
+      currency: awardCycles.currency,
     })
     .from(awardCategories)
     .innerJoin(awardCycles, eq(awardCategories.cycleId, awardCycles.id))
@@ -30,6 +32,8 @@ export async function getOpenCycleCategories() {
           heading: first.heading,
           introCopy: first.introCopy,
           supportEmail: first.supportEmail,
+          nominationFeeMinor: first.nominationFeeMinor,
+          currency: first.currency,
         }
       : null,
     unavailable: rows.length === 0,

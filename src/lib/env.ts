@@ -26,8 +26,6 @@ const serverSchema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_FROM: z.string().default("GBE Awards <info@gbeaward.com>"),
   EMAIL_REPLY_TO: z.email().default("info@gbeaward.com"),
-  UPSTASH_REDIS_REST_URL: z.url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   CRON_SECRET: z.string().optional(),
 });
 

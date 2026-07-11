@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-test("public nomination route exposes the exact accessible single-page form", async ({
+test("public nomination route exposes an accessible guided form", async ({
   page,
 }) => {
   const browserErrors: string[] = [];
@@ -13,16 +13,48 @@ test("public nomination route exposes the exact accessible single-page form", as
   for (const label of [
     "Full Name / Company Name",
     "Industry / Business Sector",
-    "Email Address",
-    "Award Nomination / Category",
   ])
     await expect(page.getByLabel(label, { exact: false })).toBeVisible();
+  await page
+    .getByLabel("Full Name / Company Name", { exact: false })
+    .fill("Accessible nomination");
+  await page
+    .getByLabel("Industry / Business Sector", { exact: false })
+    .fill("Technology");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByLabel("Email Address", { exact: false }),
+  ).toBeVisible();
   await expect(page.locator("#phone")).toBeVisible();
+  await expect(
+    page.getByLabel("Award category", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Email Address", { exact: false })
+    .fill("a11y@example.test");
+  await page.locator("#phone").fill("0771234567");
+  await page.getByRole("combobox", { name: /award category/i }).click();
+  await page.getByRole("option").first().click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByLabel("Choose supporting documents")).toBeVisible();
+  await expect(page.getByLabel("Choose payment proof")).toBeVisible();
+  await page.getByLabel("Choose payment proof").setInputFiles({
+    name: "payment-proof.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZfOQAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(
     page.getByText(
       "I confirm that the details provided are accurate and agree to the terms of the nomination process",
       { exact: false },
     ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Submit nomination" }),
   ).toBeVisible();
   await expect(page.locator('a[href="/signup"]')).toHaveCount(0);
   const results = await new AxeBuilder({ page }).exclude("iframe").analyze();

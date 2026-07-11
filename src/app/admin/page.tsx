@@ -21,13 +21,6 @@ import {
   jobRuns,
   profiles,
 } from "@/lib/db/schema";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 export default async function AdminDashboard() {
   const { profile, membership } = await requireStaff();
@@ -217,41 +210,48 @@ export default async function AdminDashboard() {
   ];
   return (
     <>
-      <div className="mb-8">
-        <h1 className="page-heading">Operations overview</h1>
-        <p className="mt-2 text-graphite">
-          Current work requiring attention across GBE Awards 2026.
-        </p>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="page-heading">Operations overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review the queue, resolve exceptions, and keep nominations moving.
+          </p>
+        </div>
+        <Link
+          href="/admin/applications"
+          className="text-sm font-semibold text-antique-gold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Open applications
+        </Link>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {metrics.map((metric) => (
-          <Card key={metric.label}>
-            <CardHeader>
-              <CardDescription>{metric.label}</CardDescription>
-              <CardTitle className="font-display text-4xl">
+      <section
+        aria-label="Application summary"
+        className="surface overflow-hidden rounded-lg"
+      >
+        <dl className="grid grid-cols-2 divide-x divide-y sm:grid-cols-3 xl:grid-cols-5 xl:divide-y-0">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="min-w-0 px-4 py-4 sm:px-5">
+              <dt className="truncate text-xs font-medium text-muted-foreground">
+                {metric.label}
+              </dt>
+              <dd className="mt-1 font-display text-3xl font-semibold leading-none">
                 {metric.value}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {metric.help}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <div className="mt-8 grid gap-6 xl:grid-cols-2">
+              </dd>
+              <p className="mt-2 hidden text-xs text-muted-foreground sm:block">
+                {metric.help}
+              </p>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <OperationalPanel
-          title="Recent submissions"
-          empty="No submitted nominations yet."
-          rows={recent.map((item) => ({
-            id: item.id,
-            primary: item.reference ?? "Pending reference",
-            secondary: `${item.nomineeName} · ${item.status.replaceAll("_", " ")}`,
-            href: `/admin/applications/${item.id}`,
-          }))}
-        />
-        <OperationalPanel
-          title="Unassigned review queue"
+          title="Review queue"
           empty="No unassigned applications require review."
+          action={{
+            href: "/admin/applications?sort=submitted&direction=asc",
+            label: "View queue",
+          }}
           rows={unassigned.map((item) => ({
             id: item.id,
             primary: item.reference ?? "Pending reference",
@@ -260,50 +260,81 @@ export default async function AdminDashboard() {
           }))}
         />
         <OperationalPanel
-          title="Failed emails"
-          empty="No email delivery failures."
-          rows={failedEmails.map((item) => ({
+          title="Latest nominations"
+          empty="No submitted nominations yet."
+          action={{ href: "/admin/applications", label: "View all" }}
+          rows={recent.map((item) => ({
             id: item.id,
-            primary: item.template.replaceAll("_", " "),
-            secondary: `${item.recipient} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
-            href: "/admin/communications",
-          }))}
-        />
-        <OperationalPanel
-          title="Expiring invitations"
-          empty="No active invitations are nearing expiry."
-          rows={expiringInvites.map((item) => ({
-            id: item.id,
-            primary: item.email,
-            secondary: `Expires ${formatInTimeZone(item.expiresAt, "Asia/Colombo", "dd MMM yyyy, HH:mm")}`,
-            href: "/admin/applicants",
-          }))}
-        />
-        <OperationalPanel
-          title="Failed scheduled jobs"
-          empty="No recorded scheduled-job failures."
-          rows={failedJobs.map((item) => ({
-            id: item.id,
-            primary: item.key,
-            secondary: formatInTimeZone(
-              item.startedAt,
-              "Asia/Colombo",
-              "dd MMM yyyy, HH:mm",
-            ),
-            href: "/admin/activity",
-          }))}
-        />
-        <OperationalPanel
-          title="Recent staff activity"
-          empty="No audited activity yet."
-          rows={activity.map((item) => ({
-            id: item.id,
-            primary: item.action,
-            secondary: `${item.actor ?? "System"} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
-            href: "/admin/activity",
+            primary: item.reference ?? "Pending reference",
+            secondary: `${item.nomineeName} · ${item.status.replaceAll("_", " ")}`,
+            href: `/admin/applications/${item.id}`,
           }))}
         />
       </div>
+      <details className="surface group mt-6 rounded-lg">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <span>System follow-up</span>
+          <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+            Emails, invitations, jobs and staff activity
+          </span>
+          <span
+            aria-hidden
+            className="hidden text-muted-foreground group-open:inline"
+          >
+            −
+          </span>
+        </summary>
+        <div className="grid gap-5 border-t p-5 xl:grid-cols-2">
+          <OperationalPanel
+            title="Failed emails"
+            empty="No email delivery failures."
+            bare
+            rows={failedEmails.map((item) => ({
+              id: item.id,
+              primary: item.template.replaceAll("_", " "),
+              secondary: `${item.recipient} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
+              href: "/admin/communications",
+            }))}
+          />
+          <OperationalPanel
+            title="Expiring invitations"
+            empty="No active invitations are nearing expiry."
+            bare
+            rows={expiringInvites.map((item) => ({
+              id: item.id,
+              primary: item.email,
+              secondary: `Expires ${formatInTimeZone(item.expiresAt, "Asia/Colombo", "dd MMM yyyy, HH:mm")}`,
+              href: "/admin/applicants",
+            }))}
+          />
+          <OperationalPanel
+            title="Failed scheduled jobs"
+            empty="No recorded scheduled-job failures."
+            bare
+            rows={failedJobs.map((item) => ({
+              id: item.id,
+              primary: item.key,
+              secondary: formatInTimeZone(
+                item.startedAt,
+                "Asia/Colombo",
+                "dd MMM yyyy, HH:mm",
+              ),
+              href: "/admin/activity",
+            }))}
+          />
+          <OperationalPanel
+            title="Recent staff activity"
+            empty="No audited activity yet."
+            bare
+            rows={activity.map((item) => ({
+              id: item.id,
+              primary: item.action,
+              secondary: `${item.actor ?? "System"} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
+              href: "/admin/activity",
+            }))}
+          />
+        </div>
+      </details>
     </>
   );
 }
@@ -312,14 +343,28 @@ function OperationalPanel({
   title,
   empty,
   rows,
+  action,
+  bare = false,
 }: {
   title: string;
   empty: string;
   rows: Array<{ id: string; primary: string; secondary: string; href: string }>;
+  action?: { href: string; label: string };
+  bare?: boolean;
 }) {
   return (
-    <section className="surface rounded-lg p-6">
-      <h2 className="section-title">{title}</h2>
+    <section className={bare ? "p-1" : "surface rounded-lg p-5"}>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="section-title">{title}</h2>
+        {action ? (
+          <Link
+            href={action.href}
+            className="shrink-0 text-xs font-semibold text-antique-gold underline-offset-4 hover:underline"
+          >
+            {action.label}
+          </Link>
+        ) : null}
+      </div>
       {rows.length ? (
         <ul className="mt-4 divide-y">
           {rows.map((row) => (

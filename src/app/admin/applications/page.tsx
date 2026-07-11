@@ -278,6 +278,28 @@ export default async function ApplicationsPage({
   ])
     if (params[key]) exportQuery.set(key, params[key]);
   if (activeCycleFilter) exportQuery.set("cycle", activeCycleFilter);
+  const advancedFilterKeys = [
+    "paymentStatus",
+    "accountStatus",
+    "cycle",
+    "reviewer",
+    "dateFrom",
+    "dateTo",
+    "actionRequired",
+    "hasDocuments",
+    "deleted",
+    "sort",
+    "direction",
+    "pageSize",
+  ];
+  const advancedFilterCount = advancedFilterKeys.filter((key) => {
+    const value = params[key];
+    if (!value) return false;
+    if (key === "sort" && value === "submitted") return false;
+    if (key === "direction" && value === "desc") return false;
+    if (key === "pageSize" && value === "25") return false;
+    return true;
+  }).length;
   return (
     <>
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -295,155 +317,185 @@ export default async function ApplicationsPage({
           Export current view
         </Button>
       </div>
-      <form className="glass-shell mb-4 flex flex-wrap gap-3 rounded-lg p-4">
-        <DebouncedApplicationSearch defaultValue={params.search} />
-        <select
-          name="status"
-          defaultValue={params.status ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All workflow statuses</option>
-          {applications.workflowStatus.enumValues
-            .filter((v) => v !== "uploading")
-            .map((v) => (
-              <option key={v} value={v}>
-                {v.replaceAll("_", " ")}
+      <form className="glass-shell mb-4 rounded-lg p-4">
+        <div className="flex flex-wrap gap-3">
+          <DebouncedApplicationSearch defaultValue={params.search} />
+          <select
+            name="status"
+            aria-label="Workflow status"
+            defaultValue={params.status ?? ""}
+            className="h-11 min-w-48 rounded-md border bg-white px-3 text-sm"
+          >
+            <option value="">All workflow statuses</option>
+            {applications.workflowStatus.enumValues
+              .filter((v) => v !== "uploading")
+              .map((v) => (
+                <option key={v} value={v}>
+                  {v.replaceAll("_", " ")}
+                </option>
+              ))}
+          </select>
+          <select
+            name="category"
+            aria-label="Award category"
+            defaultValue={params.category ?? ""}
+            className="h-11 min-w-48 rounded-md border bg-white px-3 text-sm"
+          >
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
-        </select>
-        <select
-          name="paymentStatus"
-          defaultValue={params.paymentStatus ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All payment statuses</option>
-          {applications.paymentStatus.enumValues.map((value) => (
-            <option key={value} value={value}>
-              {value.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <select
-          name="accountStatus"
-          defaultValue={params.accountStatus ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All account statuses</option>
-          {applications.accountAccessStatus.enumValues.map((value) => (
-            <option key={value} value={value}>
-              {value.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <select
-          name="cycle"
-          defaultValue={activeCycleFilter ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All award cycles</option>
-          {cycles.map((cycle) => (
-            <option key={cycle.id} value={cycle.id}>
-              {cycle.name}
-            </option>
-          ))}
-        </select>
-        <select
-          name="category"
-          defaultValue={params.category ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All categories</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-        <select
-          name="reviewer"
-          defaultValue={params.reviewer ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All reviewers</option>
-          {reviewers.map((reviewer) => (
-            <option key={reviewer.id} value={reviewer.id}>
-              {reviewer.name}
-            </option>
-          ))}
-        </select>
-        <Input
-          name="dateFrom"
-          type="date"
-          defaultValue={params.dateFrom}
-          aria-label="Submitted from"
-          className="h-11 w-auto bg-white"
-        />
-        <select
-          name="actionRequired"
-          defaultValue={params.actionRequired ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All action states</option>
-          <option value="true">Action required</option>
-        </select>
-        <select
-          name="hasDocuments"
-          defaultValue={params.hasDocuments ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">Any document state</option>
-          <option value="true">Has documents</option>
-        </select>
-        <select
-          name="deleted"
-          defaultValue={params.deleted ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">Active records</option>
-          <option value="include">Include soft-deleted</option>
-          <option value="only">Soft-deleted only</option>
-        </select>
-        <select
-          name="sort"
-          defaultValue={sort}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="submitted">Submitted time</option>
-          <option value="activity">Last activity</option>
-          <option value="nominee">Nominee name</option>
-          <option value="status">Workflow status</option>
-          <option value="category">Category</option>
-        </select>
-        <select
-          name="direction"
-          defaultValue={sortDirection}
-          aria-label="Sort direction"
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-        <select
-          name="pageSize"
-          defaultValue={String(pageSize)}
-          aria-label="Rows per page"
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="25">25 rows</option>
-          <option value="50">50 rows</option>
-          <option value="100">100 rows</option>
-        </select>
-        <Input
-          name="dateTo"
-          type="date"
-          defaultValue={params.dateTo}
-          aria-label="Submitted to"
-          className="h-11 w-auto bg-white"
-        />
-        <Button type="submit">Apply filters</Button>
-        <Button variant="ghost" render={<Link href="/admin/applications" />}>
-          Clear
-        </Button>
+          </select>
+          <Button type="submit">Apply</Button>
+          <Button variant="ghost" render={<Link href="/admin/applications" />}>
+            Clear
+          </Button>
+        </div>
+        <details className="group mt-3" open={advancedFilterCount > 0}>
+          <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            More filters
+            {advancedFilterCount ? (
+              <span className="rounded-full bg-gold-wash px-2 py-0.5 text-xs text-bronze-ink">
+                {advancedFilterCount} active
+              </span>
+            ) : null}
+            <span
+              aria-hidden
+              className="transition-transform group-open:rotate-180"
+            >
+              ⌄
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <select
+              name="paymentStatus"
+              aria-label="Payment status"
+              defaultValue={params.paymentStatus ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All payment statuses</option>
+              {applications.paymentStatus.enumValues.map((value) => (
+                <option key={value} value={value}>
+                  {value.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+            <select
+              name="accountStatus"
+              aria-label="Account status"
+              defaultValue={params.accountStatus ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All account statuses</option>
+              {applications.accountAccessStatus.enumValues.map((value) => (
+                <option key={value} value={value}>
+                  {value.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+            <select
+              name="cycle"
+              aria-label="Award cycle"
+              defaultValue={activeCycleFilter ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All award cycles</option>
+              {cycles.map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {cycle.name}
+                </option>
+              ))}
+            </select>
+            <select
+              name="reviewer"
+              aria-label="Reviewer"
+              defaultValue={params.reviewer ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All reviewers</option>
+              {reviewers.map((reviewer) => (
+                <option key={reviewer.id} value={reviewer.id}>
+                  {reviewer.name}
+                </option>
+              ))}
+            </select>
+            <Input
+              name="dateFrom"
+              type="date"
+              defaultValue={params.dateFrom}
+              aria-label="Submitted from"
+              className="h-11 w-auto bg-white"
+            />
+            <select
+              name="actionRequired"
+              aria-label="Action requirement"
+              defaultValue={params.actionRequired ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All action states</option>
+              <option value="true">Action required</option>
+            </select>
+            <select
+              name="hasDocuments"
+              aria-label="Document state"
+              defaultValue={params.hasDocuments ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">Any document state</option>
+              <option value="true">Has documents</option>
+            </select>
+            <select
+              name="deleted"
+              aria-label="Deleted record visibility"
+              defaultValue={params.deleted ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">Active records</option>
+              <option value="include">Include soft-deleted</option>
+              <option value="only">Soft-deleted only</option>
+            </select>
+            <select
+              name="sort"
+              aria-label="Sort applications by"
+              defaultValue={sort}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="submitted">Submitted time</option>
+              <option value="activity">Last activity</option>
+              <option value="nominee">Nominee name</option>
+              <option value="status">Workflow status</option>
+              <option value="category">Category</option>
+            </select>
+            <select
+              name="direction"
+              defaultValue={sortDirection}
+              aria-label="Sort direction"
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+            <select
+              name="pageSize"
+              defaultValue={String(pageSize)}
+              aria-label="Rows per page"
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="25">25 rows</option>
+              <option value="50">50 rows</option>
+              <option value="100">100 rows</option>
+            </select>
+            <Input
+              name="dateTo"
+              type="date"
+              defaultValue={params.dateTo}
+              aria-label="Submitted to"
+              className="h-11 w-auto bg-white"
+            />
+          </div>
+        </details>
       </form>
       <div className="surface overflow-hidden rounded-lg">
         <ApplicationsTable

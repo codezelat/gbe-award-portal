@@ -175,7 +175,7 @@ export default async function AdminApplicationDetail({
   });
   return (
     <>
-      <div className="glass-shell sticky top-0 z-20 -mx-3 flex flex-wrap items-end justify-between gap-4 rounded-lg px-3 py-3">
+      <div className="glass-shell sticky top-16 z-10 -mx-3 flex flex-wrap items-end justify-between gap-4 rounded-lg px-3 py-3">
         <div>
           <p className="font-mono text-sm text-antique-gold">
             {application.reference ?? "Provisional upload"}
@@ -206,18 +206,28 @@ export default async function AdminApplicationDetail({
               create a new version with a reason.
             </p>
           </section>
-          <section className="surface rounded-lg p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <details className="surface group rounded-lg">
+            <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
               <div>
-                <h2 className="section-title">Current and original values</h2>
+                <span className="section-title">
+                  Current and original values
+                </span>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Cycle: {cycle?.name ?? "Unknown cycle"} · Submission version{" "}
                   {application.currentVersion}
                 </p>
               </div>
-              <StatusBadge status={cycle?.status ?? "unknown"} />
-            </div>
-            <div className="mt-5 overflow-x-auto">
+              <div className="flex items-center gap-3">
+                <StatusBadge status={cycle?.status ?? "unknown"} />
+                <span
+                  aria-hidden
+                  className="text-muted-foreground group-open:hidden"
+                >
+                  ⌄
+                </span>
+              </div>
+            </summary>
+            <div className="overflow-x-auto border-t px-6 pb-6 pt-5">
               <table className="w-full min-w-[620px] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
@@ -267,7 +277,7 @@ export default async function AdminApplicationDetail({
                 </tbody>
               </table>
             </div>
-          </section>
+          </details>
           <section className="surface rounded-lg p-6">
             <h2 className="section-title">Applicant and account access</h2>
             <dl className="mt-5 grid gap-4 md:grid-cols-2">
@@ -526,95 +536,119 @@ export default async function AdminApplicationDetail({
               )}
             </div>
           </section>
-          <section className="surface rounded-lg p-6">
-            <h2 className="section-title">Internal notes</h2>
-            <form
-              action={addInternalNoteAction}
-              className="mt-5 flex flex-col gap-3"
-            >
-              <input type="hidden" name="applicationId" value={applicationId} />
-              <select
-                name="noteType"
-                className="h-11 rounded-md border bg-white px-3"
-              >
-                <option value="general">General</option>
-                <option value="review">Review</option>
-                <option value="finance">Finance</option>
-                <option value="security">Security</option>
-              </select>
-              <Textarea
-                name="body"
-                required
-                minLength={2}
-                maxLength={4000}
-                placeholder="Add an internal note. Applicants cannot see this."
-              />
-              <Button className="self-start">
-                <MessageSquareText data-icon="inline-start" />
-                Add note
-              </Button>
-            </form>
-            <div className="mt-6 flex flex-col gap-3">
-              {notes.map(({ note, author }) => (
-                <article key={note.id} className="rounded-md bg-muted p-4">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>
-                      {note.noteType} · {author}
-                    </span>
-                    <time>
-                      {formatInTimeZone(
-                        note.createdAt,
-                        "Asia/Colombo",
-                        "dd MMM yyyy, HH:mm",
-                      )}
-                    </time>
-                  </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm">
-                    {note.body}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </section>
-          {hasPermission(membership, "messages.send") ? (
-            <section className="surface rounded-lg p-6">
-              <h2 className="section-title">Applicant communication</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                This message is visible in the applicant portal and queues an
-                email notification.
-              </p>
+          <details className="surface group rounded-lg">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <span className="section-title">Internal notes</span>
+              <span className="text-xs text-muted-foreground">
+                {notes.length} saved
+              </span>
+            </summary>
+            <div className="border-t px-6 pb-6">
               <form
-                action={sendStaffMessageAction}
+                action={addInternalNoteAction}
                 className="mt-5 flex flex-col gap-3"
               >
                 <input
                   type="hidden"
                   name="applicationId"
-                  value={application.id}
+                  value={applicationId}
                 />
-                <Input
-                  name="subject"
-                  required
-                  minLength={2}
-                  maxLength={160}
-                  placeholder="Message subject"
-                  className="h-11 bg-white"
-                />
+                <select
+                  name="noteType"
+                  aria-label="Internal note type"
+                  className="h-11 rounded-md border bg-white px-3"
+                >
+                  <option value="general">General</option>
+                  <option value="review">Review</option>
+                  <option value="finance">Finance</option>
+                  <option value="security">Security</option>
+                </select>
                 <Textarea
                   name="body"
                   required
                   minLength={2}
                   maxLength={4000}
-                  placeholder="Applicant-visible message"
-                  className="min-h-32 bg-white"
+                  placeholder="Add an internal note. Applicants cannot see this."
                 />
-                <Button className="self-start">Send applicant message</Button>
+                <Button className="self-start">
+                  <MessageSquareText data-icon="inline-start" />
+                  Add note
+                </Button>
               </form>
-            </section>
+              <div className="mt-6 flex flex-col gap-3">
+                {notes.map(({ note, author }) => (
+                  <article key={note.id} className="rounded-md bg-muted p-4">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {note.noteType} · {author}
+                      </span>
+                      <time>
+                        {formatInTimeZone(
+                          note.createdAt,
+                          "Asia/Colombo",
+                          "dd MMM yyyy, HH:mm",
+                        )}
+                      </time>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
+                      {note.body}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </details>
+          {hasPermission(membership, "messages.send") ? (
+            <details className="surface group rounded-lg">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <span className="section-title">Send a message</span>
+                <span aria-hidden className="text-muted-foreground">
+                  ⌄
+                </span>
+              </summary>
+              <div className="border-t px-6 pb-6 pt-5">
+                <p className="mt-2 text-sm text-muted-foreground">
+                  This message is visible in the applicant portal and queues an
+                  email notification.
+                </p>
+                <form
+                  action={sendStaffMessageAction}
+                  className="mt-5 flex flex-col gap-3"
+                >
+                  <input
+                    type="hidden"
+                    name="applicationId"
+                    value={application.id}
+                  />
+                  <Input
+                    name="subject"
+                    required
+                    minLength={2}
+                    maxLength={160}
+                    placeholder="Message subject"
+                    className="h-11 bg-white"
+                  />
+                  <Textarea
+                    name="body"
+                    required
+                    minLength={2}
+                    maxLength={4000}
+                    placeholder="Applicant-visible message"
+                    className="min-h-32 bg-white"
+                  />
+                  <Button className="self-start">Send applicant message</Button>
+                </form>
+              </div>
+            </details>
           ) : null}
-          <section className="surface rounded-lg p-6">
-            <h2 className="section-title">Messages and change requests</h2>
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <details className="surface group rounded-lg">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <span className="section-title">Communication history</span>
+              <span className="text-xs text-muted-foreground">
+                {messages.length + changeRequests.length} items
+              </span>
+            </summary>
+            <div className="grid gap-5 border-t px-6 pb-6 pt-5 md:grid-cols-2">
               <div>
                 <h3 className="text-sm font-semibold">
                   Applicant-visible messages
@@ -667,10 +701,15 @@ export default async function AdminApplicationDetail({
                 </div>
               </div>
             </div>
-          </section>
-          <section className="surface rounded-lg p-6">
-            <h2 className="section-title">Version and audit history</h2>
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
+          </details>
+          <details className="surface group rounded-lg">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <span className="section-title">Version and audit history</span>
+              <span className="text-xs text-muted-foreground">
+                {versions.length} versions · {audits.length} events
+              </span>
+            </summary>
+            <div className="grid gap-5 border-t px-6 pb-6 pt-5 md:grid-cols-2">
               <div>
                 {versions.map((version) => (
                   <article key={version.id} className="border-b py-3">
@@ -704,47 +743,52 @@ export default async function AdminApplicationDetail({
                 ))}
               </div>
             </div>
-          </section>
+          </details>
         </div>
         <aside className="flex flex-col gap-6">
           {membership.role === "super_admin" ? (
-            <section className="surface rounded-lg border-destructive/30 p-5">
-              <h2 className="text-lg font-semibold">Retention control</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {application.deletedAt
-                  ? "Restore this soft-deleted record while retention permits."
-                  : "Soft-delete this record without erasing its audit history."}
-              </p>
-              <form
-                action={setApplicationDeletionAction}
-                className="mt-4 flex flex-col gap-3"
-              >
-                <input
-                  type="hidden"
-                  name="applicationId"
-                  value={application.id}
-                />
-                <input
-                  type="hidden"
-                  name="mode"
-                  value={application.deletedAt ? "restore" : "delete"}
-                />
-                <Textarea
-                  name="reason"
-                  required
-                  minLength={12}
-                  maxLength={1000}
-                  placeholder="Mandatory retention or restoration reason"
-                />
-                <Button
-                  variant={application.deletedAt ? "outline" : "destructive"}
-                >
+            <details className="surface group rounded-lg border-destructive/30">
+              <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                Retention control
+              </summary>
+              <div className="border-t px-5 pb-5 pt-4">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {application.deletedAt
-                    ? "Restore application"
-                    : "Soft-delete application"}
-                </Button>
-              </form>
-            </section>
+                    ? "Restore this soft-deleted record while retention permits."
+                    : "Soft-delete this record without erasing its audit history."}
+                </p>
+                <form
+                  action={setApplicationDeletionAction}
+                  className="mt-4 flex flex-col gap-3"
+                >
+                  <input
+                    type="hidden"
+                    name="applicationId"
+                    value={application.id}
+                  />
+                  <input
+                    type="hidden"
+                    name="mode"
+                    value={application.deletedAt ? "restore" : "delete"}
+                  />
+                  <Textarea
+                    name="reason"
+                    aria-label="Retention or restoration reason"
+                    required
+                    minLength={12}
+                    maxLength={1000}
+                    placeholder="Mandatory retention or restoration reason"
+                  />
+                  <Button
+                    variant={application.deletedAt ? "outline" : "destructive"}
+                  >
+                    {application.deletedAt
+                      ? "Restore application"
+                      : "Soft-delete application"}
+                  </Button>
+                </form>
+              </div>
+            </details>
           ) : null}
           {application.workflowStatus === "approved" &&
           !["active", "invited"].includes(application.accountAccessStatus) &&
@@ -766,32 +810,37 @@ export default async function AdminApplicationDetail({
             </section>
           ) : null}
           {hasPermission(membership, "applications.edit") ? (
-            <section className="surface rounded-lg p-5">
-              <h2 className="text-lg font-semibold">Assignment</h2>
-              <form
-                action={bulkAssignReviewerAction}
-                className="mt-4 flex flex-col gap-3"
-              >
-                <input
-                  type="hidden"
-                  name="applicationIds"
-                  value={application.id}
-                />
-                <select
-                  name="reviewerId"
-                  defaultValue={application.assignedReviewerId ?? ""}
-                  className="h-11 rounded-md border bg-white px-3"
+            <details className="surface group rounded-lg">
+              <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                Reviewer assignment
+              </summary>
+              <div className="border-t px-5 pb-5">
+                <form
+                  action={bulkAssignReviewerAction}
+                  className="mt-4 flex flex-col gap-3"
                 >
-                  <option value="">Unassigned</option>
-                  {reviewers.map((reviewer) => (
-                    <option key={reviewer.id} value={reviewer.id}>
-                      {reviewer.name}
-                    </option>
-                  ))}
-                </select>
-                <Button variant="outline">Save reviewer</Button>
-              </form>
-            </section>
+                  <input
+                    type="hidden"
+                    name="applicationIds"
+                    value={application.id}
+                  />
+                  <select
+                    name="reviewerId"
+                    aria-label="Assigned reviewer"
+                    defaultValue={application.assignedReviewerId ?? ""}
+                    className="h-11 rounded-md border bg-white px-3"
+                  >
+                    <option value="">Unassigned</option>
+                    {reviewers.map((reviewer) => (
+                      <option key={reviewer.id} value={reviewer.id}>
+                        {reviewer.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button variant="outline">Save reviewer</Button>
+                </form>
+              </div>
+            </details>
           ) : null}
           <section className="glass-feature rounded-lg p-5">
             <h2 className="text-lg font-semibold">Review actions</h2>
@@ -802,6 +851,7 @@ export default async function AdminApplicationDetail({
               <input type="hidden" name="applicationId" value={applicationId} />
               <select
                 name="to"
+                aria-label="Next workflow status"
                 required
                 className="h-11 rounded-md border bg-white px-3"
               >
@@ -816,10 +866,12 @@ export default async function AdminApplicationDetail({
               </select>
               <Textarea
                 name="applicantMessage"
+                aria-label="Applicant-facing status message"
                 placeholder="Applicant-facing message when needed"
               />
               <Textarea
                 name="reason"
+                aria-label="Internal status change reason"
                 placeholder="Internal reason (required for rejection/backward actions)"
               />
               <Button>Confirm status change</Button>
@@ -828,80 +880,17 @@ export default async function AdminApplicationDetail({
           {(visibleAllowed as readonly string[]).includes(
             "changes_requested",
           ) ? (
-            <section className="surface rounded-lg p-5">
-              <h2 className="text-lg font-semibold">Request information</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Select only the fields the applicant may edit. They lock again
-                after resubmission.
-              </p>
-              <form
-                action={requestChangesAction}
-                className="mt-4 flex flex-col gap-3"
-              >
-                <input
-                  type="hidden"
-                  name="applicationId"
-                  value={applicationId}
-                />
-                {[
-                  ["nomineeName", "Nominee / organisation name"],
-                  ["designation", "Designation"],
-                  ["industrySector", "Industry / sector"],
-                  ["businessWebsite", "Business website"],
-                  ["phoneDisplay", "Telephone"],
-                ].map(([value, label]) => (
-                  <label
-                    key={value}
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    <input type="checkbox" name="fieldKeys" value={value} />
-                    {label}
-                  </label>
-                ))}
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="requestedFileKinds"
-                    value="requested_document"
-                  />
-                  Additional supporting document
-                </label>
-                <label className="text-sm font-medium" htmlFor="dueAt">
-                  Due date (optional)
-                </label>
-                <input
-                  id="dueAt"
-                  name="dueAt"
-                  type="datetime-local"
-                  className="h-11 rounded-md border bg-white px-3"
-                />
-                <Textarea
-                  name="instructions"
-                  required
-                  minLength={10}
-                  placeholder="Explain clearly what the applicant must update."
-                />
-                <Button variant="outline">Send request</Button>
-              </form>
-            </section>
-          ) : null}
-          {hasPermission(membership, "payments.verify") ? (
-            <section className="surface rounded-lg p-5">
-              <h2 className="text-lg font-semibold">Payment review</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Current: {payment?.status.replaceAll("_", " ") ?? "Missing"}
-              </p>
-              {payment ? (
-                <p className="mt-1 font-mono text-xs text-muted-foreground">
-                  {payment.paymentReference ?? "Payment reference pending"}
-                  {payment.receiptReference
-                    ? ` · ${payment.receiptReference}`
-                    : ""}
+            <details className="surface group rounded-lg">
+              <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                Request information
+              </summary>
+              <div className="border-t px-5 pb-5 pt-4">
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Select only the fields the applicant may edit. They lock again
+                  after resubmission.
                 </p>
-              ) : null}
-              {payment ? (
                 <form
-                  action={updatePaymentAction}
+                  action={requestChangesAction}
                   className="mt-4 flex flex-col gap-3"
                 >
                   <input
@@ -909,106 +898,189 @@ export default async function AdminApplicationDetail({
                     name="applicationId"
                     value={applicationId}
                   />
-                  <select
-                    name="status"
-                    defaultValue={payment.status}
-                    className="h-11 rounded-md border bg-white px-3"
-                  >
-                    <option value="under_review">Under review</option>
-                    <option value="verified">Verified</option>
-                    <option value="rejected">Rejected</option>
-                    {membership.role === "super_admin" ||
-                    hasPermission(membership, "payments.override") ? (
-                      <>
-                        <option value="waived">Waived</option>
-                        <option value="refunded">Refunded / reversed</option>
-                      </>
-                    ) : null}
-                  </select>
-                  <Input
-                    name="payerName"
-                    defaultValue={payment.payerName ?? ""}
-                    placeholder="Payer name"
-                    maxLength={180}
-                    className="h-11 bg-white"
-                  />
-                  <Input
-                    name="bankReference"
-                    defaultValue={payment.bankReference ?? ""}
-                    placeholder="Bank reference"
-                    maxLength={160}
-                    className="h-11 bg-white"
-                  />
-                  <div className="grid grid-cols-[1fr_100px] gap-2">
-                    <Input
-                      name="amount"
-                      inputMode="decimal"
-                      defaultValue={
-                        payment.amountMinor === null
-                          ? ""
-                          : (payment.amountMinor / 100).toFixed(2)
-                      }
-                      placeholder="Amount"
-                      className="h-11 bg-white"
+                  {[
+                    ["nomineeName", "Nominee / organisation name"],
+                    ["designation", "Designation"],
+                    ["industrySector", "Industry / sector"],
+                    ["businessWebsite", "Business website"],
+                    ["phoneDisplay", "Telephone"],
+                  ].map(([value, label]) => (
+                    <label
+                      key={value}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <input type="checkbox" name="fieldKeys" value={value} />
+                      {label}
+                    </label>
+                  ))}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="requestedFileKinds"
+                      value="requested_document"
                     />
-                    <Input
-                      name="currency"
-                      defaultValue={payment.currency ?? ""}
-                      placeholder="LKR"
-                      minLength={3}
-                      maxLength={3}
-                      className="h-11 bg-white uppercase"
-                    />
-                  </div>
-                  <label className="flex flex-col gap-2 text-sm font-medium">
-                    Paid date and time
-                    <Input
-                      name="paidAt"
-                      type="datetime-local"
-                      defaultValue={
-                        payment.paidAt
-                          ? formatInTimeZone(
-                              payment.paidAt,
-                              "Asia/Colombo",
-                              "yyyy-MM-dd'T'HH:mm",
-                            )
-                          : ""
-                      }
-                      className="h-11 bg-white"
-                    />
+                    Additional supporting document
                   </label>
-                  <Textarea
-                    name="note"
-                    placeholder="Finance note or applicant-facing rejection reason"
+                  <label className="text-sm font-medium" htmlFor="dueAt">
+                    Due date (optional)
+                  </label>
+                  <input
+                    id="dueAt"
+                    name="dueAt"
+                    type="datetime-local"
+                    className="h-11 rounded-md border bg-white px-3"
                   />
-                  <Button variant="outline">
-                    <ShieldCheck data-icon="inline-start" />
-                    Save payment decision
-                  </Button>
+                  <Textarea
+                    name="instructions"
+                    required
+                    minLength={10}
+                    placeholder="Explain clearly what the applicant must update."
+                  />
+                  <Button variant="outline">Send request</Button>
                 </form>
-              ) : null}
-            </section>
+              </div>
+            </details>
           ) : null}
-          <section className="surface rounded-lg p-5">
-            <h2 className="text-lg font-semibold">History</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {versions.length} saved application version(s)
-            </p>
-            <ol className="mt-4 flex flex-col gap-4">
-              {history.map((item) => (
-                <li key={item.id} className="border-l-2 border-champagne pl-3">
-                  <p className="text-sm font-medium">{item.applicantLabel}</p>
-                  <time className="text-xs text-muted-foreground">
-                    {formatInTimeZone(
-                      item.effectiveAt,
-                      "Asia/Colombo",
-                      "dd MMM yyyy, HH:mm",
-                    )}
-                  </time>
-                </li>
-              ))}
-            </ol>
-          </section>
+          {hasPermission(membership, "payments.verify") ? (
+            <details
+              className="surface group rounded-lg"
+              open={payment?.status === "proof_submitted"}
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <span>Payment review</span>
+                <StatusBadge status={payment?.status ?? "missing"} />
+              </summary>
+              <div className="border-t px-5 pb-5 pt-4">
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Current: {payment?.status.replaceAll("_", " ") ?? "Missing"}
+                </p>
+                {payment ? (
+                  <p className="mt-1 font-mono text-xs text-muted-foreground">
+                    {payment.paymentReference ?? "Payment reference pending"}
+                    {payment.receiptReference
+                      ? ` · ${payment.receiptReference}`
+                      : ""}
+                  </p>
+                ) : null}
+                {payment ? (
+                  <form
+                    action={updatePaymentAction}
+                    className="mt-4 flex flex-col gap-3"
+                  >
+                    <input
+                      type="hidden"
+                      name="applicationId"
+                      value={applicationId}
+                    />
+                    <select
+                      name="status"
+                      aria-label="Payment decision"
+                      defaultValue={payment.status}
+                      className="h-11 rounded-md border bg-white px-3"
+                    >
+                      <option value="under_review">Under review</option>
+                      <option value="verified">Verified</option>
+                      <option value="rejected">Rejected</option>
+                      {membership.role === "super_admin" ||
+                      hasPermission(membership, "payments.override") ? (
+                        <>
+                          <option value="waived">Waived</option>
+                          <option value="refunded">Refunded / reversed</option>
+                        </>
+                      ) : null}
+                    </select>
+                    <Input
+                      name="payerName"
+                      defaultValue={payment.payerName ?? ""}
+                      placeholder="Payer name"
+                      maxLength={180}
+                      className="h-11 bg-white"
+                    />
+                    <Input
+                      name="bankReference"
+                      defaultValue={payment.bankReference ?? ""}
+                      placeholder="Bank reference"
+                      maxLength={160}
+                      className="h-11 bg-white"
+                    />
+                    <div className="grid grid-cols-[1fr_100px] gap-2">
+                      <Input
+                        name="amount"
+                        inputMode="decimal"
+                        defaultValue={
+                          payment.amountMinor === null
+                            ? ""
+                            : (payment.amountMinor / 100).toFixed(2)
+                        }
+                        placeholder="Amount"
+                        className="h-11 bg-white"
+                      />
+                      <Input
+                        name="currency"
+                        defaultValue={payment.currency ?? ""}
+                        placeholder="LKR"
+                        minLength={3}
+                        maxLength={3}
+                        className="h-11 bg-white uppercase"
+                      />
+                    </div>
+                    <label className="flex flex-col gap-2 text-sm font-medium">
+                      Paid date and time
+                      <Input
+                        name="paidAt"
+                        type="datetime-local"
+                        defaultValue={
+                          payment.paidAt
+                            ? formatInTimeZone(
+                                payment.paidAt,
+                                "Asia/Colombo",
+                                "yyyy-MM-dd'T'HH:mm",
+                              )
+                            : ""
+                        }
+                        className="h-11 bg-white"
+                      />
+                    </label>
+                    <Textarea
+                      name="note"
+                      placeholder="Finance note or applicant-facing rejection reason"
+                    />
+                    <Button variant="outline">
+                      <ShieldCheck data-icon="inline-start" />
+                      Save payment decision
+                    </Button>
+                  </form>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
+          <details className="surface group rounded-lg">
+            <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              Status history · {history.length}
+            </summary>
+            <div className="border-t px-5 pb-5 pt-4">
+              <p className="mt-1 text-xs text-muted-foreground">
+                {versions.length} saved application version(s)
+              </p>
+              <ol className="mt-4 flex flex-col gap-4">
+                {history.map((item) => (
+                  <li
+                    key={item.id}
+                    className="border-l-2 border-champagne pl-3"
+                  >
+                    <p className="text-sm font-medium">{item.applicantLabel}</p>
+                    <time className="text-xs text-muted-foreground">
+                      {formatInTimeZone(
+                        item.effectiveAt,
+                        "Asia/Colombo",
+                        "dd MMM yyyy, HH:mm",
+                      )}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </details>
         </aside>
       </div>
     </>

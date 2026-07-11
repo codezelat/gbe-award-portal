@@ -17,12 +17,14 @@ export default async function MessagesPage({
 }) {
   const { applicationId } = await searchParams;
   const { profile } = await requirePortalSession();
-  const flags = await getFeatureFlags();
-  const owned = await getDb()
-    .select()
-    .from(applications)
-    .where(eq(applications.ownerProfileId, profile.id))
-    .orderBy(desc(applications.lastActivityAt));
+  const [flags, owned] = await Promise.all([
+    getFeatureFlags(),
+    getDb()
+      .select()
+      .from(applications)
+      .where(eq(applications.ownerProfileId, profile.id))
+      .orderBy(desc(applications.lastActivityAt)),
+  ]);
   const selected = owned.find((item) => item.id === applicationId) ?? owned[0];
   const messages = selected
     ? await getDb()

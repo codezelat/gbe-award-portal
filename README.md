@@ -8,7 +8,7 @@ Production application for the Global Business Excellence Awards 2026. It provid
 
 ## What is included
 
-- Public single-page nominations with Cloudflare Turnstile, exact validation, direct private R2 uploads, progress, cancellation, retry, and idempotent completion.
+- Public guided nominations with four focused steps, configurable fee and payment instructions, Cloudflare Turnstile, exact validation, direct private R2 uploads, progress, cancellation, retry, and idempotent completion.
 - Approval-first Better Auth accounts with expiring invitations, password recovery, session revocation, and mandatory staff TOTP MFA.
 - Applicant application, profile, document, payment, message, security, and PDF-summary views with server-enforced field access.
 - Administrative dashboards for applications, applicants, payments, files, communications, categories, cycles, staff, settings, exports, reports, and append-only activity history.

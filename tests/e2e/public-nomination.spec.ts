@@ -7,18 +7,20 @@ const paymentPng = Buffer.from(
 
 async function fillNomination(page: Page) {
   await page.goto("/apply");
-  await page.getByLabel("Full Name / Company Name", { exact: false }).fill(
-    `Playwright Nominee ${Date.now()}`,
-  );
+  await page
+    .getByLabel("Full Name / Company Name", { exact: false })
+    .fill(`Playwright Nominee ${Date.now()}`);
   await page
     .getByLabel("Industry / Business Sector", { exact: false })
     .fill("Technology");
+  await page.getByRole("button", { name: "Continue" }).click();
   await page
     .getByLabel("Email Address", { exact: false })
     .fill(`playwright-${crypto.randomUUID()}@example.test`);
-  await page.locator("#phone").fill("+94771234567");
-  await page.getByRole("combobox", { name: /award nomination/i }).click();
+  await page.locator("#phone").fill("0771234567");
+  await page.getByRole("combobox", { name: /award category/i }).click();
   await page.getByRole("option").first().click();
+  await page.getByRole("button", { name: "Continue" }).click();
 }
 
 test("submits a valid nomination through real isolated Neon and R2", async ({
@@ -40,6 +42,7 @@ test("submits a valid nomination through real isolated Neon and R2", async ({
     mimeType: "image/png",
     buffer: paymentPng,
   });
+  await page.getByRole("button", { name: "Continue" }).click();
   await page
     .getByRole("checkbox", {
       name: /I confirm that the details provided are accurate/i,
@@ -83,6 +86,7 @@ test("retries only a failed upload without duplicating the application", async (
     mimeType: "image/png",
     buffer: paymentPng,
   });
+  await page.getByRole("button", { name: "Continue" }).click();
   await page
     .getByRole("checkbox", {
       name: /I confirm that the details provided are accurate/i,
@@ -113,22 +117,20 @@ test("focuses a complete validation summary before any network submission", asyn
       initiated = true;
   });
   await page.goto("/apply");
-  await page.getByRole("button", { name: "Submit nomination" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   const summary = page.locator("#form-error");
   await expect(summary).toBeFocused();
-  await expect(summary).toContainText("Enter the nominee or organisation name.");
-  await expect(summary).toContainText("You must accept the nomination declaration.");
-  await expect(summary).toContainText("Choose one payment slip or screenshot.");
+  await expect(summary).toContainText(
+    "Enter the nominee or organisation name.",
+  );
+  await expect(summary).toContainText("Enter the industry or business sector.");
   expect(initiated).toBe(false);
 });
 
 test("rejects invalid, oversized and excess supporting files in the browser", async ({
   page,
 }) => {
-  await page.goto("/apply");
-  await expect(
-    page.locator('input[name="cf-turnstile-response"]'),
-  ).toHaveCount(1, { timeout: 10_000 });
+  await fillNomination(page);
   const input = page.getByLabel("Choose supporting documents");
   await input.setInputFiles({
     name: "malware.exe",
@@ -142,7 +144,9 @@ test("rejects invalid, oversized and excess supporting files in the browser", as
     mimeType: "application/pdf",
     buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
   });
-  await expect(page.getByText("Each file must be 5 MB or smaller.")).toBeVisible();
+  await expect(
+    page.getByText("Each file must be 5 MB or smaller."),
+  ).toBeVisible();
 
   await input.setInputFiles(
     Array.from({ length: 6 }, (_, index) => ({
