@@ -1,0 +1,2 @@
+export function neutraliseSpreadsheetCell(value:unknown){if(value===null||value===undefined)return "";const string=String(value);return /^[=+\-@\t\r]/.test(string)?`'${string}`:string;}
+export function exportFilename(report:string,format:"xlsx"|"csv",at=new Date()){const safe=report.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");return `gbe-${safe}-${at.toISOString().slice(0,10)}.${format}`;}

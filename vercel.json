@@ -1,0 +1,8 @@
+{
+  "crons": [
+    { "path": "/api/cron/email-outbox", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/cleanup-uploads", "schedule": "17 * * * *" },
+    { "path": "/api/cron/cleanup-exports", "schedule": "43 * * * *" },
+    { "path": "/api/cron/cleanup-retention", "schedule": "23 2 * * *" }
+  ]
+}

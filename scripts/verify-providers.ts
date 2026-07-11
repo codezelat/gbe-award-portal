@@ -1,0 +1,22 @@
+import "dotenv/config";
+import { GetBucketCorsCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { sql } from "drizzle-orm";
+import { Redis } from "@upstash/redis";
+import { Resend } from "resend";
+import { env, publicEnv, requireProvider } from "../src/lib/env";
+import { getDb } from "../src/lib/db";
+import { getR2 } from "../src/lib/r2/client";
+
+for(const provider of ["database","r2","auth","email"] as const)requireProvider(provider);
+await getDb().execute(sql`select 1 as ok`);
+const r2=getR2();
+for(const bucket of [env.R2_PRIVATE_BUCKET,env.R2_PUBLIC_BUCKET])await r2.send(new HeadBucketCommand({Bucket:bucket}));
+const cors=await r2.send(new GetBucketCorsCommand({Bucket:env.R2_PRIVATE_BUCKET}));
+const origin=new URL(publicEnv.NEXT_PUBLIC_APP_URL).origin;
+const uploadRule=cors.CORSRules?.some((rule)=>rule.AllowedOrigins?.includes(origin)&&rule.AllowedMethods?.includes("PUT")&&(rule.AllowedHeaders?.includes("content-type")||rule.AllowedHeaders?.includes("*")));
+if(!uploadRule)throw new Error(`R2 private-bucket CORS does not allow secure PUT uploads from ${origin}.`);
+const domains=await new Resend(env.RESEND_API_KEY).domains.list();if(domains.error)throw new Error(domains.error.message);if(!domains.data?.data.some((domain)=>domain.status==="verified"))throw new Error("Resend has no verified sending domain.");
+if(!env.UPSTASH_REDIS_REST_URL||!env.UPSTASH_REDIS_REST_TOKEN)throw new Error("Upstash Redis is required outside local development.");
+await new Redis({url:env.UPSTASH_REDIS_REST_URL,token:env.UPSTASH_REDIS_REST_TOKEN}).ping();
+if(env.APP_ENV==="production"&&env.TURNSTILE_EXPECTED_HOSTNAME.split(",").map((value)=>value.trim()).some((host)=>host==="localhost"))throw new Error("Production Turnstile hostnames must not include localhost.");
+console.log(`Database, Better Auth configuration, R2 buckets/CORS, Resend domain, Redis and Turnstile hostname policy verified for ${env.APP_ENV}.`);
