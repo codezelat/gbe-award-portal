@@ -3,4 +3,6 @@
 .github
 test-results
 tests
+playwright.config.ts
+vitest*.config.ts
 SPEC.md
