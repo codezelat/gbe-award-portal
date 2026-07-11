@@ -15,7 +15,7 @@ import {
   uploadSessions,
   verification,
 } from "@/lib/db/schema";
-import { getR2 } from "@/lib/r2/client";
+import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import { env } from "@/lib/env";
 export async function cleanupStaleUploads() {
   const db = getDb();
@@ -42,7 +42,9 @@ export async function cleanupStaleUploads() {
       .limit(1);
     if (application)
       for (const item of manifest) {
-        const key = `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${application.cycle.year}/${application.application.id}/${item.id}`;
+        const key = r2ObjectKey(
+          `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${application.cycle.year}/${application.application.id}/${item.id}`,
+        );
         await getR2().send(
           new DeleteObjectCommand({
             Bucket: env.R2_PRIVATE_BUCKET,

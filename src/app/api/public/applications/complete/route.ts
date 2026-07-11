@@ -18,7 +18,7 @@ import {
 } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
 import { env } from "@/lib/env";
-import { getR2 } from "@/lib/r2/client";
+import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import {
   fileManifestItemSchema,
   isDetectedTypeAllowed,
@@ -96,7 +96,9 @@ export async function POST(request: Request) {
       etag?: string;
     }> = [];
     for (const item of manifest) {
-      const key = `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${row.cycle.year}/${row.application.id}/${item.id}`;
+      const key = r2ObjectKey(
+        `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${row.cycle.year}/${row.application.id}/${item.id}`,
+      );
       const head = await r2.send(
         new HeadObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key }),
       );

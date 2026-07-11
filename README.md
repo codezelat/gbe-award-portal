@@ -4,7 +4,7 @@ Production portal for public nominations, approval-first applicant access, payme
 
 ## Stack
 
-Next.js 16 App Router, strict TypeScript, Bun, Tailwind CSS 4, shadcn/Base UI, Neon PostgreSQL with Drizzle, Better Auth, private Cloudflare R2 uploads, Turnstile, Resend/React Email, Upstash rate limiting, ExcelJS, Vitest and Playwright.
+Next.js 16 App Router, strict TypeScript, Bun, Tailwind CSS 4, shadcn/Base UI, Neon PostgreSQL with Drizzle, Better Auth, private Cloudflare R2 uploads, Turnstile, Resend/React Email, durable rate limiting, ExcelJS, Vitest and Playwright.
 
 ## Local setup
 
@@ -23,10 +23,10 @@ Runtime uploads never touch the repository, Vercel filesystem or PostgreSQL byte
 - Turnstile: use the official test keys locally and exact comma-separated approved hostnames in `TURNSTILE_EXPECTED_HOSTNAME`. Production must not include `localhost`.
 - Resend: verify the sending domain, configure `EMAIL_FROM`, keep `info@gbeaward.com` as reply-to, and send signed webhook events to `/api/webhooks/resend`.
 - Better Auth: use a unique 32+ character secret per environment, the canonical HTTPS portal URL, secure cookies and invitation-only accounts.
-- Upstash: production fails closed when distributed rate limiting is unavailable.
-- Vercel: set `CRON_SECRET`; `vercel.json` schedules outbox, stale-upload, export and retention jobs. Job runs and failures are visible in administration.
+- Rate limiting: Upstash is supported when configured; otherwise the atomic Neon-backed limiter is used and expired buckets are cleaned by retention processing.
+- Vercel Hobby: set `CRON_SECRET`; `vercel.json` contains one daily maintenance cron. Normal emails are processed after the originating response, while the daily run handles retries, stale uploads, exports and retention.
 
-After configuring live providers, run `bun run providers:verify`. This performs read-only database, bucket/CORS, Resend-domain, Redis and hostname-policy checks.
+After configuring live providers, run `bun run providers:verify`. It verifies the database, performs and removes a small R2 test object, checks real browser CORS preflight, validates the configured Resend sender when the key permits domain reads, and checks rate-limit/Turnstile policy.
 
 ## Database and backups
 
@@ -47,7 +47,7 @@ bun run test:e2e
 bun run build
 ```
 
-`bun run check` runs lint, type checking, unit tests and the production build. CI additionally provisions PostgreSQL, applies every migration, runs integration tests and runs desktop/mobile Chromium accessibility tests.
+`bun run check` runs lint, type checking, unit tests and the production build. Run the isolated PostgreSQL integration suite and desktop/mobile Playwright suite before release.
 
 ## Production release checklist
 

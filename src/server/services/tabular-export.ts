@@ -4,7 +4,7 @@ import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { and, eq, gt } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLogs, exportsTable, files } from "@/lib/db/schema";
-import { getR2 } from "@/lib/r2/client";
+import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import { env } from "@/lib/env";
 import { exportFilename } from "@/server/services/export-service";
 import { buildTabularArtifact } from "@/lib/export/tabular-artifact";
@@ -65,7 +65,9 @@ export async function createTabularExport(input: {
     rows: input.rows,
   });
   const filename = exportFilename(input.reportKey, input.format);
-  const objectKey = `exports/${input.requestedBy}/${crypto.randomUUID()}/${filename}`;
+  const objectKey = r2ObjectKey(
+    `exports/${input.requestedBy}/${crypto.randomUUID()}/${filename}`,
+  );
   const r2 = getR2();
   try {
     await r2.send(

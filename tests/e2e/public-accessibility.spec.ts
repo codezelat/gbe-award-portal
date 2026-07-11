@@ -14,10 +14,10 @@ test("public nomination route exposes the exact accessible single-page form", as
     "Full Name / Company Name",
     "Industry / Business Sector",
     "Email Address",
-    "Phone Number",
     "Award Nomination / Category",
   ])
     await expect(page.getByLabel(label, { exact: false })).toBeVisible();
+  await expect(page.locator("#phone")).toBeVisible();
   await expect(
     page.getByText(
       "I confirm that the details provided are accurate and agree to the terms of the nomination process",

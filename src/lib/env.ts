@@ -17,6 +17,7 @@ const serverSchema = z.object({
   R2_ENDPOINT: z.url().optional(),
   R2_PRIVATE_BUCKET: z.string().default("gbe-portal-private"),
   R2_PUBLIC_BUCKET: z.string().default("gbe-portal-public"),
+  R2_OBJECT_PREFIX: z.string().trim().optional(),
   R2_PUBLIC_ASSET_BASE_URL: z.url().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
   TURNSTILE_EXPECTED_HOSTNAME: z.string().default("localhost"),

@@ -12,7 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
 import { env, requireProvider } from "@/lib/env";
-import { getR2 } from "@/lib/r2/client";
+import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import {
   initiateApplicationSchema,
   normalisePhone,
@@ -44,7 +44,9 @@ async function createUploadTargets(
   const r2 = getR2();
   return Promise.all(
     manifest.map(async (file) => {
-      const key = `${file.kind === "payment_proof" ? "payment-proofs" : "applications"}/${cycleYear}/${applicationId}/${file.id}`;
+      const key = r2ObjectKey(
+        `${file.kind === "payment_proof" ? "payment-proofs" : "applications"}/${cycleYear}/${applicationId}/${file.id}`,
+      );
       const command = new PutObjectCommand({
         Bucket: env.R2_PRIVATE_BUCKET,
         Key: key,

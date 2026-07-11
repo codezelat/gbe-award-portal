@@ -1,0 +1,6 @@
+.env*
+.git
+.github
+test-results
+tests
+SPEC.md

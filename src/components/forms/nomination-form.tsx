@@ -346,6 +346,19 @@ export function NominationForm({
     void form.handleSubmit(runSubmission, handleInvalid)(event);
   }
   const retry = () => void form.handleSubmit(runSubmission, handleInvalid)();
+  const errors = form.formState.errors;
+  const hasVisibleError = Boolean(
+    errors.root ||
+      Object.keys(errors).some((key) => key !== "root") ||
+      fileError,
+  );
+  useEffect(() => {
+    if (!hasVisibleError) return;
+    const frame = window.requestAnimationFrame(() =>
+      errorSummaryRef.current?.focus(),
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [hasVisibleError]);
 
   if (stage === "success")
     return (
@@ -367,7 +380,6 @@ export function NominationForm({
       </section>
     );
 
-  const errors = form.formState.errors;
   const visibleErrors = Object.entries(errors)
     .filter(([key]) => key !== "root")
     .map(([, value]) => value?.message)

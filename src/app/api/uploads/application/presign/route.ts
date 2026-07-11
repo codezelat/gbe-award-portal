@@ -11,7 +11,7 @@ import {
   files,
   profiles,
 } from "@/lib/db/schema";
-import { getR2 } from "@/lib/r2/client";
+import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import { env } from "@/lib/env";
 import {
   MAX_FILE_SIZE,
@@ -95,7 +95,9 @@ export async function POST(request: Request) {
       .insert(files)
       .values({
         bucket: "private",
-        objectKey: `${prefix}/${application.cycleId}/${application.id}/${crypto.randomUUID()}`,
+        objectKey: r2ObjectKey(
+          `${prefix}/${application.cycleId}/${application.id}/${crypto.randomUUID()}`,
+        ),
         purpose: input.kind,
         status: "pending",
         originalFilename: input.name,

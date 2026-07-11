@@ -13,3 +13,8 @@ export function getR2() {
     },
   });
 }
+
+export function r2ObjectKey(key: string) {
+  const prefix = env.R2_OBJECT_PREFIX?.replace(/^\/+|\/+$/g, "");
+  return prefix ? `${prefix}/${key.replace(/^\/+/, "")}` : key;
+}

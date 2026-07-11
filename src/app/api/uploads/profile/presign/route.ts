@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { files, profiles } from "@/lib/db/schema";
-import { getR2 } from "@/lib/r2/client";
+import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import { env } from "@/lib/env";
 import {
   isExtensionAllowed,
@@ -45,7 +45,9 @@ export async function POST(request: Request) {
       .insert(files)
       .values({
         bucket: "private",
-        objectKey: `profiles/originals/${profile.id}/${crypto.randomUUID()}`,
+        objectKey: r2ObjectKey(
+          `profiles/originals/${profile.id}/${crypto.randomUUID()}`,
+        ),
         purpose: "profile_original",
         status: "pending",
         originalFilename: input.name,
