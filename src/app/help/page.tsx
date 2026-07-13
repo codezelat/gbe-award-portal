@@ -26,9 +26,9 @@ export default function Help() {
           href="https://wa.link/10p065"
           target="_blank"
           rel="noreferrer"
-          className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-md border border-antique-gold/40 px-5 font-semibold text-antique-gold transition-colors hover:bg-gold-wash"
+          className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-md bg-[#25D366] px-5 font-semibold text-white shadow-sm transition-colors hover:bg-[#1ebe57] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
         >
-          <MessageCircle />
+          <MessageCircle className="fill-white/15" />
           Contact us on WhatsApp
         </a>
       </main>
