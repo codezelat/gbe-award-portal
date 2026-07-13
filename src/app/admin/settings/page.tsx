@@ -21,6 +21,13 @@ const supported = [
   "legal_terms",
   "privacy_notice",
 ];
+const structuredSettingKeys = new Set([
+  "feature_flags",
+  "email_templates",
+  "brand_asset_keys",
+  "legal_terms",
+  "privacy_notice",
+]);
 export default async function SettingsPage() {
   const { membership } = await requireStaff();
   if (!hasPermission(membership, "settings.manage")) notFound();
@@ -53,12 +60,14 @@ export default async function SettingsPage() {
               defaultValue={
                 typeof map.get(key) === "string"
                   ? String(map.get(key))
-                  : JSON.stringify(
-                      map.get(key) ??
-                        (key === "feature_flags" ? defaultFeatureFlags : {}),
-                      null,
-                      2,
-                    )
+                  : map.has(key) || structuredSettingKeys.has(key)
+                    ? JSON.stringify(
+                        map.get(key) ??
+                          (key === "feature_flags" ? defaultFeatureFlags : {}),
+                        null,
+                        2,
+                      )
+                    : ""
               }
               className="mt-3 min-h-32 bg-white font-mono text-xs"
             />

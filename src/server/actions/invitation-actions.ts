@@ -1,17 +1,19 @@
 "use server";
 import { createHash } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
+import { activatableInvitationStatuses } from "@/lib/domain/invitations";
 import {
   applications,
+  account,
   auditLogs,
   invitations,
   profiles,
   user,
 } from "@/lib/db/schema";
-import { getAuth } from "@/lib/auth";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -35,7 +37,12 @@ export async function acceptInvitationAction(formData: FormData) {
   const [invite] = await db
     .select()
     .from(invitations)
-    .where(and(eq(invitations.id, inviteId), eq(invitations.status, "pending")))
+    .where(
+      and(
+        eq(invitations.id, inviteId),
+        inArray(invitations.status, activatableInvitationStatuses),
+      ),
+    )
     .limit(1);
   if (
     !invite ||
@@ -54,9 +61,7 @@ export async function acceptInvitationAction(formData: FormData) {
     .where(eq(profiles.id, invite.profileId))
     .limit(1);
   if (!profile) throw new Error("Applicant profile not found.");
-  await getAuth().api.setUserPassword({
-    body: { userId: profile.authUserId, newPassword: input.password },
-  });
+  const passwordHash = await hashPassword(input.password);
   const now = new Date();
   await db.transaction(async (tx) => {
     const accepted = await tx
@@ -68,10 +73,25 @@ export async function acceptInvitationAction(formData: FormData) {
         updatedAt: now,
       })
       .where(
-        and(eq(invitations.id, invite.id), eq(invitations.status, "pending")),
+        and(
+          eq(invitations.id, invite.id),
+          inArray(invitations.status, activatableInvitationStatuses),
+        ),
       )
       .returning({ id: invitations.id });
     if (!accepted.length) throw new Error("This invitation was already used.");
+    const credential = await tx
+      .update(account)
+      .set({ password: passwordHash, updatedAt: now })
+      .where(
+        and(
+          eq(account.userId, profile.authUserId),
+          eq(account.providerId, "credential"),
+        ),
+      )
+      .returning({ id: account.id });
+    if (!credential.length)
+      throw new Error("This invitation is incomplete. Contact support.");
     await tx
       .update(user)
       .set({ emailVerified: true, updatedAt: now })

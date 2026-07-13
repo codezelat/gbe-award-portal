@@ -1,9 +1,11 @@
 import { createHmac } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import postgres from "postgres";
 import {
   E2E_ADMIN_EMAIL,
   E2E_ADMIN_PASSWORD,
   E2E_APPLICATION_REFERENCE,
+  e2eDatabaseUrl,
 } from "./database";
 
 function decodeBase32(value: string) {
@@ -351,4 +353,31 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await page.getByPlaceholder("Work email").fill(staffEmail);
   await page.getByRole("button", { name: "Send secure invitation" }).click();
   await expect(page.getByText(staffEmail, { exact: false })).toBeVisible();
+
+  const db = postgres(e2eDatabaseUrl(), { max: 1 });
+  const [outbox] = await db<{ payload: { url?: string } }[]>`
+    select payload
+    from email_outbox
+    where recipient_email = ${staffEmail}
+      and template_key = 'staff_invitation'
+    order by created_at desc
+    limit 1
+  `;
+  const invitationUrl = outbox?.payload.url;
+  expect(invitationUrl).toBeTruthy();
+  await db`
+    update invitations
+    set status = 'sent', sent_at = now(), updated_at = now()
+    where email_normalised = ${staffEmail}
+      and type = 'staff'
+  `;
+  await db.end();
+
+  await page.goto(invitationUrl!);
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("E2E-Staff-Password-2026!");
+  await page.getByLabel("Confirm password").fill("E2E-Staff-Password-2026!");
+  await page.getByRole("button", { name: "Activate secure access" }).click();
+  await expect(page).toHaveURL(/\/login\?activated=true/);
 });
