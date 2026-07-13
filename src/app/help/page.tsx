@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Mail, ShieldCheck, Upload } from "lucide-react";
+import { Mail, MessageCircle } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
 export const metadata: Metadata = {
   title: "Portal help",
@@ -15,31 +15,21 @@ export default function Help() {
           Assistance with nominations, invitation access and approved applicant
           accounts.
         </p>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <section className="surface rounded-lg p-6">
-            <Upload className="text-antique-gold" />
-            <h2 className="mt-4 text-lg font-semibold">Nomination uploads</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Files must be 5 MB or smaller. Supporting files accept PDF, DOC,
-              DOCX, JPEG, PNG or WebP. Payment proof accepts PDF or supported
-              images.
-            </p>
-          </section>
-          <section className="surface rounded-lg p-6">
-            <ShieldCheck className="text-antique-gold" />
-            <h2 className="mt-4 text-lg font-semibold">Portal access</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Submitting a nomination does not create an account. Secure access
-              is invited only after administrative approval.
-            </p>
-          </section>
-        </div>
         <a
           href="mailto:info@gbeaward.com"
-          className="ceremonial-button mt-6 flex min-h-12 items-center justify-center gap-2 rounded-md px-5 font-semibold"
+          className="ceremonial-button mt-8 flex min-h-12 items-center justify-center gap-2 rounded-md px-5 font-semibold"
         >
           <Mail />
           Contact info@gbeaward.com
+        </a>
+        <a
+          href="https://wa.link/10p065"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-md border border-antique-gold/40 px-5 font-semibold text-antique-gold transition-colors hover:bg-gold-wash"
+        >
+          <MessageCircle />
+          Contact us on WhatsApp
         </a>
       </main>
     </>
