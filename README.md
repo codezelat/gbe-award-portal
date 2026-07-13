@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://access.gbeaward.com">
-    <img src="public/brand/gbe-logo-full.png" alt="Global Business Excellence Awards" width="300" />
+    <img src="public/brand/gbe-logo-full.png" alt="Global Business Excellence Awards" width="170" />
   </a>
 </p>
 
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="public/brand/hero-award-2026.webp" alt="Global Business Excellence Awards 2026 trophy" width="300" />
+  <img src="public/brand/hero-award-2026.webp" alt="Global Business Excellence Awards 2026 trophy" width="170" />
 </p>
 
 # GBE Awards Portal
@@ -27,6 +27,7 @@ The production portal for the **Global Business Excellence Awards 2026**. It giv
 **Live:** [access.gbeaward.com](https://access.gbeaward.com)
 
 **Support:** [info@gbeaward.com](mailto:info@gbeaward.com) · [WhatsApp](https://wa.link/10p065)
+
 **Official site:** [gbeaward.com](https://gbeaward.com)
 
 > [!IMPORTANT]
@@ -249,3 +250,4 @@ In short: use Bun, keep server/data access on the server, preserve the private-f
 - [Portal terms](https://access.gbeaward.com/terms)
 - [Portal help](https://access.gbeaward.com/help)
 - [Official GBE Awards website](https://gbeaward.com)
+- [Proprietary licence](LICENSE)
