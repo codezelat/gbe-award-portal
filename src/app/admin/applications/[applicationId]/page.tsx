@@ -493,7 +493,7 @@ export default async function AdminApplicationDetail({
                 linkedFiles.map(({ link, file }) => (
                   <div
                     key={link.id}
-                    className="flex items-center gap-3 rounded-md border bg-white p-4"
+                    className="flex flex-col items-start gap-3 rounded-md border bg-white p-4 sm:flex-row sm:items-center"
                   >
                     <FileText className="text-antique-gold" />
                     <div className="min-w-0 flex-1">
@@ -506,7 +506,7 @@ export default async function AdminApplicationDetail({
                         {file.status}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                       {file.mimeTypeDetected === "application/pdf" ||
                       file.mimeTypeDetected?.startsWith("image/") ? (
                         <Button

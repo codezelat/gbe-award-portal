@@ -79,6 +79,36 @@ export default async function setup() {
       form_schema_version, now(), now()
     from fixture
   `;
+  await seeded`
+    with fixture as (
+      select id from applications where reference = ${E2E_APPLICATION_REFERENCE}
+    ), proof as (
+      insert into files (
+        bucket, object_key, purpose, status, original_filename,
+        safe_download_filename, extension, mime_type_claimed,
+        mime_type_detected, size_bytes, validated_at
+      )
+      values (
+        'private', 'e2e/playwright/fixture-payment-proof.pdf',
+        'payment_proof', 'ready', 'fixture-payment-proof.pdf',
+        'fixture-payment-proof.pdf', 'pdf', 'application/pdf',
+        'application/pdf', 1024, now()
+      )
+      returning id
+    ), linked_proof as (
+      insert into application_files (application_id, file_id, kind)
+      select fixture.id, proof.id, 'payment_proof' from fixture, proof
+      returning id, application_id
+    )
+    insert into payments (
+      application_id, status, currency, amount_minor, proof_application_file_id,
+      payer_name, bank_reference, payment_reference, paid_at
+    )
+    select
+      application_id, 'proof_submitted', 'LKR', 5500000, id,
+      'Playwright Fixture Payer', 'E2E-BANK-REFERENCE', 'PAY-E2E-2026', now()
+    from linked_proof
+  `;
   const runtimeRole = new URL(e2eRuntimeDatabaseUrl()).username;
   if (!/^[a-z_][a-z0-9_]*$/i.test(runtimeRole))
     throw new Error("The Playwright runtime database role is invalid.");
