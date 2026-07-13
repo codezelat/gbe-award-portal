@@ -27,7 +27,7 @@ export default async function CategoriesPage() {
         Create, order and activate award categories without altering historical
         submission snapshots.
       </p>
-      <div className="mt-7 grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="surface overflow-hidden rounded-lg">
           <div className="divide-y">
             {categories.map(({ category, cycleName }) => (

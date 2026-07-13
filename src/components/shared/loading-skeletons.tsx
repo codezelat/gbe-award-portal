@@ -110,7 +110,13 @@ export function ApplicationDashboardSkeleton() {
   );
 }
 
-export function TablePageSkeleton({ label = "Loading records" }: { label?: string }) {
+export function TablePageSkeleton({
+  label = "Loading records",
+  compactCards = false,
+}: {
+  label?: string;
+  compactCards?: boolean;
+}) {
   return (
     <div aria-busy>
       <LoadingStatus label={label} />
@@ -123,19 +129,36 @@ export function TablePageSkeleton({ label = "Loading records" }: { label?: strin
         </div>
       </section>
       <section className="surface mt-4 overflow-hidden rounded-lg">
-        <div className="grid grid-cols-[1.2fr_1.1fr_.8fr_.8fr] gap-4 border-b px-5 py-4">
-          {Array.from({ length: 4 }, (_, index) => (
-            <Skeleton key={index} className="h-3 w-20" />
+        {compactCards ? (
+          <div className="divide-y xl:hidden">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="p-4">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="mt-3 h-5 w-3/5" />
+                <Skeleton className="mt-2 h-4 w-4/5" />
+                <div className="mt-4 flex gap-2">
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className={compactCards ? "hidden xl:block" : ""}>
+          <div className="grid grid-cols-2 gap-4 border-b px-5 py-4 sm:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => (
+              <Skeleton key={index} className="h-3 w-20 max-w-full" />
+            ))}
+          </div>
+          {Array.from({ length: 7 }, (_, index) => (
+            <div key={index} className="grid grid-cols-2 gap-4 border-b px-5 py-5 sm:grid-cols-4 last:border-0">
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-5 w-20" />
+              <Skeleton className="h-4 w-16" />
+            </div>
           ))}
         </div>
-        {Array.from({ length: 7 }, (_, index) => (
-          <div key={index} className="grid grid-cols-[1.2fr_1.1fr_.8fr_.8fr] gap-4 border-b px-5 py-5 last:border-0">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-        ))}
       </section>
     </div>
   );
@@ -223,7 +246,7 @@ export function MessagesPageSkeleton() {
     <div aria-busy>
       <LoadingStatus label="Loading messages" />
       <PageHeadingSkeleton />
-      <div className="mt-7 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="surface rounded-lg p-6">
           <Skeleton className="h-6 w-32" />
           <div className="mt-5 flex flex-col gap-4">

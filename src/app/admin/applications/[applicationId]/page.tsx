@@ -187,7 +187,7 @@ export default async function AdminApplicationDetail({
           <StatusBadge status={application.paymentStatus} />
         </div>
       </div>
-      <div className="mt-7 grid gap-6 xl:grid-cols-[1fr_360px]">
+      <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-6">
           <section className="surface rounded-lg p-6">
             <h2 className="section-title">Submitted nomination</h2>
@@ -1007,7 +1007,7 @@ export default async function AdminApplicationDetail({
                       maxLength={160}
                       className="h-11 bg-white"
                     />
-                    <div className="grid grid-cols-[1fr_100px] gap-2">
+                    <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2">
                       <Input
                         name="amount"
                         inputMode="decimal"

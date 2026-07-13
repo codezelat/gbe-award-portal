@@ -105,7 +105,7 @@ export default async function FilesPage({
         Authorised validation, evidence history and retention controls. Raw R2
         credentials and permanent private URLs are never exposed.
       </p>
-      <form className="surface mt-6 grid gap-3 rounded-lg p-4 lg:grid-cols-[1fr_180px_220px_120px_auto]">
+      <form className="surface mt-6 grid gap-3 rounded-lg p-4 lg:grid-cols-[minmax(0,1fr)_180px_220px_120px_auto]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" />
           <Input

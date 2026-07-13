@@ -38,7 +38,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
     testInfo.project.name !== "desktop-chromium",
     "One administrator identity must enrol MFA exactly once.",
   );
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await page.goto("/login");
   await page.waitForLoadState("networkidle");
   await page.getByLabel("Email address").fill(E2E_ADMIN_EMAIL);
@@ -106,5 +106,55 @@ test("enforces staff MFA, then permits search and a real filtered export", async
     await expect(
       page.getByRole("navigation", { name: "Mobile administration" }),
     ).toBeVisible();
+  }
+
+  const applicationHref = await page
+    .getByRole("link", { name: E2E_APPLICATION_REFERENCE })
+    .getAttribute("href");
+  expect(applicationHref).toMatch(/^\/admin\/applications\//);
+
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 768, height: 900 },
+    { width: 1024, height: 900 },
+    { width: 1280, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const path of [
+      "/admin",
+      "/admin/applications",
+      applicationHref!,
+      "/admin/applicants",
+      "/admin/payments",
+      "/admin/files",
+      "/admin/communications",
+      "/admin/exports",
+      "/admin/reports",
+      "/admin/categories",
+      "/admin/cycles",
+      "/admin/staff",
+      "/admin/settings",
+      "/admin/activity",
+    ]) {
+      await page.goto(path);
+      await expect(page).not.toHaveURL(/\/login/);
+      await expect(
+        page.locator("#main-content"),
+        `${path} should render the administration shell at ${viewport.width}px`,
+      ).toBeVisible();
+      await expect(
+        page.locator("#main-content h1"),
+        `${path} should render its page heading at ${viewport.width}px`,
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth + 1,
+        ),
+        `${path} should not overflow at ${viewport.width}px`,
+      ).toBe(true);
+    }
   }
 });

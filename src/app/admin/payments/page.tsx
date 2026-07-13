@@ -113,7 +113,7 @@ export default async function PaymentsPage({
       <p className="mt-2 text-graphite">
         Review private evidence, reconciliation details and payment decisions.
       </p>
-      <form className="surface mt-6 grid gap-3 rounded-lg p-4 md:grid-cols-[1fr_210px_120px_auto]">
+      <form className="surface mt-6 grid gap-3 rounded-lg p-4 md:grid-cols-[minmax(0,1fr)_210px_120px_auto]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" />
           <Input

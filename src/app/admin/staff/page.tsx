@@ -69,7 +69,7 @@ export default async function StaffPage({
         />
         <Button>Search</Button>
       </form>
-      <div className="mt-7 grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex flex-col gap-3">
           {rows.map(({ profile, membership, email, twoFactorEnabled }) => (
             <form

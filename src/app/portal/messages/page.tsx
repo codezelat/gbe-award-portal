@@ -63,7 +63,7 @@ export default async function MessagesPage({
           ))}
         </nav>
       ) : null}
-      <div className="mt-7 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="surface rounded-lg p-6">
           <h2 className="section-title">
             {selected?.reference ?? "No linked application"}

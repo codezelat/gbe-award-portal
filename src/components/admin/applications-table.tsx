@@ -167,7 +167,7 @@ export function ApplicationsTable({
   const exportUrl = `${exportBase}&${selected.map((id) => `id=${encodeURIComponent(id)}`).join("&")}`;
   return (
     <>
-      <div className="hidden lg:block">
+      <div className="hidden xl:block">
         <Table className="min-w-[940px]">
           <TableHeader className="sticky top-0 z-10 bg-white">
             {table.getHeaderGroups().map((group) => (
@@ -229,7 +229,7 @@ export function ApplicationsTable({
           </TableBody>
         </Table>
       </div>
-      <div className="divide-y lg:hidden">
+      <div className="divide-y xl:hidden">
         {table.getRowModel().rows.length ? (
           table.getRowModel().rows.map((row) => (
             <article key={row.id} className="p-4">

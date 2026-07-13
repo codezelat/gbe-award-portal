@@ -127,9 +127,9 @@ export default async function CommunicationsPage({
         Transactional delivery state, approved copy and audited applicant
         messages.
       </p>
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div>
-          <form className="surface grid gap-3 rounded-lg p-4 md:grid-cols-2 xl:grid-cols-[1fr_150px_210px_150px_150px_120px_110px]">
+      <div className="mt-6 grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
+          <form className="surface grid gap-3 rounded-lg p-4 md:grid-cols-2 lg:grid-cols-3">
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" />
               <Input
