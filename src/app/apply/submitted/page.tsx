@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -11,11 +12,11 @@ export const metadata: Metadata = {
 
 export default function SubmittedPage() {
   return (
-    <>
+    <div className="flex min-h-svh flex-col">
       <PublicHeader />
       <main
         id="main-content"
-        className="mx-auto grid min-h-[70vh] max-w-2xl place-items-center px-5 py-16"
+        className="mx-auto grid w-full max-w-2xl flex-1 place-items-center px-5 py-16"
       >
         <section className="glass-feature w-full rounded-xl p-8 text-center md:p-12">
           <CheckCircle2 className="mx-auto size-12 text-emerald-700" />
@@ -38,6 +39,7 @@ export default function SubmittedPage() {
           </div>
         </section>
       </main>
-    </>
+      <PublicFooter />
+    </div>
   );
 }

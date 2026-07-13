@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Mail } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { NominationForm } from "@/components/forms/nomination-form";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
@@ -19,9 +20,9 @@ export default async function ApplyPage() {
     ]);
   const supportEmail = cycle?.supportEmail ?? "info@gbeaward.com";
   return (
-    <>
+    <div className="flex min-h-svh flex-col">
       <PublicHeader />
-      <main id="main-content">
+      <main id="main-content" className="flex-1">
         <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18">
           <div className="mb-9 border-b border-mist pb-9">
             <div>
@@ -52,6 +53,7 @@ export default async function ApplyPage() {
           />
         </section>
       </main>
-    </>
+      <PublicFooter />
+    </div>
   );
 }

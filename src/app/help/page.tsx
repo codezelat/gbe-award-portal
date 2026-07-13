@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import { Mail, MessageCircle } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 export const metadata: Metadata = {
   title: "Portal help",
   alternates: { canonical: "/help" },
 };
 export default function Help() {
   return (
-    <>
+    <div className="flex min-h-svh flex-col">
       <PublicHeader />
-      <main id="main-content" className="mx-auto max-w-3xl px-5 py-14 md:py-20">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-3xl flex-1 px-5 py-14 md:py-20"
+      >
         <h1 className="page-heading">Portal help</h1>
         <p className="mt-4 max-w-2xl leading-7 text-graphite">
           Assistance with nominations, invitation access and approved applicant
@@ -32,6 +36,7 @@ export default function Help() {
           Contact us on WhatsApp
         </a>
       </main>
-    </>
+      <PublicFooter />
+    </div>
   );
 }

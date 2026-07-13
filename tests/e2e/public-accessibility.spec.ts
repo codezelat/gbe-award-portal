@@ -75,6 +75,35 @@ test("public and authentication routes have no horizontal overflow", async ({
   }
 });
 
+test("public routes and footer links remain available", async ({ page }) => {
+  for (const path of ["/apply", "/apply/submitted", "/help", "/privacy", "/terms"]) {
+    const response = await page.goto(path);
+    expect(response, `${path} should return a response`).not.toBeNull();
+    expect(response!.status(), `${path} should not be broken`).toBeLessThan(400);
+  }
+
+  await page.goto("/help");
+  const footer = page.getByRole("contentinfo");
+  await expect(footer).toBeVisible();
+  await expect(
+    footer.getByRole("link", { name: "Privacy policy" }),
+  ).toHaveAttribute("href", "https://gbeaward.com/privacy-policy");
+  await expect(footer.getByRole("link", { name: "Terms" })).toHaveAttribute(
+    "href",
+    "/terms",
+  );
+  await expect(footer.getByRole("link", { name: "Contact" })).toHaveAttribute(
+    "href",
+    "mailto:info@gbeaward.com",
+  );
+
+  const footerBox = await footer.boundingBox();
+  expect(footerBox).not.toBeNull();
+  expect(Math.round(footerBox!.y + footerBox!.height)).toBe(
+    await page.evaluate(() => window.innerHeight),
+  );
+});
+
 test("protected portals redirect anonymous visitors to sign in", async ({
   page,
 }) => {

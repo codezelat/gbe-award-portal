@@ -1,4 +1,5 @@
 import { PublicHeader } from "@/components/shared/public-header";
+import { PublicFooter } from "@/components/shared/public-footer";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function LoadingStatus({ label }: { label: string }) {
@@ -249,9 +250,9 @@ export function MessagesPageSkeleton() {
 
 export function PublicNominationSkeleton() {
   return (
-    <>
+    <div className="flex min-h-svh flex-col">
       <PublicHeader />
-      <main id="main-content">
+      <main id="main-content" className="flex-1">
         <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18" aria-busy>
           <LoadingStatus label="Loading nomination form" />
           <div className="mb-9 border-b border-mist pb-9">
@@ -282,15 +283,20 @@ export function PublicNominationSkeleton() {
           </section>
         </section>
       </main>
-    </>
+      <PublicFooter />
+    </div>
   );
 }
 
 export function PublicContentSkeleton({ label = "Loading page" }: { label?: string }) {
   return (
-    <>
+    <div className="flex min-h-svh flex-col">
       <PublicHeader />
-      <main id="main-content" className="mx-auto max-w-3xl px-5 py-14 md:py-20" aria-busy>
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-3xl flex-1 px-5 py-14 md:py-20"
+        aria-busy
+      >
         <LoadingStatus label={label} />
         <PageHeadingSkeleton />
         <section className="surface mt-7 rounded-lg p-6 md:p-9">
@@ -299,15 +305,20 @@ export function PublicContentSkeleton({ label = "Loading page" }: { label?: stri
           ))}
         </section>
       </main>
-    </>
+      <PublicFooter />
+    </div>
   );
 }
 
 export function PublicCompletionSkeleton() {
   return (
-    <>
+    <div className="flex min-h-svh flex-col">
       <PublicHeader />
-      <main id="main-content" className="mx-auto grid min-h-[70vh] max-w-2xl place-items-center px-5 py-16" aria-busy>
+      <main
+        id="main-content"
+        className="mx-auto grid w-full max-w-2xl flex-1 place-items-center px-5 py-16"
+        aria-busy
+      >
         <LoadingStatus label="Loading nomination confirmation" />
         <section className="glass-feature w-full rounded-xl p-8 text-center md:p-12">
           <Skeleton className="mx-auto size-12 rounded-full" />
@@ -320,7 +331,8 @@ export function PublicCompletionSkeleton() {
           </div>
         </section>
       </main>
-    </>
+      <PublicFooter />
+    </div>
   );
 }
 
