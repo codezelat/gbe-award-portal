@@ -1,5 +1,5 @@
 import { PublicContentSkeleton } from "@/components/shared/loading-skeletons";
 
 export default function Loading() {
-  return <PublicContentSkeleton label="Loading GBE Awards" />;
+  return <PublicContentSkeleton label="Loading nomination terms" />;
 }

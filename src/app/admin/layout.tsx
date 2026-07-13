@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { desc } from "drizzle-orm";
 import { PortalShell } from "@/components/shared/portal-shell";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
 import { awardCycles } from "@/lib/db/schema";
+import { AdminShellLoading } from "@/components/shared/loading-skeletons";
 export const metadata: Metadata = {
   title: "Administration",
   robots: { index: false, follow: false },
@@ -15,6 +17,14 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <Suspense fallback={<AdminShellLoading />}>
+      <AdminWorkspace>{children}</AdminWorkspace>
+    </Suspense>
+  );
+}
+
+async function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const { profile, membership } = await requireStaff();
   const cycles = await getDb()
     .select({ id: awardCycles.id, name: awardCycles.name })
