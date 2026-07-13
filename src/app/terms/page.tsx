@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { PublicHeader } from "@/components/shared/public-header";
 import { PublicFooter } from "@/components/shared/public-footer";
 import { getPublicSetting } from "@/server/dal/settings";
+
+const description =
+  "Read the terms for submitting a nomination through the GBE Awards portal.";
+
 export const metadata: Metadata = {
   title: "Nomination terms",
+  description,
   alternates: { canonical: "/terms" },
+  openGraph: { title: "Nomination terms", description, url: "/terms" },
 };
 export const dynamic = "force-dynamic";
 export default async function Terms() {

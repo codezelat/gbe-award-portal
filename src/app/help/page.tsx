@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { Mail, MessageCircle } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
 import { PublicFooter } from "@/components/shared/public-footer";
+
+const description =
+  "Get help with GBE Awards nominations, invitation access and approved applicant accounts.";
+
 export const metadata: Metadata = {
   title: "Portal help",
+  description,
   alternates: { canonical: "/help" },
+  openGraph: { title: "Portal help", description, url: "/help" },
 };
 export default function Help() {
   return (

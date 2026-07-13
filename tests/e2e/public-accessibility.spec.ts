@@ -104,6 +104,65 @@ test("public routes and footer links remain available", async ({ page }) => {
   );
 });
 
+test("public discovery files expose only indexable routes", async ({ page }) => {
+  const robotsResponse = await page.goto("/robots.txt");
+  expect(robotsResponse).not.toBeNull();
+  expect(await page.locator("body").textContent()).toContain("Sitemap:");
+  expect(await page.locator("body").textContent()).toContain("Disallow: /api/");
+
+  const sitemapResponse = await page.goto("/sitemap.xml");
+  expect(sitemapResponse).not.toBeNull();
+  const sitemap = await page.locator("body").textContent();
+  for (const path of ["/apply", "/help", "/privacy", "/terms"])
+    expect(sitemap).toContain(path);
+  for (const path of ["/login", "/auth/", "/portal", "/admin"])
+    expect(sitemap).not.toContain(path);
+});
+
+test("public metadata is canonical and private routes are explicitly no-index", async ({
+  page,
+}) => {
+  await page.goto("/apply");
+  await expect(page).toHaveTitle("Apply for the GBE Awards 2026 | GBE Awards");
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "http://localhost:3100/apply",
+  );
+  await expect(page.locator('meta[property="og:type"]')).toHaveAttribute(
+    "content",
+    "website",
+  );
+  await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
+
+  for (const path of [
+    "/login",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+    "/apply/submitted",
+    "/portal",
+    "/admin",
+    "/admin/login",
+  ]) {
+    const response = await page.request.get(path, { maxRedirects: 0 });
+    expect(response.headers()["x-robots-tag"], path).toBe(
+      "noindex, nofollow, noarchive",
+    );
+  }
+
+  for (const path of [
+    "/login",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+    "/apply/submitted",
+  ]) {
+    await page.goto(path);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex, nofollow",
+    );
+  }
+});
+
 test("help contact actions expose the intended destinations", async ({ page }) => {
   await page.goto("/help");
   await expect(

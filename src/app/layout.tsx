@@ -4,10 +4,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { brand } from "@/config/brand";
 import "./globals.css";
 
+const portalUrl =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://access.gbeaward.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  ),
+  metadataBase: new URL(portalUrl),
   title: {
     default: "Apply for the GBE Awards 2026",
     template: "%s | GBE Awards",
@@ -17,6 +18,24 @@ export const metadata: Metadata = {
   applicationName: brand.shortName,
   robots: { index: true, follow: true },
   openGraph: {
+    title: "Apply for the GBE Awards 2026",
+    description:
+      "Recognition for outstanding organisations and leaders across the world.",
+    type: "website",
+    url: "/apply",
+    siteName: brand.name,
+    locale: "en_GB",
+    images: [
+      {
+        url: "/brand/hero-award-2026.webp",
+        width: 800,
+        height: 1300,
+        alt: "GBE Awards 2026",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
     title: "Apply for the GBE Awards 2026",
     description:
       "Recognition for outstanding organisations and leaders across the world.",

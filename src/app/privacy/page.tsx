@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import { PublicHeader } from "@/components/shared/public-header";
 import { PublicFooter } from "@/components/shared/public-footer";
 import { getPublicSetting } from "@/server/dal/settings";
+
+const description =
+  "Read the privacy notice for the GBE Awards nomination portal.";
+
 export const metadata: Metadata = {
   title: "Privacy notice",
+  description,
   alternates: { canonical: "/privacy" },
+  openGraph: { title: "Privacy notice", description, url: "/privacy" },
 };
 export const dynamic = "force-dynamic";
 export default async function Privacy() {

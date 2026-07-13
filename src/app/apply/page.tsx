@@ -3,12 +3,39 @@ import { Mail } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
 import { PublicFooter } from "@/components/shared/public-footer";
 import { NominationForm } from "@/components/forms/nomination-form";
+import { brand } from "@/config/brand";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
 
+const description =
+  "Submit a nomination for the Global Business Excellence Awards 2026 and showcase outstanding achievement, innovation and impact.";
+const portalUrl =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://access.gbeaward.com";
+
 export const metadata: Metadata = {
   title: "Apply for the GBE Awards 2026",
+  description,
   alternates: { canonical: "/apply" },
+  openGraph: {
+    title: "Apply for the GBE Awards 2026",
+    description,
+    url: "/apply",
+    type: "website",
+    images: [
+      {
+        url: "/brand/hero-award-2026.webp",
+        width: 800,
+        height: 1300,
+        alt: "GBE Awards 2026",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Apply for the GBE Awards 2026",
+    description,
+    images: ["/brand/hero-award-2026.webp"],
+  },
 };
 export const dynamic = "force-dynamic";
 
@@ -19,10 +46,47 @@ export default async function ApplyPage() {
       getPublicPaymentInstructions(),
     ]);
   const supportEmail = cycle?.supportEmail ?? "info@gbeaward.com";
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${brand.officialSite}/#organization`,
+        name: brand.name,
+        url: brand.officialSite,
+        logo: `${portalUrl}/brand/gbe-logo-full.png`,
+        email: brand.supportEmail,
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${portalUrl}/#website`,
+        name: `${brand.shortName} nomination portal`,
+        url: portalUrl,
+        inLanguage: "en-GB",
+        publisher: { "@id": `${brand.officialSite}/#organization` },
+      },
+      {
+        "@type": "WebPage",
+        "@id": `${portalUrl}/apply#webpage`,
+        name: "Apply for the GBE Awards 2026",
+        url: `${portalUrl}/apply`,
+        description,
+        isPartOf: { "@id": `${portalUrl}/#website` },
+        about: { "@id": `${brand.officialSite}/#organization` },
+        inLanguage: "en-GB",
+      },
+    ],
+  };
   return (
     <div className="flex min-h-svh flex-col">
       <PublicHeader />
       <main id="main-content" className="flex-1">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
+          }}
+        />
         <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18">
           <div className="mb-9 border-b border-mist pb-9">
             <div>
