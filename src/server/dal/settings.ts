@@ -16,6 +16,7 @@ export async function getPublicSetting(key: "legal_terms" | "privacy_notice") {
 const paymentInstructionsSchema = z
   .object({
     refundableIfNotAwarded: z.boolean().optional(),
+    standardFeeMinor: z.number().int().nonnegative().optional(),
     cardPaymentUrl: z.url().startsWith("https://").optional(),
     bankTransfer: z
       .object({

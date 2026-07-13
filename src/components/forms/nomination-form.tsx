@@ -9,6 +9,8 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronsUpDown,
+  CreditCard,
+  Landmark,
   LoaderCircle,
   LockKeyhole,
   RotateCcw,
@@ -44,6 +46,15 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { declarationText } from "@/config/brand";
 import {
   publicApplicationSchema,
@@ -58,6 +69,7 @@ import { Turnstile } from "./turnstile";
 type Category = { id: string; name: string };
 type PaymentInstructions = {
   refundableIfNotAwarded?: boolean;
+  standardFeeMinor?: number;
   cardPaymentUrl?: string;
   bankTransfer?: {
     accountName: string;
@@ -96,10 +108,19 @@ type SubmissionStage =
 
 const FORM_STEPS = [
   { title: "Nominee", description: "Who you are nominating" },
-  { title: "Contact", description: "Contact and category" },
-  { title: "Documents", description: "Evidence and payment proof" },
+  { title: "Contact", description: "Contact, category and documents" },
+  { title: "Payment", description: "Payment and proof" },
   { title: "Confirm", description: "Review and submit" },
 ] as const;
+
+function formatFee(amountMinor?: number, currency?: string) {
+  if (amountMinor === undefined || !currency) return null;
+  return new Intl.NumberFormat("en-LK", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amountMinor / 100);
+}
 
 function uploadFile(
   upload: SelectedUpload,
@@ -194,16 +215,10 @@ export function NominationForm({
       )
     : 0;
   const busy = ["preparing", "uploading", "finalising"].includes(stage);
-  const fee = useMemo(
-    () =>
-      feeMinor !== undefined && currency
-        ? new Intl.NumberFormat("en-LK", {
-            style: "currency",
-            currency,
-            maximumFractionDigits: 0,
-          }).format(feeMinor / 100)
-        : null,
-    [currency, feeMinor],
+  const fee = formatFee(feeMinor, currency);
+  const standardFee = formatFee(
+    paymentInstructions?.standardFeeMinor,
+    currency,
   );
 
   useEffect(() => {
@@ -603,113 +618,11 @@ export function NominationForm({
                 </Field>
               )}
             />
-          </FieldGroup>
-        </FormSection>
-      ) : null}
-      {currentStep === 2 ? (
-        <FormSection
-          headingRef={stepHeadingRef}
-          number="3"
-          title="Documents and payment"
-        >
-          <FieldGroup>
-            <div className="rounded-md border border-champagne/50 bg-gold-wash/55 p-4 text-sm text-graphite">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-medium text-foreground">Application fee</p>
-                {fee ? (
-                  <p className="text-lg font-semibold text-foreground">{fee}</p>
-                ) : null}
-              </div>
-              <p className="mt-1 leading-6">
-                Covers nomination processing and document verification.
-                {paymentInstructions?.refundableIfNotAwarded
-                  ? " Fully refundable if the nominee is not awarded."
-                  : ""}
-              </p>
-              {paymentInstructions?.cardPaymentUrl ||
-              paymentInstructions?.bankTransfer ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-champagne/40 pt-4">
-                  {paymentInstructions.cardPaymentUrl ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      nativeButton={false}
-                      render={
-                        <a
-                          href={paymentInstructions.cardPaymentUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        />
-                      }
-                    >
-                      Pay securely by card
-                    </Button>
-                  ) : null}
-                  {paymentInstructions.bankTransfer ? (
-                    <details className="group">
-                      <summary className="min-h-9 cursor-pointer content-center font-medium text-antique-gold underline-offset-4 hover:underline">
-                        View bank-transfer details
-                      </summary>
-                      <dl className="mt-3 grid gap-x-6 gap-y-2 border-l border-champagne pl-4 text-xs sm:grid-cols-2">
-                        <div>
-                          <dt className="text-muted-foreground">
-                            Account name
-                          </dt>
-                          <dd className="font-medium text-foreground">
-                            {paymentInstructions.bankTransfer.accountName}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">Bank</dt>
-                          <dd className="font-medium text-foreground">
-                            {paymentInstructions.bankTransfer.bankName}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">
-                            Account number
-                          </dt>
-                          <dd className="font-mono font-medium text-foreground">
-                            {paymentInstructions.bankTransfer.accountNumber}
-                          </dd>
-                        </div>
-                        {paymentInstructions.bankTransfer.branchName ? (
-                          <div>
-                            <dt className="text-muted-foreground">Branch</dt>
-                            <dd className="font-medium text-foreground">
-                              {paymentInstructions.bankTransfer.branchName}
-                            </dd>
-                          </div>
-                        ) : null}
-                        {paymentInstructions.bankTransfer.bankCode ? (
-                          <div>
-                            <dt className="text-muted-foreground">Bank code</dt>
-                            <dd className="font-mono font-medium text-foreground">
-                              {paymentInstructions.bankTransfer.bankCode}
-                            </dd>
-                          </div>
-                        ) : null}
-                        {paymentInstructions.bankTransfer.branchCode ? (
-                          <div>
-                            <dt className="text-muted-foreground">
-                              Branch code
-                            </dt>
-                            <dd className="font-mono font-medium text-foreground">
-                              {paymentInstructions.bankTransfer.branchCode}
-                            </dd>
-                          </div>
-                        ) : null}
-                      </dl>
-                    </details>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
             <Field>
               <FieldLabel>Supporting documents</FieldLabel>
               <FieldDescription>
                 Optional · add up to five files that strengthen the nomination.
+                Each file can be up to 5 MB.
               </FieldDescription>
               <FilePicker
                 kind="supporting_document"
@@ -719,6 +632,45 @@ export function NominationForm({
                 onRetry={retry}
               />
             </Field>
+          </FieldGroup>
+        </FormSection>
+      ) : null}
+      {currentStep === 2 ? (
+        <FormSection headingRef={stepHeadingRef} number="3" title="Payment">
+          <FieldGroup>
+            <div className="rounded-md border border-champagne/50 bg-gold-wash/55 p-4 text-sm text-graphite">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <p className="font-medium text-foreground">Application fee</p>
+                <div className="flex items-baseline gap-2">
+                  {standardFee ? (
+                    <span className="text-sm text-muted-foreground line-through">
+                      {standardFee}
+                    </span>
+                  ) : null}
+                  {fee ? (
+                    <span className="text-lg font-semibold text-foreground">
+                      {fee}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              {standardFee ? (
+                <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-antique-gold">
+                  Early-bird fee
+                </p>
+              ) : null}
+              <p className="mt-2 leading-6">
+                Covers nomination processing and document verification.
+                {paymentInstructions?.refundableIfNotAwarded
+                  ? " Fully refundable if the nominee is not awarded."
+                  : ""}
+              </p>
+              <div className="mt-4 border-t border-champagne/40 pt-4">
+                <PaymentMethodDialog
+                  paymentInstructions={paymentInstructions}
+                />
+              </div>
+            </div>
             <Field data-invalid={Boolean(fileError)}>
               <FieldLabel>
                 Payment proof{" "}
@@ -727,7 +679,8 @@ export function NominationForm({
                 </span>
               </FieldLabel>
               <FieldDescription>
-                Required · add one payment slip, receipt or screenshot.
+                After paying by card or bank transfer, add one payment slip,
+                receipt or screenshot. Maximum 5 MB.
               </FieldDescription>
               <FilePicker
                 kind="payment_proof"
@@ -924,6 +877,137 @@ export function NominationForm({
         </div>
       ) : null}
     </form>
+  );
+}
+
+function PaymentMethodDialog({
+  paymentInstructions,
+}: {
+  paymentInstructions?: PaymentInstructions;
+}) {
+  const cardPaymentUrl = paymentInstructions?.cardPaymentUrl;
+  const bankTransfer = paymentInstructions?.bankTransfer;
+  if (!cardPaymentUrl && !bankTransfer)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Payment instructions will be provided by the GBE Awards team.
+      </p>
+    );
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={<Button type="button" variant="outline" size="sm" />}
+      >
+        Choose payment method
+      </DialogTrigger>
+      <DialogContent className="gap-5 p-5 sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Choose payment method</DialogTitle>
+          <DialogDescription>
+            Pay securely by card or use the bank-transfer details below. When
+            payment is complete, return here and upload one receipt, slip or
+            screenshot.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          {cardPaymentUrl ? (
+            <div className="rounded-md border border-mist bg-white p-4">
+              <div className="flex gap-3">
+                <CreditCard
+                  className="mt-0.5 size-5 shrink-0 text-antique-gold"
+                  aria-hidden
+                />
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">Card payment</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Opens the secure payment page in a new tab.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="mt-3"
+                    nativeButton={false}
+                    render={
+                      <a
+                        href={cardPaymentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    }
+                  >
+                    Pay securely by card
+                    <ArrowRight data-icon="inline-end" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {bankTransfer ? (
+            <div className="rounded-md border border-mist bg-white p-4">
+              <div className="flex gap-3">
+                <Landmark
+                  className="mt-0.5 size-5 shrink-0 text-antique-gold"
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground">Bank transfer</p>
+                  <dl className="mt-3 grid gap-x-6 gap-y-3 text-xs sm:grid-cols-2">
+                    <PaymentDetail label="Account name">
+                      {bankTransfer.accountName}
+                    </PaymentDetail>
+                    <PaymentDetail label="Bank">
+                      {bankTransfer.bankName}
+                    </PaymentDetail>
+                    <PaymentDetail label="Account number" mono>
+                      {bankTransfer.accountNumber}
+                    </PaymentDetail>
+                    {bankTransfer.branchName ? (
+                      <PaymentDetail label="Branch">
+                        {bankTransfer.branchName}
+                      </PaymentDetail>
+                    ) : null}
+                    {bankTransfer.bankCode ? (
+                      <PaymentDetail label="Bank code" mono>
+                        {bankTransfer.bankCode}
+                      </PaymentDetail>
+                    ) : null}
+                    {bankTransfer.branchCode ? (
+                      <PaymentDetail label="Branch code" mono>
+                        {bankTransfer.branchCode}
+                      </PaymentDetail>
+                    ) : null}
+                  </dl>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <DialogFooter showCloseButton />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PaymentDetail({
+  label,
+  mono = false,
+  children,
+}: {
+  label: string;
+  mono?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd
+        className={
+          mono ? "font-mono font-medium text-foreground" : "font-medium text-foreground"
+        }
+      >
+        {children}
+      </dd>
+    </div>
   );
 }
 
