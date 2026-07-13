@@ -15,18 +15,18 @@ Before changing anything:
 
 ## 2. Repository map
 
-| Path | Responsibility |
-| --- | --- |
-| `src/app/` | App Router pages, route handlers, layouts, metadata, loading and error boundaries. `apply` is public; `portal` is applicant-only; `admin` is staff-only. |
-| `src/components/` | Shared UI, form, upload, applicant and admin presentation components. Prefer existing primitives in `src/components/ui/`. |
-| `src/server/` | Server actions, data-access layer, business services, jobs and security controls. Keep privileged work here. |
-| `src/lib/` | Environment parsing, database, Better Auth, R2 client, domain and export utilities. |
-| `src/config/` | Award branding, navigation and role-permission definitions. |
-| `src/emails/` | React Email components and templates. |
-| `drizzle/migrations/` | Append-only PostgreSQL migration history. |
-| `scripts/` | Environment/provider verification, cycle seeding and one-time first-admin bootstrap. |
-| `tests/unit/`, `tests/integration/`, `tests/e2e/` | Unit, database-integrity and browser coverage. |
-| `public/brand/` | Versioned public logo/artwork. Never store private applicant files here. |
+| Path                                              | Responsibility                                                                                                                                           |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/`                                        | App Router pages, route handlers, layouts, metadata, loading and error boundaries. `apply` is public; `portal` is applicant-only; `admin` is staff-only. |
+| `src/components/`                                 | Shared UI, form, upload, applicant and admin presentation components. Prefer existing primitives in `src/components/ui/`.                                |
+| `src/server/`                                     | Server actions, data-access layer, business services, jobs and security controls. Keep privileged work here.                                             |
+| `src/lib/`                                        | Environment parsing, database, Better Auth, R2 client, domain and export utilities.                                                                      |
+| `src/config/`                                     | Award branding, navigation and role-permission definitions.                                                                                              |
+| `src/emails/`                                     | React Email components and templates.                                                                                                                    |
+| `drizzle/migrations/`                             | Append-only PostgreSQL migration history.                                                                                                                |
+| `scripts/`                                        | Environment/provider verification, cycle seeding and one-time first-admin bootstrap.                                                                     |
+| `tests/unit/`, `tests/integration/`, `tests/e2e/` | Unit, database-integrity and browser coverage.                                                                                                           |
+| `public/brand/`                                   | Versioned public logo/artwork. Never store private applicant files here.                                                                                 |
 
 ## 3. Commands
 
@@ -74,7 +74,7 @@ bun run db:bootstrap-admin
 ### Domain rules
 
 - Preserve `src/lib/domain/application-status.ts` and the transition service as the source of truth for nomination status changes. Do not update workflow state from arbitrary UI code.
-- Permission checks use `src/lib/domain/permissions.ts` and `src/config/permissions.ts`; do not rely on hidden navigation or client rendering as access control.
+- Internal access has two levels: `staff` for the complete nomination workflow and `super_admin` for people/system governance. Permission checks use `src/lib/domain/permissions.ts` and `src/config/permissions.ts`; do not rely on hidden navigation or client rendering as access control.
 - Award-cycle data, fee settings, legal text, categories, programme copy and opening status are business-controlled content. Do not silently alter them during technical work. Ask for explicit direction when a change goes beyond the requested scope.
 - References must remain opaque, non-sequential and unique. Do not replace their random six-digit suffix with a count or predictable ID.
 
@@ -121,14 +121,14 @@ bun run db:bootstrap-admin
 
 Run the narrowest useful checks while iterating, then the full relevant gate before handoff:
 
-| Change | Minimum verification |
-| --- | --- |
-| UI/copy/layout | `bun run lint`, `bun run typecheck`, targeted Playwright/Vitest test; inspect desktop and mobile rendering. |
-| Shared component/layout | `bun run check` and affected Playwright paths, including overflow and loading behavior. |
-| Validation, permissions, workflow or API route | Unit coverage plus the affected integration/E2E scenario. |
-| Database migration | Schema/migration review, `bun run db:migrate` on an isolated database, relevant integration tests. |
-| Provider, upload, auth, email or cron change | `bun run env:verify`, `bun run providers:verify`, targeted E2E and real non-production provider verification. |
-| Release | `bun run check`, relevant integration/E2E suite, `git diff --check`, clean intended worktree, Vercel Ready state and post-deploy smoke check. |
+| Change                                         | Minimum verification                                                                                                                          |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI/copy/layout                                 | `bun run lint`, `bun run typecheck`, targeted Playwright/Vitest test; inspect desktop and mobile rendering.                                   |
+| Shared component/layout                        | `bun run check` and affected Playwright paths, including overflow and loading behavior.                                                       |
+| Validation, permissions, workflow or API route | Unit coverage plus the affected integration/E2E scenario.                                                                                     |
+| Database migration                             | Schema/migration review, `bun run db:migrate` on an isolated database, relevant integration tests.                                            |
+| Provider, upload, auth, email or cron change   | `bun run env:verify`, `bun run providers:verify`, targeted E2E and real non-production provider verification.                                 |
+| Release                                        | `bun run check`, relevant integration/E2E suite, `git diff --check`, clean intended worktree, Vercel Ready state and post-deploy smoke check. |
 
 Do not claim a route, provider or deployment works merely because it compiles. State what was actually exercised and any external dependency still requiring the owner’s action.
 

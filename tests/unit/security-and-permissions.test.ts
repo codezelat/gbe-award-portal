@@ -26,11 +26,14 @@ const base = {
 describe("permission enforcement", () => {
   it("grants role defaults and honours explicit denial", () => {
     expect(
-      hasPermission({ role: "finance", permissions: {} }, "payments.verify"),
+      hasPermission({ role: "staff", permissions: {} }, "payments.verify"),
     ).toBe(true);
     expect(
+      hasPermission({ role: "staff", permissions: {} }, "configuration.manage"),
+    ).toBe(false);
+    expect(
       hasPermission(
-        { role: "finance", permissions: { "payments.verify": false } },
+        { role: "staff", permissions: { "payments.verify": false } },
         "payments.verify",
       ),
     ).toBe(false);
@@ -39,7 +42,7 @@ describe("permission enforcement", () => {
         { role: "reviewer", permissions: {} },
         "applications.view_all",
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       hasPermission({ role: "super_admin", permissions: {} }, "anything"),
     ).toBe(true);

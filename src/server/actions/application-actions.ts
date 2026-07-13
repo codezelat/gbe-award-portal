@@ -62,20 +62,10 @@ async function assertApplicationAccess(
 export async function changeStatusAction(formData: FormData) {
   scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
-  if (
-    !hasPermission(membership, "applications.change_status") &&
-    !["admin", "super_admin"].includes(membership.role)
-  )
+  if (!hasPermission(membership, "applications.change_status"))
     throw new Error("You do not have permission to change status.");
   const input = statusSchema.parse(Object.fromEntries(formData));
   await assertApplicationAccess(profile.id, membership, input.applicationId);
-  if (
-    membership.role === "reviewer" &&
-    !(["under_review", "changes_requested"] as string[]).includes(input.to)
-  )
-    throw new Error(
-      "Reviewers may only begin review or request applicant changes.",
-    );
   await enforceRateLimit(`status-change:${profile.id}`, 60, 3600);
   if (
     input.to === "approved" &&
@@ -169,10 +159,7 @@ export async function setApplicationDeletionAction(formData: FormData) {
 }
 export async function addInternalNoteAction(formData: FormData) {
   const { profile, membership } = await requireStaff();
-  if (
-    !hasPermission(membership, "applications.edit") &&
-    !["admin", "super_admin", "reviewer", "finance"].includes(membership.role)
-  )
+  if (!hasPermission(membership, "applications.edit"))
     throw new Error("You do not have permission to add notes.");
   const input = z
     .object({
@@ -190,10 +177,7 @@ export async function addInternalNoteAction(formData: FormData) {
 export async function updatePaymentAction(formData: FormData) {
   scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
-  if (
-    !hasPermission(membership, "payments.verify") &&
-    !["finance", "admin", "super_admin"].includes(membership.role)
-  )
+  if (!hasPermission(membership, "payments.verify"))
     throw new Error("You do not have finance permission.");
   const input = z
     .object({
@@ -398,10 +382,7 @@ const editableApplicationFields = [
 export async function requestChangesAction(formData: FormData) {
   scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
-  if (
-    !hasPermission(membership, "applications.change_status") &&
-    !["admin", "super_admin", "reviewer"].includes(membership.role)
-  )
+  if (!hasPermission(membership, "applications.change_status"))
     throw new Error("You do not have permission to request changes.");
   const input = z
     .object({
@@ -473,10 +454,7 @@ export async function requestChangesAction(formData: FormData) {
 export async function editApplicationAction(formData: FormData) {
   scheduleEmailOutboxProcessing();
   const { profile, membership } = await requireStaff();
-  if (
-    !hasPermission(membership, "applications.edit") &&
-    !["admin", "super_admin"].includes(membership.role)
-  )
+  if (!hasPermission(membership, "applications.edit"))
     throw new Error("Application editing permission is required.");
   const input = z
     .object({

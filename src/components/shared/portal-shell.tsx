@@ -30,6 +30,12 @@ export function PortalShell({
       !allowedAdminHrefs ||
       allowedAdminHrefs.includes(item.href),
   );
+  const roleLabel =
+    kind === "admin"
+      ? role === "super_admin"
+        ? "Super admin"
+        : "Staff"
+      : "Approved applicant";
   return (
     <div className="min-h-svh lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="glass-shell fixed inset-y-0 left-0 z-30 hidden w-60 flex-col px-4 py-6 lg:flex">
@@ -46,9 +52,7 @@ export function PortalShell({
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{name}</p>
-            <p className="text-xs capitalize text-muted-foreground">
-              {role?.replace("_", " ") ?? "Approved applicant"}
-            </p>
+            <p className="text-xs text-muted-foreground">{roleLabel}</p>
           </div>
         </div>
         <nav

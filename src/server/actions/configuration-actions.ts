@@ -11,10 +11,7 @@ import {
   systemSettings,
 } from "@/lib/db/schema";
 function requireConfig(membership: { role: string; permissions: unknown }) {
-  if (
-    !hasPermission(membership, "configuration.manage") &&
-    !["admin", "super_admin"].includes(membership.role)
-  )
+  if (!hasPermission(membership, "configuration.manage"))
     throw new Error("Settings permission is required.");
 }
 export async function createCycleAction(formData: FormData) {

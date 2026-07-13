@@ -816,7 +816,7 @@ export default async function AdminApplicationDetail({
           {hasPermission(membership, "applications.edit") ? (
             <details className="surface group rounded-lg">
               <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                Reviewer assignment
+                Staff assignment
               </summary>
               <div className="border-t px-5 pb-5">
                 <form
@@ -830,7 +830,7 @@ export default async function AdminApplicationDetail({
                   />
                   <select
                     name="reviewerId"
-                    aria-label="Assigned reviewer"
+                    aria-label="Assigned staff member"
                     defaultValue={application.assignedReviewerId ?? ""}
                     className="h-11 rounded-md border bg-white px-3"
                   >
@@ -841,7 +841,7 @@ export default async function AdminApplicationDetail({
                       </option>
                     ))}
                   </select>
-                  <Button variant="outline">Save reviewer</Button>
+                  <Button variant="outline">Save assignment</Button>
                 </form>
               </div>
             </details>

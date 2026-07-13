@@ -43,8 +43,7 @@ export async function GET(request: Request) {
   if (
     !staff ||
     staff.membership.suspendedAt ||
-    (!hasPermission(staff.membership, "exports.create") &&
-      !["admin", "super_admin"].includes(staff.membership.role))
+    !hasPermission(staff.membership, "exports.create")
   )
     return NextResponse.json(
       { message: "Export permission required." },

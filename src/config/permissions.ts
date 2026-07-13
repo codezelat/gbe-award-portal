@@ -1,6 +1,6 @@
 export const rolePermissions: Record<string, readonly string[]> = {
   super_admin: ["*"],
-  admin: [
+  staff: [
     "applications.view",
     "applications.view_all",
     "applications.edit",
@@ -15,28 +15,10 @@ export const rolePermissions: Record<string, readonly string[]> = {
     "messages.send",
     "exports.create",
     "applicants.manage",
-    "configuration.manage",
-    "audit.view",
   ],
-  reviewer: [
-    "applications.view",
-    "applications.change_status",
-    "files.view",
-    "messages.send",
-  ],
-  finance: [
-    "applications.view",
-    "applications.view_all",
-    "payments.view",
-    "payments.verify",
-    "files.view",
-    "exports.create",
-  ],
-  support: [
-    "applications.view",
-    "applications.view_all",
-    "files.view",
-    "messages.send",
-    "applicants.manage",
-  ],
+  // Existing memberships are treated as staff until their records are edited.
+  admin: [],
+  reviewer: [],
+  finance: [],
+  support: [],
 };

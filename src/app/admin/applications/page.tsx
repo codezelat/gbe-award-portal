@@ -410,11 +410,11 @@ export default async function ApplicationsPage({
             </select>
             <select
               name="reviewer"
-              aria-label="Reviewer"
+              aria-label="Assigned staff member"
               defaultValue={params.reviewer ?? ""}
               className="h-11 rounded-md border bg-white px-3 text-sm"
             >
-              <option value="">All reviewers</option>
+              <option value="">All staff members</option>
               {reviewers.map((reviewer) => (
                 <option key={reviewer.id} value={reviewer.id}>
                   {reviewer.name}

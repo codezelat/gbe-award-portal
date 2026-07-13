@@ -79,10 +79,7 @@ export async function GET(request: Request) {
     if (
       !staff ||
       staff.membership.suspendedAt ||
-      (!hasPermission(staff.membership, "applications.view") &&
-        !["admin", "super_admin", "reviewer", "finance", "support"].includes(
-          staff.membership.role,
-        ))
+      !hasPermission(staff.membership, "applications.view")
     )
       return NextResponse.json(
         { ok: false, message: "Access denied." },

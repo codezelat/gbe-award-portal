@@ -24,6 +24,7 @@ import {
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 export default async function AdminDashboard() {
   const { profile, membership } = await requireStaff();
+  const isSuperAdmin = membership.role === "super_admin";
   const db = getDb();
   const rawCycleId = (await cookies()).get("gbe_admin_cycle")?.value;
   const selectedCycleId =
@@ -271,70 +272,72 @@ export default async function AdminDashboard() {
           }))}
         />
       </div>
-      <details className="surface group mt-6 rounded-lg">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-          <span>System follow-up</span>
-          <span className="text-xs font-normal text-muted-foreground group-open:hidden">
-            Emails, invitations, jobs and staff activity
-          </span>
-          <span
-            aria-hidden
-            className="hidden text-muted-foreground group-open:inline"
-          >
-            −
-          </span>
-        </summary>
-        <div className="grid gap-5 border-t p-5 xl:grid-cols-2">
-          <OperationalPanel
-            title="Failed emails"
-            empty="No email delivery failures."
-            bare
-            rows={failedEmails.map((item) => ({
-              id: item.id,
-              primary: item.template.replaceAll("_", " "),
-              secondary: `${item.recipient} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
-              href: "/admin/communications",
-            }))}
-          />
-          <OperationalPanel
-            title="Expiring invitations"
-            empty="No active invitations are nearing expiry."
-            bare
-            rows={expiringInvites.map((item) => ({
-              id: item.id,
-              primary: item.email,
-              secondary: `Expires ${formatInTimeZone(item.expiresAt, "Asia/Colombo", "dd MMM yyyy, HH:mm")}`,
-              href: "/admin/applicants",
-            }))}
-          />
-          <OperationalPanel
-            title="Failed scheduled jobs"
-            empty="No recorded scheduled-job failures."
-            bare
-            rows={failedJobs.map((item) => ({
-              id: item.id,
-              primary: item.key,
-              secondary: formatInTimeZone(
-                item.startedAt,
-                "Asia/Colombo",
-                "dd MMM yyyy, HH:mm",
-              ),
-              href: "/admin/activity",
-            }))}
-          />
-          <OperationalPanel
-            title="Recent staff activity"
-            empty="No audited activity yet."
-            bare
-            rows={activity.map((item) => ({
-              id: item.id,
-              primary: item.action,
-              secondary: `${item.actor ?? "System"} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
-              href: "/admin/activity",
-            }))}
-          />
-        </div>
-      </details>
+      {isSuperAdmin ? (
+        <details className="surface group mt-6 rounded-lg">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <span>System follow-up</span>
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+              Emails, invitations, jobs and staff activity
+            </span>
+            <span
+              aria-hidden
+              className="hidden text-muted-foreground group-open:inline"
+            >
+              −
+            </span>
+          </summary>
+          <div className="grid gap-5 border-t p-5 xl:grid-cols-2">
+            <OperationalPanel
+              title="Failed emails"
+              empty="No email delivery failures."
+              bare
+              rows={failedEmails.map((item) => ({
+                id: item.id,
+                primary: item.template.replaceAll("_", " "),
+                secondary: `${item.recipient} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
+                href: "/admin/communications",
+              }))}
+            />
+            <OperationalPanel
+              title="Expiring invitations"
+              empty="No active invitations are nearing expiry."
+              bare
+              rows={expiringInvites.map((item) => ({
+                id: item.id,
+                primary: item.email,
+                secondary: `Expires ${formatInTimeZone(item.expiresAt, "Asia/Colombo", "dd MMM yyyy, HH:mm")}`,
+                href: "/admin/applicants",
+              }))}
+            />
+            <OperationalPanel
+              title="Failed scheduled jobs"
+              empty="No recorded scheduled-job failures."
+              bare
+              rows={failedJobs.map((item) => ({
+                id: item.id,
+                primary: item.key,
+                secondary: formatInTimeZone(
+                  item.startedAt,
+                  "Asia/Colombo",
+                  "dd MMM yyyy, HH:mm",
+                ),
+                href: "/admin/activity",
+              }))}
+            />
+            <OperationalPanel
+              title="Recent staff activity"
+              empty="No audited activity yet."
+              bare
+              rows={activity.map((item) => ({
+                id: item.id,
+                primary: item.action,
+                secondary: `${item.actor ?? "System"} · ${formatInTimeZone(item.createdAt, "Asia/Colombo", "dd MMM, HH:mm")}`,
+                href: "/admin/activity",
+              }))}
+            />
+          </div>
+        </details>
+      ) : null}
     </>
   );
 }

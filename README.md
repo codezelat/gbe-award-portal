@@ -35,12 +35,12 @@ The production portal for the **Global Business Excellence Awards 2026**. It giv
 
 ## ✨ What it does
 
-| For | Experience |
-| --- | --- |
-| **Nominees** | A four-step public nomination journey with category selection, supporting documents, payment choice and payment-proof upload. Every file is uploaded directly to private storage and every completed nomination gets a non-sequential `GBE-2026-######` reference. |
-| **Approved applicants** | Invitation-only access to applications, requested documents, payment status, messages, profile, password management and account security. A public nomination never creates an account by itself. |
-| **Award staff** | Role-aware operations screens for applications, applicants, payments, files, communications, exports, reports, categories, award cycles, settings and append-only activity. Staff must enrol TOTP MFA before administration access. |
-| **Operations** | Controlled workflow transitions, reviewer assignment, change requests, payment verification, signed downloads, exports, delivery tracking, retention work and an auditable history of sensitive actions. |
+| For                     | Experience                                                                                                                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Nominees**            | A four-step public nomination journey with category selection, supporting documents, payment choice and payment-proof upload. Every file is uploaded directly to private storage and every completed nomination gets a non-sequential `GBE-2026-######` reference. |
+| **Approved applicants** | Invitation-only access to applications, requested documents, payment status, messages, profile, password management and account security. A public nomination never creates an account by itself.                                                                  |
+| **Award staff**         | One focused Staff workspace for applications, applicants, payments, files, communications, exports and reports. Super admins also manage award cycles, categories, staff, settings and audit activity. Staff must enrol TOTP MFA before administration access.     |
+| **Operations**          | Controlled workflow transitions, reviewer assignment, change requests, payment verification, signed downloads, exports, delivery tracking, retention work and an auditable history of sensitive actions.                                                           |
 
 ## 🧭 Product flow
 
@@ -68,23 +68,23 @@ Supporting documents and payment proof are independently limited to **5 MB per f
 
 ## 🏗️ Architecture
 
-| Layer | Technology | Responsibility |
-| --- | --- | --- |
-| Application | Next.js 16 App Router, React 19, strict TypeScript | Public, applicant and staff routes; server actions; route handlers; streaming loading states. |
-| Interface | Tailwind CSS 4, shadcn/Base UI, TanStack Table | Responsive, keyboard-accessible light-mode interface with tailored mobile/tablet layouts. |
-| Data | Neon PostgreSQL, Drizzle ORM | Relational award data, workflow state, accounts, audit history, email outbox, rate limits and migrations. |
-| Authentication | Better Auth + Drizzle adapter | Approval-first invitations, password recovery, session revocation and mandatory TOTP MFA for staff. |
-| File storage | Cloudflare R2 + AWS SDK | Private, browser-to-R2 presigned uploads; type detection; signed downloads; lifecycle cleanup. |
-| Abuse protection | Cloudflare Turnstile + PostgreSQL-backed rate limiting | Nomination verification and durable, cross-instance request limits. |
-| Email | Resend + React Email | Durable outbox, idempotent delivery, retry/backoff and signed delivery webhooks. |
-| Exports | ExcelJS, CSV and React PDF | Filtered staff exports and private applicant application summaries. |
-| Hosting | Vercel + Cloudflare DNS | Production hosting, security headers and one Hobby-compatible daily cron. |
+| Layer            | Technology                                             | Responsibility                                                                                            |
+| ---------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Application      | Next.js 16 App Router, React 19, strict TypeScript     | Public, applicant and staff routes; server actions; route handlers; streaming loading states.             |
+| Interface        | Tailwind CSS 4, shadcn/Base UI, TanStack Table         | Responsive, keyboard-accessible light-mode interface with tailored mobile/tablet layouts.                 |
+| Data             | Neon PostgreSQL, Drizzle ORM                           | Relational award data, workflow state, accounts, audit history, email outbox, rate limits and migrations. |
+| Authentication   | Better Auth + Drizzle adapter                          | Approval-first invitations, password recovery, session revocation and mandatory TOTP MFA for staff.       |
+| File storage     | Cloudflare R2 + AWS SDK                                | Private, browser-to-R2 presigned uploads; type detection; signed downloads; lifecycle cleanup.            |
+| Abuse protection | Cloudflare Turnstile + PostgreSQL-backed rate limiting | Nomination verification and durable, cross-instance request limits.                                       |
+| Email            | Resend + React Email                                   | Durable outbox, idempotent delivery, retry/backoff and signed delivery webhooks.                          |
+| Exports          | ExcelJS, CSV and React PDF                             | Filtered staff exports and private applicant application summaries.                                       |
+| Hosting          | Vercel + Cloudflare DNS                                | Production hosting, security headers and one Hobby-compatible daily cron.                                 |
 
 ### Security model
 
 - **Public routes** are limited to the nomination and information pages. Turnstile checks action and expected hostname server-side.
 - **Private routes** are protected early by `src/proxy.ts`, then enforce a session and application-level profile checks in the server data-access layer.
-- **Staff routes** require a staff profile, active membership, granular permissions and mandatory TOTP MFA. The QR code and manual setup URI work with Google Authenticator, Microsoft Authenticator and compatible apps.
+- **Staff routes** require a staff profile, active membership and mandatory TOTP MFA. Staff can complete the full nomination workflow; super admins additionally manage people and system configuration. The QR code and manual setup URI work with Google Authenticator, Microsoft Authenticator and compatible apps.
 - **Uploads** go to the private R2 bucket by presigned URL. Object metadata, detected types, ownership and disposition are checked before a record becomes available.
 - **Sensitive operations** write audit events. Administrative data is noindexed, and platform headers block framing and apply a restrictive content policy.
 - **Database roles are split:** the runtime uses the least-privilege pooled connection; migrations use a separate direct owner connection.
@@ -164,17 +164,17 @@ Sign in, enrol TOTP MFA immediately, then remove all three `BOOTSTRAP_ADMIN_*` v
 
 Copy [.env.example](.env.example); it is the complete, non-secret contract. Keep actual values in local environment files or encrypted Vercel settings only.
 
-| Group | Variables | Notes |
-| --- | --- | --- |
-| Application | `NEXT_PUBLIC_APP_URL`, `APP_ENV`, `APP_TIMEZONE`, `SUPPORT_EMAIL`, `OFFICIAL_SITE_URL` | Production URLs must use HTTPS. The portal timezone is `Asia/Colombo`. |
-| Database | `DATABASE_URL`, `DATABASE_URL_DIRECT` | Required. Use separate runtime and migration-owner roles; never use the direct owner URL in the Vercel runtime. |
-| Authentication | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Required. The URL must exactly match `NEXT_PUBLIC_APP_URL`; the secret must be at least 32 characters. |
-| R2 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_PRIVATE_BUCKET`, `R2_PUBLIC_BUCKET`, `R2_OBJECT_PREFIX`, `R2_PUBLIC_ASSET_BASE_URL` | Keep uploads/exports in the private bucket. Use `R2_OBJECT_PREFIX` to isolate preview, test and production objects. |
-| Turnstile | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME`, `TURNSTILE_APPLICATION_ACTION` | Use Cloudflare’s test keys only outside production. The action must remain `gbe_nomination_submit`. |
-| Resend | `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | `EMAIL_FROM` must use a verified Resend domain. Configure the signed Resend webhook at `/api/webhooks/resend`. |
-| Operations | `CRON_SECRET` | Required and at least 24 characters. Authorizes maintenance routes; Vercel invokes only `/api/cron/daily` on the scheduled job. |
-| First admin | `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` | Temporary only. Remove immediately after the initial account has been created and secured. |
-| Seed | `SEED_CYCLE_OPENS_AT`, `SEED_CYCLE_CLOSES_AT` | Required only by `bun run db:seed`; use approved ISO 8601 timestamps. |
+| Group          | Variables                                                                                                                                                           | Notes                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Application    | `NEXT_PUBLIC_APP_URL`, `APP_ENV`, `APP_TIMEZONE`, `SUPPORT_EMAIL`, `OFFICIAL_SITE_URL`                                                                              | Production URLs must use HTTPS. The portal timezone is `Asia/Colombo`.                                                          |
+| Database       | `DATABASE_URL`, `DATABASE_URL_DIRECT`                                                                                                                               | Required. Use separate runtime and migration-owner roles; never use the direct owner URL in the Vercel runtime.                 |
+| Authentication | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`                                                                                                                             | Required. The URL must exactly match `NEXT_PUBLIC_APP_URL`; the secret must be at least 32 characters.                          |
+| R2             | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_PRIVATE_BUCKET`, `R2_PUBLIC_BUCKET`, `R2_OBJECT_PREFIX`, `R2_PUBLIC_ASSET_BASE_URL` | Keep uploads/exports in the private bucket. Use `R2_OBJECT_PREFIX` to isolate preview, test and production objects.             |
+| Turnstile      | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME`, `TURNSTILE_APPLICATION_ACTION`                                             | Use Cloudflare’s test keys only outside production. The action must remain `gbe_nomination_submit`.                             |
+| Resend         | `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `EMAIL_FROM`, `EMAIL_REPLY_TO`                                                                                           | `EMAIL_FROM` must use a verified Resend domain. Configure the signed Resend webhook at `/api/webhooks/resend`.                  |
+| Operations     | `CRON_SECRET`                                                                                                                                                       | Required and at least 24 characters. Authorizes maintenance routes; Vercel invokes only `/api/cron/daily` on the scheduled job. |
+| First admin    | `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`                                                                                         | Temporary only. Remove immediately after the initial account has been created and secured.                                      |
+| Seed           | `SEED_CYCLE_OPENS_AT`, `SEED_CYCLE_CLOSES_AT`                                                                                                                       | Required only by `bun run db:seed`; use approved ISO 8601 timestamps.                                                           |
 
 Run both checks after configuring an environment:
 
@@ -187,16 +187,16 @@ bun run providers:verify
 
 ## 🧪 Quality checks
 
-| Command | What it proves |
-| --- | --- |
-| `bun run lint` | ESLint passes with zero warnings. |
-| `bun run typecheck` | Strict TypeScript has no errors. |
-| `bun run test` | Fast unit tests for business rules, security/permissions, validation, loading boundaries, exports and PDFs. |
-| `bun run test:integration` | Database-integrity tests against an isolated `gbe_award_portal_test*` database. Requires `TEST_DATABASE_URL` and `TEST_DATABASE_ADMIN_URL`. |
-| `bun run test:e2e` | Playwright desktop/mobile journeys using a recreated `gbe_award_portal_test_e2e` database and `e2e/playwright` R2 prefix. It covers public submission, retries, file validation, accessibility, staff MFA, export and responsive overflow. |
-| `bun run build` | Production Next.js build. |
-| `bun run check` | Lint, typecheck, unit tests and production build in one command. |
-| `bun audit` | Bun dependency vulnerability audit. |
+| Command                    | What it proves                                                                                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bun run lint`             | ESLint passes with zero warnings.                                                                                                                                                                                                          |
+| `bun run typecheck`        | Strict TypeScript has no errors.                                                                                                                                                                                                           |
+| `bun run test`             | Fast unit tests for business rules, security/permissions, validation, loading boundaries, exports and PDFs.                                                                                                                                |
+| `bun run test:integration` | Database-integrity tests against an isolated `gbe_award_portal_test*` database. Requires `TEST_DATABASE_URL` and `TEST_DATABASE_ADMIN_URL`.                                                                                                |
+| `bun run test:e2e`         | Playwright desktop/mobile journeys using a recreated `gbe_award_portal_test_e2e` database and `e2e/playwright` R2 prefix. It covers public submission, retries, file validation, accessibility, staff MFA, export and responsive overflow. |
+| `bun run build`            | Production Next.js build.                                                                                                                                                                                                                  |
+| `bun run check`            | Lint, typecheck, unit tests and production build in one command.                                                                                                                                                                           |
+| `bun audit`                | Bun dependency vulnerability audit.                                                                                                                                                                                                        |
 
 > [!CAUTION]
 > Integration and end-to-end tests recreate dedicated test databases. Their names are guarded in code, but they still require a database owner connection that is allowed to create and drop only test databases. Never point test variables at a production database.
@@ -219,11 +219,11 @@ Files are not stored in PostgreSQL or Vercel’s filesystem. The application sto
 
 Application responses queue email in PostgreSQL. A Next.js `after()` callback attempts prompt delivery; a durable outbox retries failed messages with backoff, and Resend’s signed webhook records delivered, bounced and failed events.
 
-| Endpoint | Purpose | Protection |
-| --- | --- | --- |
-| `POST /api/webhooks/resend` | Records verified Resend delivery events | `RESEND_WEBHOOK_SECRET` signature verification |
-| `GET /api/cron/daily` | Runs email retries, stale-upload cleanup, expired-export cleanup, retention and stale rate-limit cleanup | Bearer authorization using the configured `CRON_SECRET` |
-| `GET /api/health` | Reports database reachability | No secrets returned; do not treat it as a public status page |
+| Endpoint                    | Purpose                                                                                                  | Protection                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `POST /api/webhooks/resend` | Records verified Resend delivery events                                                                  | `RESEND_WEBHOOK_SECRET` signature verification               |
+| `GET /api/cron/daily`       | Runs email retries, stale-upload cleanup, expired-export cleanup, retention and stale rate-limit cleanup | Bearer authorization using the configured `CRON_SECRET`      |
+| `GET /api/health`           | Reports database reachability                                                                            | No secrets returned; do not treat it as a public status page |
 
 Vercel Hobby supports one cron entry. [vercel.json](vercel.json) schedules the daily route at `23 2 * * *`; do not add overlapping Vercel cron entries for individual cleanup jobs.
 

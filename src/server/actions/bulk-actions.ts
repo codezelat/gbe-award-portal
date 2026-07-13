@@ -43,8 +43,7 @@ export async function bulkAssignReviewerAction(formData: FormData) {
         ),
       )
       .limit(1);
-    if (!reviewer)
-      throw new Error("The selected reviewer is not active staff.");
+    if (!reviewer) throw new Error("The selected staff member is not active.");
   }
   await db.transaction(async (tx) => {
     const scoped = await tx

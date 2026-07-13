@@ -10,13 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 
-const roles = [
-  "super_admin",
-  "admin",
-  "reviewer",
-  "finance",
-  "support",
-] as const;
+const roles = ["staff", "super_admin"] as const;
 const pageSize = 30;
 
 export default async function StaffPage({
@@ -57,8 +51,8 @@ export default async function StaffPage({
     <>
       <h1 className="page-heading">Staff</h1>
       <p className="mt-2 text-graphite">
-        Invitation-only staff access with explicit portal roles and mandatory
-        MFA.
+        Staff run day-to-day nomination operations. Super admins manage people
+        and system settings. MFA is mandatory for everyone here.
       </p>
       <form className="mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
         <Input
@@ -86,7 +80,9 @@ export default async function StaffPage({
               </div>
               <select
                 name="role"
-                defaultValue={membership.role}
+                defaultValue={
+                  membership.role === "super_admin" ? "super_admin" : "staff"
+                }
                 className="h-10 rounded-md border bg-white px-3 text-sm"
               >
                 {roles.map((role) => (
@@ -165,10 +161,6 @@ export default async function StaffPage({
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="canViewAllApplications" />
-              Can view all applications
-            </label>
             <Button>Send secure invitation</Button>
           </form>
         </section>

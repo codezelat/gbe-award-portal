@@ -239,7 +239,7 @@ export const staffMemberships = pgTable("staff_memberships", {
     .unique()
     .references(() => profiles.id),
   role: text("role", {
-    enum: ["super_admin", "admin", "reviewer", "finance", "support"],
+    enum: ["super_admin", "staff"],
   }).notNull(),
   permissions: jsonb("permissions").notNull().default({}),
   canViewAllApplications: boolean("can_view_all_applications")

@@ -324,7 +324,7 @@ export function ApplicationsTable({
                 ))}
                 <select
                   name="reviewerId"
-                  aria-label="Assign selected applications to reviewer"
+                  aria-label="Assign selected applications to a staff member"
                   className="h-9 rounded-md border bg-white px-3 text-sm"
                 >
                   <option value="">Unassigned</option>

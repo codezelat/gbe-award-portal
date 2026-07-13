@@ -33,8 +33,6 @@ export const adminNavigation = [
 export const portalNavigation = [
   { href: "/portal", label: "Overview", icon: Gauge },
   { href: "/portal/applications", label: "My application", icon: FileArchive },
-  { href: "/portal/documents", label: "Documents", icon: FolderOpen },
-  { href: "/portal/payment", label: "Payment", icon: Banknote },
   { href: "/portal/messages", label: "Messages", icon: MessageSquare },
   { href: "/portal/profile", label: "Profile", icon: UserRound },
   { href: "/portal/security", label: "Security", icon: ShieldCheck },

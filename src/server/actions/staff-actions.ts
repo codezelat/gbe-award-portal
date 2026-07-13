@@ -33,17 +33,14 @@ export async function inviteStaffAction(formData: FormData) {
     .object({
       name: z.string().trim().min(2).max(180),
       email: z.email().transform((value) => value.toLowerCase()),
-      role: z.enum(["super_admin", "admin", "reviewer", "finance", "support"]),
-      canViewAllApplications: z.string().optional(),
+      role: z.enum(["super_admin", "staff"]),
     })
     .parse(Object.fromEntries(formData));
   if (input.role === "super_admin" && membership.role !== "super_admin")
     throw new Error(
       "Only a super administrator can invite another super administrator.",
     );
-  const authRole = ["super_admin", "admin"].includes(input.role)
-    ? "admin"
-    : "user";
+  const authRole = input.role === "super_admin" ? "admin" : "user";
   const auth = getAuth();
   const created = await auth.api.createUser({
     body: {
@@ -72,7 +69,6 @@ export async function inviteStaffAction(formData: FormData) {
       await tx.insert(staffMemberships).values({
         profileId: profile.id,
         role: input.role,
-        canViewAllApplications: input.canViewAllApplications === "on",
         mfaRequired: true,
         createdBy: actor.id,
       });
@@ -134,7 +130,7 @@ export async function updateStaffAction(formData: FormData) {
   const input = z
     .object({
       membershipId: z.uuid(),
-      role: z.enum(["super_admin", "admin", "reviewer", "finance", "support"]),
+      role: z.enum(["super_admin", "staff"]),
       status: z.enum(["active", "suspended"]),
     })
     .parse(Object.fromEntries(formData));
@@ -168,14 +164,13 @@ export async function updateStaffAction(formData: FormData) {
   }
   const auth = getAuth();
   const requestHeaders = await headers();
-  const oldAuthRole = ["super_admin", "admin"].includes(before.membership.role)
-    ? "admin"
-    : "user";
+  const oldAuthRole =
+    before.membership.role === "super_admin" ? "admin" : "user";
   await auth.api.setRole({
     headers: requestHeaders,
     body: {
       userId: before.profile.authUserId,
-      role: ["super_admin", "admin"].includes(input.role) ? "admin" : "user",
+      role: input.role === "super_admin" ? "admin" : "user",
     },
   });
   try {
