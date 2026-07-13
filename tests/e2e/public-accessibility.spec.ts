@@ -104,6 +104,16 @@ test("public routes and footer links remain available", async ({ page }) => {
   );
 });
 
+test("help contact actions expose the intended destinations", async ({ page }) => {
+  await page.goto("/help");
+  await expect(
+    page.getByRole("link", { name: "Contact info@gbeaward.com" }),
+  ).toHaveAttribute("href", "mailto:info@gbeaward.com");
+  await expect(
+    page.getByRole("link", { name: "Contact us on WhatsApp" }),
+  ).toHaveAttribute("href", "https://wa.link/10p065");
+});
+
 test("protected portals redirect anonymous visitors to sign in", async ({
   page,
 }) => {

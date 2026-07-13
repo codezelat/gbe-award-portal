@@ -19,22 +19,24 @@ export default function Help() {
           Assistance with nominations, invitation access and approved applicant
           accounts.
         </p>
-        <a
-          href="mailto:info@gbeaward.com"
-          className="ceremonial-button mt-8 flex min-h-12 items-center justify-center gap-2 rounded-md px-5 font-semibold"
-        >
-          <Mail />
-          Contact info@gbeaward.com
-        </a>
-        <a
-          href="https://wa.link/10p065"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-md bg-[#25D366] px-5 font-semibold text-white shadow-sm transition-colors hover:bg-[#1ebe57] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
-        >
-          <MessageCircle className="fill-white/15" />
-          Contact us on WhatsApp
-        </a>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <a
+            href="mailto:info@gbeaward.com"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-foreground px-5 text-sm font-semibold text-background shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#302f29] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-antique-gold focus-visible:ring-offset-2"
+          >
+            <Mail aria-hidden />
+            Contact info@gbeaward.com
+          </a>
+          <a
+            href="https://wa.link/10p065"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#208b5a] px-5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#176f47] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#208b5a] focus-visible:ring-offset-2"
+          >
+            <MessageCircle className="fill-white/15" aria-hidden />
+            Contact us on WhatsApp
+          </a>
+        </div>
       </main>
       <PublicFooter />
     </div>
