@@ -44,7 +44,11 @@ function createAuth() {
           });
       },
     },
-    session: { cookieCache: { enabled: true, maxAge: 300 } },
+    session: {
+      expiresIn: 30 * 24 * 60 * 60,
+      updateAge: 24 * 60 * 60,
+      cookieCache: { enabled: true, maxAge: 300 },
+    },
     rateLimit: { enabled: true, window: 60, max: 10 },
     advanced: {
       useSecureCookies: env.APP_ENV === "production",
