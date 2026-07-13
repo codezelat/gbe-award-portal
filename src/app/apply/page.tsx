@@ -50,10 +50,6 @@ export default async function ApplyPage() {
             currency={cycle?.currency ?? undefined}
             paymentInstructions={paymentInstructions ?? undefined}
           />
-          <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
-            Your nomination is reviewed before portal access is issued. Times
-            are shown in Asia/Colombo.
-          </p>
         </section>
       </main>
     </>

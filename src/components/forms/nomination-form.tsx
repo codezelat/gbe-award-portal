@@ -557,7 +557,7 @@ export function NominationForm({
             <ControlledInput
               form={form}
               name="nomineeName"
-              label="Full Name / Company Name"
+              label="Company Name / Full Name"
               required
             />
             <ControlledInput

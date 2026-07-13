@@ -10,12 +10,10 @@ test("public nomination route exposes an accessible guided form", async ({
   });
   await page.goto("/apply");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  for (const label of [
-    "Full Name / Company Name",
-  ])
+  for (const label of ["Company Name / Full Name"])
     await expect(page.getByLabel(label, { exact: false })).toBeVisible();
   await page
-    .getByLabel("Full Name / Company Name", { exact: false })
+    .getByLabel("Company Name / Full Name", { exact: false })
     .fill("Accessible nomination");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(

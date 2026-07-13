@@ -8,7 +8,7 @@ const paymentPng = Buffer.from(
 async function fillNomination(page: Page, continueToPayment = true) {
   await page.goto("/apply");
   await page
-    .getByLabel("Full Name / Company Name", { exact: false })
+    .getByLabel("Company Name / Full Name", { exact: false })
     .fill(`Playwright Nominee ${Date.now()}`);
   await page.getByRole("button", { name: "Continue" }).click();
   await page
