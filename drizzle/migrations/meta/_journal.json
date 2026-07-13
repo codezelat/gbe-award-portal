@@ -64,6 +64,13 @@
       "when": 1783756963338,
       "tag": "0008_rapid_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783926837218,
+      "tag": "0009_dear_scorpion",
+      "breakpoints": true
     }
   ]
 }

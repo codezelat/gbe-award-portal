@@ -36,6 +36,7 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Command,
   CommandDialog,
@@ -187,7 +188,7 @@ export function NominationForm({
     defaultValues: {
       nomineeName: "",
       designation: "",
-      industrySector: "",
+      awardNomination: "",
       businessWebsite: "",
       email: "",
       phone: "",
@@ -417,8 +418,8 @@ export function NominationForm({
 
   async function moveToNextStep() {
     const fieldsByStep: Array<Array<keyof PublicApplicationInput>> = [
-      ["nomineeName", "designation", "industrySector", "businessWebsite"],
-      ["email", "phone", "categoryId"],
+      ["nomineeName", "designation", "businessWebsite"],
+      ["email", "phone", "categoryId", "awardNomination"],
       [],
       ["declarationAccepted", "turnstileToken"],
     ];
@@ -567,12 +568,6 @@ export function NominationForm({
             />
             <ControlledInput
               form={form}
-              name="industrySector"
-              label="Industry / Business Sector"
-              required
-            />
-            <ControlledInput
-              form={form}
               name="businessWebsite"
               label="Business Website"
               description="If applicable"
@@ -613,6 +608,28 @@ export function NominationForm({
                     onValueChange={field.onChange}
                     disabled={unavailable || busy}
                     invalid={fieldState.invalid}
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="awardNomination"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="awardNomination">
+                    Award nomination{" "}
+                    <span aria-hidden className="text-destructive">
+                      *
+                    </span>
+                  </FieldLabel>
+                  <Textarea
+                    {...field}
+                    id="awardNomination"
+                    required
+                    aria-invalid={fieldState.invalid}
+                    className="min-h-28 bg-white"
                   />
                   <FieldError errors={[fieldState.error]} />
                 </Field>

@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { fileTypeFromBuffer } from "file-type";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import {
   applicationFiles,
@@ -36,6 +36,14 @@ const inputSchema = z.object({
 });
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+const isUniqueViolation = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "cause" in error &&
+  typeof error.cause === "object" &&
+  error.cause !== null &&
+  "code" in error.cause &&
+  error.cause.code === "23505";
 export async function POST(request: Request) {
   scheduleEmailOutboxProcessing();
   const requestId = crypto.randomUUID();
@@ -171,9 +179,34 @@ export async function POST(request: Request) {
         })
         .from(cycleSequences)
         .where(eq(cycleSequences.cycleId, row.cycle.id));
-      const number = Math.max(1, sequence.nextApplication - 1);
       const paymentNumber = Math.max(1, sequence.nextPayment - 1);
-      const reference = `GBE-${row.cycle.year}-${String(number).padStart(6, "0")}`;
+      let reference: string | undefined;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const candidate = `GBE-${row.cycle.year}-${randomInt(100000, 1_000_000)}`;
+        try {
+          const [claimedReference] = await tx.transaction(async (savepoint) =>
+            savepoint
+              .update(applications)
+              .set({ reference: candidate, updatedAt: new Date() })
+              .where(
+                and(
+                  eq(applications.id, row.application.id),
+                  eq(applications.workflowStatus, "uploading"),
+                  isNull(applications.reference),
+                ),
+              )
+              .returning({ id: applications.id }),
+          );
+          if (claimedReference) {
+            reference = candidate;
+            break;
+          }
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+        }
+      }
+      if (!reference)
+        throw new Error("We could not allocate a unique nomination reference.");
       const paymentReference = `PAY-${row.cycle.year}-${String(paymentNumber).padStart(6, "0")}`;
       await tx
         .update(payments)
@@ -215,7 +248,7 @@ export async function POST(request: Request) {
       const snapshot = {
         nomineeName: row.application.nomineeName,
         designation: row.application.designation,
-        industrySector: row.application.industrySector,
+        awardNomination: row.application.awardNomination,
         businessWebsite: row.application.businessWebsite,
         email: row.application.emailDisplay,
         phone: row.application.phoneDisplay,
@@ -231,7 +264,6 @@ export async function POST(request: Request) {
       const updatedApplication = await tx
         .update(applications)
         .set({
-          reference,
           workflowStatus: "submitted",
           submittedAt,
           currentVersion: 1,

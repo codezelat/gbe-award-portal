@@ -390,7 +390,7 @@ export async function updatePaymentAction(formData: FormData) {
 const editableApplicationFields = [
   "nomineeName",
   "designation",
-  "industrySector",
+  "awardNomination",
   "businessWebsite",
   "phoneDisplay",
 ] as const;
@@ -484,7 +484,7 @@ export async function editApplicationAction(formData: FormData) {
       version: z.coerce.number().int().nonnegative(),
       nomineeName: z.string().trim().min(2).max(180),
       designation: z.string().trim().max(120).optional(),
-      industrySector: z.string().trim().min(2).max(160),
+      awardNomination: z.string().trim().min(10).max(4000),
       businessWebsite: z.union([z.literal(""), z.url()]).optional(),
       email: z.email(),
       phoneDisplay: z.string().trim().min(5).max(40),
@@ -563,7 +563,7 @@ export async function editApplicationAction(formData: FormData) {
       const changedFields = [
         "nomineeName",
         "designation",
-        "industrySector",
+        "awardNomination",
         "businessWebsite",
         "email",
         "phoneDisplay",
@@ -599,7 +599,7 @@ export async function editApplicationAction(formData: FormData) {
         .set({
           nomineeName: input.nomineeName,
           designation: input.designation || null,
-          industrySector: input.industrySector,
+          awardNomination: input.awardNomination,
           businessWebsite: input.businessWebsite || null,
           emailNormalised: input.email.toLowerCase(),
           emailDisplay: input.email,

@@ -12,15 +12,11 @@ test("public nomination route exposes an accessible guided form", async ({
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   for (const label of [
     "Full Name / Company Name",
-    "Industry / Business Sector",
   ])
     await expect(page.getByLabel(label, { exact: false })).toBeVisible();
   await page
     .getByLabel("Full Name / Company Name", { exact: false })
     .fill("Accessible nomination");
-  await page
-    .getByLabel("Industry / Business Sector", { exact: false })
-    .fill("Technology");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(
     page.getByLabel("Email Address", { exact: false }),
@@ -35,8 +31,11 @@ test("public nomination route exposes an accessible guided form", async ({
   await page.locator("#phone").fill("0771234567");
   await page.getByRole("combobox", { name: /award category/i }).click();
   await page.getByRole("option").first().click();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page
+    .getByLabel("Award nomination", { exact: false })
+    .fill("Recognising this nominee for sustained excellence and impact.");
   await expect(page.getByLabel("Choose supporting documents")).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByLabel("Choose payment proof")).toBeVisible();
   await page.getByLabel("Choose payment proof").setInputFiles({
     name: "payment-proof.png",

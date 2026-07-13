@@ -12,6 +12,7 @@ import { applicantVisibleStatus } from "@/lib/domain/outcome-visibility";
 import { requirePortalSession } from "@/server/dal/auth";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { submitRequestedChangesAction } from "@/server/actions/applicant-actions";
 import { getFeatureFlags } from "@/server/services/feature-flags";
@@ -58,7 +59,7 @@ export default async function ApplicationDetail({
   const fields = [
     ["Official name / organisation", app.nomineeName],
     ["Designation", app.designation || "Not provided"],
-    ["Industry / business sector", app.industrySector],
+    ["Award nomination", app.awardNomination],
     ["Business website", app.businessWebsite || "Not provided"],
     ["Primary email", app.emailDisplay],
     ["Telephone", app.phoneDisplay],
@@ -126,14 +127,14 @@ export default async function ApplicationDetail({
                 />
               </label>
             ) : null}
-            {changeRequest.fieldKeys.includes("industrySector") ? (
+            {changeRequest.fieldKeys.includes("awardNomination") ? (
               <label className="flex flex-col gap-2 text-sm font-medium">
-                Industry / sector
-                <Input
-                  name="industrySector"
-                  defaultValue={app.industrySector}
+                Award nomination
+                <Textarea
+                  name="awardNomination"
+                  defaultValue={app.awardNomination}
                   required
-                  className="h-[50px] bg-white"
+                  className="min-h-28 bg-white"
                 />
               </label>
             ) : null}

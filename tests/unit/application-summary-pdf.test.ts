@@ -12,10 +12,10 @@ describe("application summary PDF", () => {
       boldFontPath:
         require.resolve("@expo-google-fonts/noto-sans/700Bold/NotoSans_700Bold.ttf"),
       data: {
-        reference: "GBE-2026-000042",
+        reference: "GBE-2026-563842",
         nomineeName: "Acme International",
         designation: "Managing Director",
-        industrySector: "Technology",
+        awardNomination: "Recognising Acme International for technology innovation.",
         businessWebsite: "https://example.com",
         email: "nominee@example.com",
         phone: "+94 77 123 4567",

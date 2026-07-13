@@ -63,11 +63,11 @@ export const publicApplicationSchema = z.object({
     .min(2, "Enter the nominee or organisation name.")
     .max(180),
   designation: z.string().trim().max(120).optional().or(z.literal("")),
-  industrySector: z
+  awardNomination: z
     .string()
     .trim()
-    .min(2, "Enter the industry or business sector.")
-    .max(160),
+    .min(10, "Describe the award nomination.")
+    .max(4000),
   businessWebsite: z
     .string()
     .trim()

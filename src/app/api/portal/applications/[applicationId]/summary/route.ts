@@ -86,7 +86,7 @@ export async function GET(
         reference: row.application.reference ?? "Pending reference",
         nomineeName: row.application.nomineeName,
         designation: row.application.designation,
-        industrySector: row.application.industrySector,
+        awardNomination: row.application.awardNomination,
         businessWebsite: row.application.businessWebsite,
         email: row.application.emailDisplay,
         phone: row.application.phoneDisplay,

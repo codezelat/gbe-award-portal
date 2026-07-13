@@ -9,7 +9,7 @@ import { declarationText } from "@/config/brand";
 const valid = {
   nomineeName: "Acme Ltd",
   designation: "",
-  industrySector: "Technology",
+  awardNomination: "Recognising Acme Ltd for sustained technology innovation.",
   businessWebsite: "gbeaward.com",
   email: "hello@example.com",
   phone: "+94771234567",

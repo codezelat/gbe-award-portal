@@ -13,7 +13,7 @@ export type ApplicationSummaryData = {
   reference: string;
   nomineeName: string;
   designation?: string | null;
-  industrySector: string;
+  awardNomination: string;
   businessWebsite?: string | null;
   email: string;
   phone: string;
@@ -115,7 +115,7 @@ export async function buildApplicationSummaryPdf(input: {
         <Text style={styles.category}>{data.category}</Text>
         <View style={styles.grid}>
           <Field label="Designation" value={data.designation} />
-          <Field label="Industry / sector" value={data.industrySector} />
+          <Field label="Award nomination" value={data.awardNomination} />
           <Field label="Primary email" value={data.email} />
           <Field label="Telephone" value={data.phone} />
           <Field label="Business website" value={data.businessWebsite} />

@@ -5,14 +5,11 @@ const paymentPng = Buffer.from(
   "base64",
 );
 
-async function fillNomination(page: Page) {
+async function fillNomination(page: Page, continueToPayment = true) {
   await page.goto("/apply");
   await page
     .getByLabel("Full Name / Company Name", { exact: false })
     .fill(`Playwright Nominee ${Date.now()}`);
-  await page
-    .getByLabel("Industry / Business Sector", { exact: false })
-    .fill("Technology");
   await page.getByRole("button", { name: "Continue" }).click();
   await page
     .getByLabel("Email Address", { exact: false })
@@ -20,7 +17,11 @@ async function fillNomination(page: Page) {
   await page.locator("#phone").fill("0771234567");
   await page.getByRole("combobox", { name: /award category/i }).click();
   await page.getByRole("option").first().click();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page
+    .getByLabel("Award nomination", { exact: false })
+    .fill("Recognising this nominee for sustained excellence and impact.");
+  if (continueToPayment)
+    await page.getByRole("button", { name: "Continue" }).click();
 }
 
 test("submits a valid nomination through real isolated Neon and R2", async ({
@@ -58,7 +59,7 @@ test("submits a valid nomination through real isolated Neon and R2", async ({
   await expect(
     page.getByRole("heading", { name: "Nomination received" }),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/^GBE-2026-\d{6}$/)).toBeVisible();
+  await expect(page.getByText(/^GBE-2026-[1-9]\d{5}$/)).toBeVisible();
 });
 
 test("retries only a failed upload without duplicating the application", async ({
@@ -123,14 +124,13 @@ test("focuses a complete validation summary before any network submission", asyn
   await expect(summary).toContainText(
     "Enter the nominee or organisation name.",
   );
-  await expect(summary).toContainText("Enter the industry or business sector.");
   expect(initiated).toBe(false);
 });
 
 test("rejects invalid, oversized and excess supporting files in the browser", async ({
   page,
 }) => {
-  await fillNomination(page);
+  await fillNomination(page, false);
   const input = page.getByLabel("Choose supporting documents");
   await input.setInputFiles({
     name: "malware.exe",

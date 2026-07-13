@@ -146,7 +146,7 @@ export default async function AdminApplicationDetail({
   const fields = [
     ["Nominee / organisation", application.nomineeName],
     ["Designation", application.designation || "Not provided"],
-    ["Industry", application.industrySector],
+    ["Award nomination", application.awardNomination],
     ["Website", application.businessWebsite || "Not provided"],
     ["Email", application.emailDisplay],
     ["Telephone", application.phoneDisplay],
@@ -244,7 +244,11 @@ export default async function AdminApplicationDetail({
                       application.nomineeName,
                     ],
                     ["Designation", "designation", application.designation],
-                    ["Industry", "industrySector", application.industrySector],
+                    [
+                      "Award nomination",
+                      "awardNomination",
+                      application.awardNomination,
+                    ],
                     ["Website", "businessWebsite", application.businessWebsite],
                     ["Email", "email", application.emailDisplay],
                     ["Telephone", "phone", application.phoneDisplay],
@@ -384,13 +388,13 @@ export default async function AdminApplicationDetail({
                     className="h-11 bg-white"
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Industry / sector
-                  <Input
-                    name="industrySector"
-                    defaultValue={application.industrySector}
+                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
+                  Award nomination
+                  <Textarea
+                    name="awardNomination"
+                    defaultValue={application.awardNomination}
                     required
-                    className="h-11 bg-white"
+                    className="min-h-28 bg-white"
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-sm font-medium">
@@ -901,7 +905,7 @@ export default async function AdminApplicationDetail({
                   {[
                     ["nomineeName", "Nominee / organisation name"],
                     ["designation", "Designation"],
-                    ["industrySector", "Industry / sector"],
+                    ["awardNomination", "Award nomination"],
                     ["businessWebsite", "Business website"],
                     ["phoneDisplay", "Telephone"],
                   ].map(([value, label]) => (

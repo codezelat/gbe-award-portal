@@ -2,7 +2,7 @@ export const E2E_DATABASE_NAME = "gbe_award_portal_test_e2e";
 export const E2E_R2_PREFIX = "e2e/playwright";
 export const E2E_ADMIN_EMAIL = "admin@playwright.example.test";
 export const E2E_ADMIN_PASSWORD = "Playwright-only-Admin-2026!";
-export const E2E_APPLICATION_REFERENCE = "GBE-2026-900001";
+export const E2E_APPLICATION_REFERENCE = "GBE-2026-963842";
 
 export function databaseUrlFor(name: string) {
   const source = process.env.DATABASE_URL_DIRECT;

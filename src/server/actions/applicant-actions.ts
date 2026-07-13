@@ -142,7 +142,7 @@ export async function submitRequestedChangesAction(formData: FormData) {
       requestId: z.uuid(),
       nomineeName: z.string().trim().min(2).max(180).optional(),
       designation: z.string().trim().max(120).optional(),
-      industrySector: z.string().trim().min(2).max(160).optional(),
+      awardNomination: z.string().trim().min(10).max(4000).optional(),
       businessWebsite: z.union([z.literal(""), z.url()]).optional(),
       phoneDisplay: z.string().trim().min(5).max(40).optional(),
     })
@@ -202,7 +202,7 @@ export async function submitRequestedChangesAction(formData: FormData) {
       typeof application,
       | "nomineeName"
       | "designation"
-      | "industrySector"
+      | "awardNomination"
       | "businessWebsite"
       | "phoneDisplay"
     >
@@ -211,8 +211,8 @@ export async function submitRequestedChangesAction(formData: FormData) {
     updates.nomineeName = input.nomineeName;
   if (allowed.has("designation") && input.designation !== undefined)
     updates.designation = input.designation || null;
-  if (allowed.has("industrySector") && input.industrySector !== undefined)
-    updates.industrySector = input.industrySector;
+  if (allowed.has("awardNomination") && input.awardNomination !== undefined)
+    updates.awardNomination = input.awardNomination;
   if (allowed.has("businessWebsite") && input.businessWebsite !== undefined)
     updates.businessWebsite = input.businessWebsite || null;
   if (allowed.has("phoneDisplay") && input.phoneDisplay !== undefined)
