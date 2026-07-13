@@ -4,7 +4,6 @@ import { authClient } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TwoFactorSetup } from "@/components/forms/two-factor-setup";
 type Session = {
   id: string;
   token: string;
@@ -13,13 +12,7 @@ type Session = {
   createdAt: Date;
   expiresAt: Date;
 };
-export function AccountSecurity({
-  showMfa = false,
-  mfaEnabled = false,
-}: {
-  showMfa?: boolean;
-  mfaEnabled?: boolean;
-}) {
+export function AccountSecurity() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -59,20 +52,6 @@ export function AccountSecurity({
   }
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {showMfa ? (
-        <section className="surface rounded-lg p-6 lg:col-span-2">
-          <h2 className="section-title">Multi-factor authentication</h2>
-          {mfaEnabled ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Authenticator protection is enabled for this account.
-            </p>
-          ) : (
-            <div className="mt-5 max-w-xl">
-              <TwoFactorSetup redirectTo="/portal/security" />
-            </div>
-          )}
-        </section>
-      ) : null}
       <section className="surface rounded-lg p-6">
         <h2 className="section-title">Change password</h2>
         <form onSubmit={change} className="mt-5 flex flex-col gap-4">

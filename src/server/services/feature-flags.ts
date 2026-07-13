@@ -7,7 +7,6 @@ export const defaultFeatureFlags = {
   applications_enabled: true,
   applicant_messages_enabled: true,
   profile_social_fields_enabled: false,
-  applicant_mfa_enabled: false,
   outcome_visibility_enabled: true,
   analytics_enabled: false,
   excel_exports_enabled: true,

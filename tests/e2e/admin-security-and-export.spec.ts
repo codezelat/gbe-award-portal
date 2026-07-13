@@ -58,7 +58,10 @@ test("enforces staff MFA, then permits search and a real filtered export", async
 
   await page.getByLabel("Confirm current password").fill(E2E_ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Begin MFA enrolment" }).click();
-  const uri = await page.getByLabel("Authenticator setup URI").inputValue();
+  const uri = await page.getByLabel("Manual setup URI").inputValue();
+  const qrCode = page.getByAltText("Authenticator setup QR code");
+  await expect(qrCode).toBeVisible();
+  await expect(qrCode).toHaveAttribute("src", /^data:image\/png;base64,/);
   const secret = new URL(uri).searchParams.get("secret");
   expect(secret).toBeTruthy();
   await page.getByLabel("Six-digit authenticator code").fill(totp(secret!));

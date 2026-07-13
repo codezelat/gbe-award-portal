@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,36 @@ export function TwoFactorSetup({
   const router = useRouter();
   const [uri, setUri] = useState("");
   const [codes, setCodes] = useState<string[]>([]);
+  const [qrCode, setQrCode] = useState("");
+  const [qrError, setQrError] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!uri) return;
+    let active = true;
+    void import("qrcode")
+      .then(({ toDataURL }) =>
+        toDataURL(uri, {
+          width: 224,
+          margin: 1,
+          errorCorrectionLevel: "M",
+          color: { dark: "#17212b", light: "#ffffff" },
+        }),
+      )
+      .then((dataUrl) => {
+        if (active) setQrCode(dataUrl);
+      })
+      .catch(() => {
+        if (active)
+          setQrError(
+            "The QR code could not be generated. Use the setup URI below instead.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [uri]);
+
   async function enable(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -68,12 +98,32 @@ export function TwoFactorSetup({
     <div className="flex flex-col gap-5">
       <Alert>
         <AlertDescription>
-          Add this account to a TOTP authenticator. Store the recovery codes
-          securely; they are shown only once.
+          Scan this code with Google Authenticator, Microsoft Authenticator,
+          Authy, 1Password, or another TOTP authenticator. Store the recovery
+          codes securely; they are shown only once.
         </AlertDescription>
       </Alert>
+      <div className="mx-auto rounded-xl border border-mist bg-white p-3 shadow-sm">
+        {qrCode ? (
+          <Image
+            src={qrCode}
+            alt="Authenticator setup QR code"
+            width={224}
+            height={224}
+            unoptimized
+          />
+        ) : (
+          <div
+            className="grid size-56 place-items-center rounded-md bg-muted text-sm text-muted-foreground"
+            role="status"
+          >
+            Generating secure QR code…
+          </div>
+        )}
+      </div>
+      {qrError ? <p className="text-sm text-destructive">{qrError}</p> : null}
       <label className="flex flex-col gap-2 text-sm font-medium">
-        Authenticator setup URI
+        Manual setup URI
         <Input
           readOnly
           value={uri}

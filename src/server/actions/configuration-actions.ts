@@ -363,13 +363,12 @@ export async function saveSettingAction(formData: FormData) {
         applications_enabled: z.boolean().optional(),
         applicant_messages_enabled: z.boolean().optional(),
         profile_social_fields_enabled: z.boolean().optional(),
-        applicant_mfa_enabled: z.boolean().optional(),
         outcome_visibility_enabled: z.boolean().optional(),
         analytics_enabled: z.boolean().optional(),
         excel_exports_enabled: z.boolean().optional(),
         csv_exports_enabled: z.boolean().optional(),
       })
-      .strict()
+      .strip()
       .parse(value);
   if (key === "email_templates")
     value = z
