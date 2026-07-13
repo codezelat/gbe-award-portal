@@ -82,4 +82,29 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
   expect(await download.failure()).toBeNull();
+
+  for (const viewport of [
+    { width: 1023, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto(
+      `/admin/applications?search=${encodeURIComponent(E2E_APPLICATION_REFERENCE)}`,
+    );
+    await expect(
+      page.getByRole("link", { name: E2E_APPLICATION_REFERENCE }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth + 1,
+      ),
+      `admin applications should not overflow at ${viewport.width}px`,
+    ).toBe(true);
+    await page.locator('summary[aria-label="Open navigation"]').click();
+    await expect(
+      page.getByRole("navigation", { name: "Mobile administration" }),
+    ).toBeVisible();
+  }
 });

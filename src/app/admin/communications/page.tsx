@@ -191,7 +191,7 @@ export default async function CommunicationsPage({
             </select>
             <Button className="h-11">Filter</Button>
           </form>
-          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <p>{total.value} matching email(s)</p>
             {filters.length ? (
               <Link href="/admin/communications" className="underline">
@@ -199,7 +199,7 @@ export default async function CommunicationsPage({
               </Link>
             ) : null}
           </div>
-          <div className="mt-5 overflow-x-auto rounded-lg border bg-white">
+          <div className="data-table-scroll mt-5 overflow-x-auto rounded-lg border bg-white">
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
@@ -284,7 +284,7 @@ export default async function CommunicationsPage({
             </table>
           </div>
           <nav
-            className="mt-5 flex items-center justify-between"
+            className="mt-5 flex flex-wrap items-center justify-between gap-3"
             aria-label="Communication pagination"
           >
             <Button

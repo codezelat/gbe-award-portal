@@ -497,7 +497,7 @@ export default async function ApplicationsPage({
           </div>
         </details>
       </form>
-      <div className="surface overflow-hidden rounded-lg">
+      <div className="surface min-w-0 overflow-hidden rounded-lg">
         <ApplicationsTable
           rows={rows.map((row) => ({
             id: row.id,
@@ -529,7 +529,7 @@ export default async function ApplicationsPage({
           reviewers={reviewers}
           exportBase={`/api/admin/exports/applications?${exportQuery}`}
         />
-        <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
           <span>
             Page {page} · {total.value} matching applications
           </span>

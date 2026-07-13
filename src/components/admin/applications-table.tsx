@@ -167,7 +167,7 @@ export function ApplicationsTable({
   const exportUrl = `${exportBase}&${selected.map((id) => `id=${encodeURIComponent(id)}`).join("&")}`;
   return (
     <>
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <Table className="min-w-[940px]">
           <TableHeader className="sticky top-0 z-10 bg-white">
             {table.getHeaderGroups().map((group) => (
@@ -229,7 +229,7 @@ export function ApplicationsTable({
           </TableBody>
         </Table>
       </div>
-      <div className="divide-y md:hidden">
+      <div className="divide-y lg:hidden">
         {table.getRowModel().rows.length ? (
           table.getRowModel().rows.map((row) => (
             <article key={row.id} className="p-4">
@@ -282,9 +282,9 @@ export function ApplicationsTable({
       </div>
       {selected.length ? (
         <div className="glass-shell sticky bottom-4 z-20 mx-3 mb-3 rounded-lg p-3 shadow-xl">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <strong className="text-sm">{selected.length} selected</strong>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"

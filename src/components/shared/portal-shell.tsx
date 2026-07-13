@@ -31,8 +31,8 @@ export function PortalShell({
       allowedAdminHrefs.includes(item.href),
   );
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]">
-      <aside className="glass-shell fixed inset-y-0 left-0 z-30 hidden w-60 flex-col px-4 py-6 md:flex">
+    <div className="min-h-svh lg:grid lg:grid-cols-[240px_1fr]">
+      <aside className="glass-shell fixed inset-y-0 left-0 z-30 hidden w-60 flex-col px-4 py-6 lg:flex">
         <AppLogo className="px-2" />
         <div className="mt-8 flex items-center gap-3 border-y py-4">
           <Avatar>
@@ -77,14 +77,14 @@ export function PortalShell({
           </Button>
         </form>
       </aside>
-      <div className="md:col-start-2">
-        <header className="glass-shell sticky top-0 z-20 flex h-16 items-center justify-between px-5 md:px-8">
-          <div className="md:hidden">
+      <div className="min-w-0 lg:col-start-2">
+        <header className="glass-shell sticky top-0 z-20 flex h-16 items-center justify-between px-4 sm:px-5 lg:px-8">
+          <div className="lg:hidden">
             <AppLogo compact />
           </div>
-          <details className="relative ml-auto md:hidden">
+          <details className="relative ml-auto lg:hidden">
             <summary
-              className="grid size-11 cursor-pointer list-none place-items-center rounded-md border bg-white"
+              className="grid size-11 cursor-pointer list-none place-items-center rounded-lg border bg-white shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Open navigation"
             >
               <Menu aria-hidden />
@@ -95,7 +95,7 @@ export function PortalShell({
                   ? "Mobile administration"
                   : "Mobile applicant portal"
               }
-              className="absolute right-0 top-12 z-50 flex max-h-[70vh] w-72 flex-col gap-1 overflow-y-auto rounded-lg border bg-white p-3 shadow-xl"
+              className="absolute right-0 top-[calc(100%+0.5rem)] z-50 flex max-h-[calc(100svh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] flex-col gap-1 overflow-y-auto rounded-xl border bg-white p-3 shadow-xl"
             >
               {kind === "admin" && cycleOptions?.length ? (
                 <form
@@ -142,7 +142,7 @@ export function PortalShell({
           {kind === "admin" && cycleOptions?.length ? (
             <form
               action={setAdminCycleAction}
-              className="hidden items-center gap-2 md:flex"
+              className="hidden items-center gap-2 lg:flex"
             >
               <label
                 htmlFor="admin-cycle"
@@ -167,20 +167,20 @@ export function PortalShell({
               </Button>
             </form>
           ) : (
-            <p className="hidden text-sm text-muted-foreground md:block">
+            <p className="hidden text-sm text-muted-foreground lg:block">
               GBE Awards portal
             </p>
           )}
           <a
             href="mailto:info@gbeaward.com"
-            className="hidden text-sm text-antique-gold sm:block"
+            className="hidden text-sm text-antique-gold lg:block"
           >
             info@gbeaward.com
           </a>
         </header>
         <main
           id="main-content"
-          className="mx-auto max-w-[1440px] px-5 py-8 md:px-8 md:py-10"
+          className="mx-auto w-full min-w-0 max-w-[1440px] px-4 py-6 sm:px-5 sm:py-8 lg:px-8 lg:py-10"
         >
           {children}
         </main>

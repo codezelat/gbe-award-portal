@@ -26,8 +26,8 @@ function FieldSkeleton({ tall = false }: { tall?: boolean }) {
 
 function PortalShellSkeleton({ label }: { label: string }) {
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]" aria-busy>
-      <aside className="glass-shell fixed inset-y-0 left-0 hidden w-60 px-6 py-8 md:block">
+    <div className="min-h-svh lg:grid lg:grid-cols-[240px_1fr]" aria-busy>
+      <aside className="glass-shell fixed inset-y-0 left-0 hidden w-60 px-6 py-8 lg:block">
         <Skeleton className="h-12 w-36" />
         <div className="mt-8 flex items-center gap-3 border-y py-4">
           <Skeleton className="size-10 rounded-full" />
@@ -42,12 +42,12 @@ function PortalShellSkeleton({ label }: { label: string }) {
           ))}
         </div>
       </aside>
-      <div className="md:col-start-2">
-        <header className="glass-shell flex h-16 items-center justify-between px-5 md:px-8">
-          <Skeleton className="hidden h-4 w-28 md:block" />
+      <div className="min-w-0 lg:col-start-2">
+        <header className="glass-shell flex h-16 items-center justify-between px-4 sm:px-5 lg:px-8">
+          <Skeleton className="hidden h-4 w-28 lg:block" />
           <Skeleton className="h-4 w-36" />
         </header>
-        <main className="mx-auto max-w-[1440px] px-5 py-8 md:px-8 md:py-10">
+        <main className="mx-auto w-full min-w-0 max-w-[1440px] px-4 py-6 sm:px-5 sm:py-8 lg:px-8 lg:py-10">
           <DashboardSkeleton label={label} />
         </main>
       </div>

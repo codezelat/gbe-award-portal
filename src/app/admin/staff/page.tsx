@@ -60,12 +60,12 @@ export default async function StaffPage({
         Invitation-only staff access with explicit portal roles and mandatory
         MFA.
       </p>
-      <form className="mt-6 flex max-w-xl gap-3">
+      <form className="mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
         <Input
           name="search"
           defaultValue={search}
           placeholder="Search staff name or email"
-          className="h-11 bg-white"
+          className="h-11 flex-1 bg-white"
         />
         <Button>Search</Button>
       </form>
@@ -109,7 +109,7 @@ export default async function StaffPage({
             </form>
           ))}
           <nav
-            className="mt-2 flex items-center justify-between"
+            className="mt-2 flex flex-wrap items-center justify-between gap-3"
             aria-label="Pagination"
           >
             <Button

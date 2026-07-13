@@ -47,12 +47,12 @@ export default async function ApplicantsPage({
         Approved applicant profiles, linked nominations and account access
         controls.
       </p>
-      <form className="mt-6 flex max-w-xl gap-3">
+      <form className="mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
         <Input
           name="search"
           defaultValue={search}
           placeholder="Search name or email"
-          className="h-11 bg-white"
+          className="h-11 flex-1 bg-white"
         />
         <Button>Search</Button>
       </form>
@@ -127,7 +127,7 @@ export default async function ApplicantsPage({
         ))}
       </div>
       <nav
-        className="mt-5 flex items-center justify-between"
+        className="mt-5 flex flex-wrap items-center justify-between gap-3"
         aria-label="Pagination"
       >
         <Button

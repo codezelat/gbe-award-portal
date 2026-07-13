@@ -227,7 +227,7 @@ export default async function AdminApplicationDetail({
                 </span>
               </div>
             </summary>
-            <div className="overflow-x-auto border-t px-6 pb-6 pt-5">
+            <div className="data-table-scroll overflow-x-auto border-t px-6 pb-6 pt-5">
               <table className="w-full min-w-[620px] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
@@ -472,7 +472,7 @@ export default async function AdminApplicationDetail({
             </details>
           ) : null}
           <section className="surface rounded-lg p-6">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="section-title">Documents</h2>
               {hasPermission(membership, "files.manage") ? (
                 <Button

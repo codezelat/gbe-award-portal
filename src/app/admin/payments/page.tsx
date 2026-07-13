@@ -148,7 +148,7 @@ export default async function PaymentsPage({
         </select>
         <Button className="h-11">Apply filters</Button>
       </form>
-      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <p>{total.value} matching payment record(s)</p>
         {query.search || query.status ? (
           <Link href="/admin/payments" className="underline">
@@ -156,7 +156,7 @@ export default async function PaymentsPage({
           </Link>
         ) : null}
       </div>
-      <div className="mt-5 overflow-x-auto rounded-lg border bg-white">
+      <div className="data-table-scroll mt-5 overflow-x-auto rounded-lg border bg-white">
         <table className="w-full min-w-[1050px] text-left text-sm">
           <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
@@ -306,7 +306,7 @@ export default async function PaymentsPage({
         </table>
       </div>
       <nav
-        className="mt-5 flex items-center justify-between"
+        className="mt-5 flex flex-wrap items-center justify-between gap-3"
         aria-label="Payment pagination"
       >
         <Button

@@ -363,12 +363,12 @@ export default async function AdminSection({
       <h1 className="page-heading capitalize">{section}</h1>
       <p className="mt-2 text-graphite">{descriptions[section]}</p>
       {["applicants", "activity"].includes(section) ? (
-        <form className="mt-6 flex max-w-xl gap-3">
+        <form className="mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
           <Input
             name="search"
             defaultValue={search}
             placeholder="Search this operational view"
-            className="h-11 bg-white"
+            className="h-11 flex-1 bg-white"
           />
           <Button type="submit">Search</Button>
         </form>
@@ -471,7 +471,7 @@ export default async function AdminSection({
       </p>
       {section !== "reports" ? (
         <nav
-          className="mt-4 flex items-center justify-between"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3"
           aria-label="Pagination"
         >
           <Button
