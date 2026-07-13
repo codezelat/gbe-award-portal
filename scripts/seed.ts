@@ -34,7 +34,7 @@ const [cycle] = existing
         supportEmail: "info@gbeaward.com",
         heading: "Global Business Excellence Awards 2026",
         introCopy:
-          "Recognising outstanding businesses and visionaries across the UK, Sri Lanka and the world.",
+          "Recognising outstanding businesses and visionaries across the world.",
         declarationText,
         declarationVersion: "2026-1",
         termsVersion: "2026-1",
