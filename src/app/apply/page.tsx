@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Check, FileCheck2, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
 import { NominationForm } from "@/components/forms/nomination-form";
 import { getOpenCycleCategories } from "@/server/dal/categories";
@@ -23,7 +23,7 @@ export default async function ApplyPage() {
       <PublicHeader />
       <main id="main-content">
         <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18">
-          <div className="mb-9 grid gap-8 border-b border-mist pb-9 md:grid-cols-[1fr_250px] md:items-end">
+          <div className="mb-9 border-b border-mist pb-9">
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-antique-gold">
                 2026 nominations
@@ -41,32 +41,6 @@ export default async function ApplyPage() {
               >
                 <Mail aria-hidden /> {supportEmail}
               </a>
-            </div>
-            <div className="border-l border-mist pl-5 text-sm text-graphite">
-              <p className="font-semibold text-foreground">Before you begin</p>
-              <ul className="mt-3 space-y-3">
-                <li className="flex gap-2">
-                  <Check
-                    className="mt-0.5 size-4 shrink-0 text-antique-gold"
-                    aria-hidden
-                  />
-                  Contact and nominee details
-                </li>
-                <li className="flex gap-2">
-                  <Check
-                    className="mt-0.5 size-4 shrink-0 text-antique-gold"
-                    aria-hidden
-                  />
-                  Your award category
-                </li>
-                <li className="flex gap-2">
-                  <FileCheck2
-                    className="mt-0.5 size-4 shrink-0 text-antique-gold"
-                    aria-hidden
-                  />
-                  One payment-proof file
-                </li>
-              </ul>
             </div>
           </div>
           <NominationForm

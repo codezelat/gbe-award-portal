@@ -538,20 +538,18 @@ export function NominationForm({
           title="Nominee details"
         >
           <FieldGroup>
-            <div className="grid gap-5 md:grid-cols-2">
-              <ControlledInput
-                form={form}
-                name="nomineeName"
-                label="Full Name / Company Name"
-                required
-              />
-              <ControlledInput
-                form={form}
-                name="designation"
-                label="Designation"
-                description="Complete this only when nominating an individual."
-              />
-            </div>
+            <ControlledInput
+              form={form}
+              name="nomineeName"
+              label="Full Name / Company Name"
+              required
+            />
+            <ControlledInput
+              form={form}
+              name="designation"
+              label="Designation"
+              description="Complete this only when nominating an individual."
+            />
             <ControlledInput
               form={form}
               name="industrySector"
