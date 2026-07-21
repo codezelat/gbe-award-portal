@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 type ProgrammeMedia = {
   type: "post" | "reel";
@@ -18,17 +19,17 @@ type ProgrammeMedia = {
 
 const programmeMedia: readonly ProgrammeMedia[] = [
   {
-    type: "post",
-    facebookUrl:
-      "https://www.facebook.com/gbeaward/posts/pfbid033Pqy6icmSSfDim4BWb8QVFmF1dc17WQp6DZDtPUCQhEsk7vYtW4k4ZiRJALzxTrjl",
-  },
-  {
     type: "reel",
     facebookUrl: "https://www.facebook.com/reel/2587233971693850",
   },
   {
     type: "reel",
     facebookUrl: "https://www.facebook.com/reel/989937467132055",
+  },
+  {
+    type: "post",
+    facebookUrl:
+      "https://www.facebook.com/gbeaward/posts/pfbid033Pqy6icmSSfDim4BWb8QVFmF1dc17WQp6DZDtPUCQhEsk7vYtW4k4ZiRJALzxTrjl",
   },
   {
     type: "reel",
@@ -41,11 +42,20 @@ const programmeMedia: readonly ProgrammeMedia[] = [
 ];
 
 function getFacebookEmbedUrl(media: ProgrammeMedia) {
-  const query = new URLSearchParams({
-    href: media.facebookUrl,
-    show_text: media.type === "post" ? "true" : "false",
-    width: "500",
-  });
+  const query = new URLSearchParams(
+    media.type === "reel"
+      ? {
+          height: "711",
+          href: media.facebookUrl,
+          show_text: "false",
+          width: "400",
+        }
+      : {
+          href: media.facebookUrl,
+          show_text: "true",
+          width: "500",
+        },
+  );
   const plugin = media.type === "post" ? "post.php" : "video.php";
 
   return `https://www.facebook.com/plugins/${plugin}?${query.toString()}`;
@@ -86,7 +96,10 @@ export function ProgrammeDetailsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[calc(100svh-1rem)] w-[calc(100%-1rem)] max-w-[540px] gap-0 overflow-hidden border-0 bg-[#111] p-0 text-white shadow-2xl [&_[data-slot=dialog-close]]:right-2 [&_[data-slot=dialog-close]]:top-2 [&_[data-slot=dialog-close]]:z-20 [&_[data-slot=dialog-close]]:bg-black/55 [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-black/80"
+        className={cn(
+          "max-h-[calc(100svh-1rem)] w-[calc(100%-1rem)] gap-0 overflow-hidden border-0 bg-[#111] p-0 text-white shadow-2xl [&_[data-slot=dialog-close]]:right-2 [&_[data-slot=dialog-close]]:top-2 [&_[data-slot=dialog-close]]:z-20 [&_[data-slot=dialog-close]]:bg-black/55 [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:bg-black/80",
+          isReel ? "max-w-[400px]" : "max-w-[540px]",
+        )}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>GBE Awards 2026 programme media</DialogTitle>
@@ -103,17 +116,35 @@ export function ProgrammeDetailsDialog({
           role="region"
           tabIndex={0}
         >
-          <iframe
-            key={media.facebookUrl}
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            allowFullScreen
-            className="block h-[min(68svh,680px)] min-h-[300px] w-full border-0 bg-white animate-in fade-in-0 duration-200"
-            data-testid="programme-facebook-embed"
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            src={getFacebookEmbedUrl(media)}
-            title={`GBE Awards 2026 programme item ${activeIndex + 1}`}
-          />
+          {isReel ? (
+            <div className="flex h-[calc(100svh-4rem)] max-h-[711px] items-center justify-center bg-black">
+              <div className="aspect-[9/16] h-full max-w-full animate-in fade-in-0 duration-200">
+                <iframe
+                  key={media.facebookUrl}
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="block size-full border-0 bg-white"
+                  data-testid="programme-facebook-embed"
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  src={getFacebookEmbedUrl(media)}
+                  title={`GBE Awards 2026 programme item ${activeIndex + 1}`}
+                />
+              </div>
+            </div>
+          ) : (
+            <iframe
+              key={media.facebookUrl}
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+              allowFullScreen
+              className="block h-[min(68svh,680px)] min-h-[300px] w-full animate-in border-0 bg-white fade-in-0 duration-200"
+              data-testid="programme-facebook-embed"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              src={getFacebookEmbedUrl(media)}
+              title={`GBE Awards 2026 programme item ${activeIndex + 1}`}
+            />
+          )}
 
           <Button
             type="button"

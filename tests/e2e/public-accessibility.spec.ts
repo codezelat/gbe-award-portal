@@ -79,6 +79,12 @@ test("programme details load Facebook media only after the visitor requests it",
   page,
 }) => {
   await page.goto("/apply");
+  await expect(
+    page.getByRole("link", { name: "Download Event Brochure" }),
+  ).toHaveAttribute(
+    "href",
+    "https://drive.usercontent.google.com/download?id=1rJ1JfccI57Yyr928QCoCr_1UqjmU9z3c&export=download&confirm=t",
+  );
   await expect(page.getByRole("button", { name: "View Program Details" })).toBeVisible();
   await expect(page.locator("iframe")).toHaveCount(0);
 
@@ -88,8 +94,6 @@ test("programme details load Facebook media only after the visitor requests it",
   ).toBeVisible();
 
   const embed = page.getByTestId("programme-facebook-embed");
-  await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/post\.php/);
-  await page.getByRole("button", { name: "Next programme item" }).click();
   await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/video\.php/);
   await expect(
     page.getByRole("link", { name: "Open this reel with sound on Facebook" }),
@@ -97,6 +101,10 @@ test("programme details load Facebook media only after the visitor requests it",
     "href",
     "https://www.facebook.com/reel/2587233971693850",
   );
+  await page.getByRole("button", { name: "Next programme item" }).click();
+  await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/video\.php/);
+  await page.getByRole("button", { name: "Show programme item 3" }).click();
+  await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/post\.php/);
 });
 
 test("public routes and footer links remain available", async ({ page }) => {
