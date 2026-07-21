@@ -86,6 +86,7 @@ Supporting documents and payment proof are independently limited to **5 MB per f
 - **Private routes** are protected early by `src/proxy.ts`, then enforce a session and application-level profile checks in the server data-access layer.
 - **Staff routes** require a staff profile, active membership and mandatory TOTP MFA. Staff can complete the full nomination workflow; super admins additionally manage people and system configuration. The QR code and manual setup URI work with Google Authenticator, Microsoft Authenticator and compatible apps.
 - **Uploads** go to the private R2 bucket by presigned URL. Object metadata, detected types, ownership and disposition are checked before a record becomes available.
+- **Programme media** on `/apply` is an on-demand dialog: the Facebook post/reel frames and their client bundle load only after a visitor requests them. No Facebook SDK is loaded into the nomination page; the restrictive policy permits Facebook only as a frame source for this dialog.
 - **Sensitive operations** write audit events. Administrative data is noindexed, and platform headers block framing and apply a restrictive content policy.
 - **Database roles are split:** the runtime uses the least-privilege pooled connection; migrations use a separate direct owner connection.
 

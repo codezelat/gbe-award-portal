@@ -3,6 +3,7 @@ import { Mail } from "lucide-react";
 import { PublicHeader } from "@/components/shared/public-header";
 import { PublicFooter } from "@/components/shared/public-footer";
 import { NominationForm } from "@/components/forms/nomination-form";
+import { ProgrammeDetailsButton } from "@/components/programme/programme-details-button";
 import { brand } from "@/config/brand";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
@@ -88,8 +89,8 @@ export default async function ApplyPage() {
           }}
         />
         <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18">
-          <div className="mb-9 border-b border-mist pb-9">
-            <div>
+          <div className="mb-9 flex flex-col gap-6 border-b border-mist pb-9 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-2xl">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-antique-gold">
                 2026 nominations
               </p>
@@ -106,6 +107,9 @@ export default async function ApplyPage() {
               >
                 <Mail aria-hidden /> {supportEmail}
               </a>
+            </div>
+            <div className="shrink-0 sm:pb-1">
+              <ProgrammeDetailsButton />
             </div>
           </div>
           <NominationForm

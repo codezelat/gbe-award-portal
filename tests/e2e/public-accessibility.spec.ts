@@ -75,6 +75,28 @@ test("public and authentication routes have no horizontal overflow", async ({
   }
 });
 
+test("programme details load Facebook media only after the visitor requests it", async ({
+  page,
+}) => {
+  await page.goto("/apply");
+  await expect(page.getByRole("button", { name: "View Program Details" })).toBeVisible();
+  await expect(page.locator("iframe")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "View Program Details" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Programme details" }),
+  ).toBeVisible();
+
+  const embed = page.getByTestId("programme-facebook-embed");
+  await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/post\.php/);
+  await page.getByRole("button", { name: "Next programme item" }).click();
+  await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/video\.php/);
+  await expect(page.getByRole("link", { name: "Watch with sound" })).toHaveAttribute(
+    "href",
+    "https://www.facebook.com/reel/2587233971693850",
+  );
+});
+
 test("public routes and footer links remain available", async ({ page }) => {
   for (const path of ["/apply", "/apply/submitted", "/help", "/privacy", "/terms"]) {
     const response = await page.goto(path);
