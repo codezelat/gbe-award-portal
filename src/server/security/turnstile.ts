@@ -9,7 +9,11 @@ type TurnstileResult = {
   metadata?: { result_with_testing_key?: boolean };
 };
 const officialAlwaysPassesSecret = "1x0000000000000000000000000000000AA";
-export async function verifyTurnstile(token: string, remoteIp?: string) {
+export async function verifyTurnstile(
+  token: string,
+  remoteIp?: string,
+  expectedAction = env.TURNSTILE_APPLICATION_ACTION,
+) {
   if (!env.TURNSTILE_SECRET_KEY)
     throw new Error("Security verification is not configured.");
   const body = new FormData();
@@ -45,7 +49,7 @@ export async function verifyTurnstile(token: string, remoteIp?: string) {
     !result.success ||
     !result.hostname ||
     !allowedHosts.includes(result.hostname.toLowerCase()) ||
-    result.action !== env.TURNSTILE_APPLICATION_ACTION
+    result.action !== expectedAction
   )
     throw new Error(
       "Security verification expired or could not be confirmed. Please verify again.",

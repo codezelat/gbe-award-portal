@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { turnstileActions } from "@/config/turnstile";
 
 const serverSchema = z.object({
   APP_ENV: z
@@ -21,7 +22,9 @@ const serverSchema = z.object({
   R2_PUBLIC_ASSET_BASE_URL: z.url().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
   TURNSTILE_EXPECTED_HOSTNAME: z.string().default("localhost"),
-  TURNSTILE_APPLICATION_ACTION: z.string().default("gbe_nomination_submit"),
+  TURNSTILE_APPLICATION_ACTION: z
+    .string()
+    .default(turnstileActions.nomination),
   RESEND_API_KEY: z.string().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_FROM: z.string().default("GBE Awards <info@gbeaward.com>"),

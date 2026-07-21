@@ -1,6 +1,7 @@
 "use client";
 import Script from "next/script";
 import { useEffect, useRef } from "react";
+import { turnstileActions } from "@/config/turnstile";
 
 declare global {
   interface Window {
@@ -13,9 +14,11 @@ declare global {
 }
 export function Turnstile({
   onToken,
+  action = turnstileActions.nomination,
   resetSignal = 0,
 }: {
   onToken: (token: string) => void;
+  action?: string;
   resetSignal?: number;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -30,7 +33,7 @@ export function Turnstile({
       sitekey:
         process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??
         "1x00000000000000000000AA",
-      action: "gbe_nomination_submit",
+      action,
       theme: "light",
       callback: onToken,
       "expired-callback": () => onToken(""),

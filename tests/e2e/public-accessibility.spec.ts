@@ -181,3 +181,47 @@ test("protected portals redirect anonymous visitors to sign in", async ({
     await expect(page).toHaveURL(/\/login/);
   }
 });
+
+test("requires Turnstile after two failed sign-in attempts", async ({ page }) => {
+  const email = `turnstile-${crypto.randomUUID()}@example.test`;
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password").fill("incorrect-password");
+
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  await expect(
+    page.getByText("The email or password was not recognised."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  await expect(
+    page.getByText("Complete the security verification, then try again."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Security verification" }),
+  ).toBeVisible();
+
+  await page.waitForFunction(() =>
+    Boolean(
+      document.querySelector<HTMLInputElement>(
+        'input[name="cf-turnstile-response"]',
+      )?.value,
+    ),
+  );
+  const challengeAttempt = page.waitForResponse((response) =>
+    response.url().includes("/api/auth/sign-in/email"),
+  );
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  expect((await challengeAttempt).status()).toBe(401);
+  await expect(
+    page.getByText("Complete the security verification, then try again."),
+  ).toBeVisible();
+
+  const thirdAttempt = await page.request.post("/api/auth/sign-in/email", {
+    data: { email, password: "incorrect-password", rememberMe: true },
+  });
+  expect(thirdAttempt.status()).toBe(403);
+  await expect(thirdAttempt.json()).resolves.toMatchObject({
+    code: "TURNSTILE_REQUIRED",
+  });
+});

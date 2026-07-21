@@ -88,6 +88,7 @@ bun run db:bootstrap-admin
 ### Authentication, email and jobs
 
 - Better Auth is invitation-only (`disableSignUp: true`); public nomination does not create an account. Do not add a generic sign-up route.
+- Login uses an adaptive Turnstile challenge after two failed attempts for the same HMAC-protected email/IP fingerprint in a 15-minute window. Verify the `gbe_login` action server-side before a further password check; do not add a client-only CAPTCHA or a second scheduler.
 - Staff MFA is mandatory. Keep the existing QR/manual TOTP enrolment and challenge flows compatible with standard authenticator apps.
 - Email is a durable outbox. Queue mail through the established flow; do not send ad-hoc messages directly from a page/action when delivery tracking and retry are required.
 - Verify Resend webhook signatures before changing state.

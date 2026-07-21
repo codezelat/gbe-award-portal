@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, LogIn } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
+import { turnstileActions } from "@/config/turnstile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Turnstile } from "@/components/forms/turnstile";
 import {
   Field,
   FieldDescription,
@@ -17,23 +19,45 @@ export function LoginForm() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [requiresTurnstile, setRequiresTurnstile] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileReset, setTurnstileReset] = useState(0);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (requiresTurnstile && !turnstileToken) {
+      setError("Complete the security verification to continue.");
+      return;
+    }
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
-    const result = await authClient.signIn.email({
-      email: String(data.get("email")),
-      password: String(data.get("password")),
-      rememberMe: true,
-    });
+    const result = await authClient.signIn.email(
+      {
+        email: String(data.get("email")),
+        password: String(data.get("password")),
+        rememberMe: true,
+      },
+      turnstileToken
+        ? { headers: { "x-captcha-response": turnstileToken } }
+        : undefined,
+    );
     setPending(false);
     if (result.error) {
+      if (result.error.code === "TURNSTILE_REQUIRED") {
+        setRequiresTurnstile(true);
+        setTurnstileToken("");
+        setTurnstileReset((value) => value + 1);
+      }
       setError(
-        "The email or password was not recognised. Check your details and try again.",
+        result.error.code === "TURNSTILE_REQUIRED"
+          ? "Complete the security verification, then try again."
+          : "The email or password was not recognised. Check your details and try again.",
       );
       return;
     }
+    setRequiresTurnstile(false);
+    setTurnstileToken("");
     if (result.data && "twoFactorRedirect" in result.data) {
       router.push("/auth/two-factor");
       return;
@@ -81,6 +105,18 @@ export function LoginForm() {
           />
           <FieldDescription>Portal access is invitation only.</FieldDescription>
         </Field>
+        {requiresTurnstile ? (
+          <Field>
+            <FieldDescription>
+              For your security, complete this check before trying again.
+            </FieldDescription>
+            <Turnstile
+              action={turnstileActions.login}
+              onToken={setTurnstileToken}
+              resetSignal={turnstileReset}
+            />
+          </Field>
+        ) : null}
       </FieldGroup>
       <Button className="h-12" disabled={pending}>
         {pending ? (
