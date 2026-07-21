@@ -84,14 +84,16 @@ test("programme details load Facebook media only after the visitor requests it",
 
   await page.getByRole("button", { name: "View Program Details" }).click();
   await expect(
-    page.getByRole("heading", { name: "Programme details" }),
+    page.getByRole("dialog", { name: "GBE Awards 2026 programme media" }),
   ).toBeVisible();
 
   const embed = page.getByTestId("programme-facebook-embed");
   await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/post\.php/);
   await page.getByRole("button", { name: "Next programme item" }).click();
   await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/video\.php/);
-  await expect(page.getByRole("link", { name: "Watch with sound" })).toHaveAttribute(
+  await expect(
+    page.getByRole("link", { name: "Open this reel with sound on Facebook" }),
+  ).toHaveAttribute(
     "href",
     "https://www.facebook.com/reel/2587233971693850",
   );
