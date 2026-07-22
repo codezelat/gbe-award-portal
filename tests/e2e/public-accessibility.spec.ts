@@ -9,6 +9,9 @@ test("public nomination route exposes an accessible guided form", async ({
     if (message.type() === "error") browserErrors.push(message.text());
   });
   await page.goto("/apply");
+  await expect(
+    page.getByRole("link", { name: "Already invited? Sign in" }),
+  ).toHaveAttribute("href", "/login");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   for (const label of ["Company Name / Full Name"])
     await expect(page.getByLabel(label, { exact: false })).toBeVisible();

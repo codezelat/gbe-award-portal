@@ -80,7 +80,7 @@ export default async function ApplyPage() {
   };
   return (
     <div className="flex min-h-svh flex-col">
-      <PublicHeader />
+      <PublicHeader compactSignIn />
       <main id="main-content" className="flex-1">
         <script
           type="application/ld+json"
