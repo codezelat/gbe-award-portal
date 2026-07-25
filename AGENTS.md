@@ -84,6 +84,7 @@ bun run db:bootstrap-admin
 - Keep uploads private. Use the existing presign/complete routes, object-key prefixing, detected-type checks and signed download flow.
 - Respect existing size, quantity, ownership, purpose and disposition checks. Do not trust browser MIME types or filenames.
 - Use a dedicated R2 prefix for tests/previews. Do not reuse production objects or buckets for test data.
+- Only a super admin may permanently remove an incomplete nomination shell, and only when it has no final reference or retained evidence. The removal must clear its staged private objects and linked operational rows; it must refuse submitted or evidenced nominations.
 
 ### Authentication, email and jobs
 

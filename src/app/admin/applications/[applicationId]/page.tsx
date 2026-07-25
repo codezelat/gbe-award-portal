@@ -39,6 +39,7 @@ import {
   transitionMap,
   type WorkflowStatus,
 } from "@/lib/domain/application-status";
+import { missingPaymentVerificationFields } from "@/lib/domain/payment-verification";
 export default async function AdminApplicationDetail({
   params,
 }: {
@@ -173,6 +174,20 @@ export default async function AdminApplicationDetail({
       return hasPermission(membership, "applications.release_outcome");
     return true;
   });
+  const verificationGaps =
+    payment?.status === "verified"
+      ? missingPaymentVerificationFields({
+          applicationReference: application.reference,
+          applicationSubmittedAt: application.submittedAt,
+          paymentReference: payment.paymentReference,
+          proofApplicationFileId: payment.proofApplicationFileId,
+          payerName: payment.payerName,
+          bankReference: payment.bankReference,
+          amountMinor: payment.amountMinor,
+          currency: payment.currency,
+          paidAt: payment.paidAt,
+        })
+      : [];
   return (
     <>
       <div className="glass-shell sticky top-16 z-10 -mx-3 flex flex-wrap items-end justify-between gap-4 rounded-lg px-3 py-3">
@@ -948,7 +963,10 @@ export default async function AdminApplicationDetail({
           {hasPermission(membership, "payments.verify") ? (
             <details
               className="surface group rounded-lg"
-              open={payment?.status === "proof_submitted"}
+              open={
+                payment?.status === "proof_submitted" ||
+                verificationGaps.length > 0
+              }
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                 <span>Payment review</span>
@@ -964,6 +982,15 @@ export default async function AdminApplicationDetail({
                     {payment.receiptReference
                       ? ` · ${payment.receiptReference}`
                       : ""}
+                  </p>
+                ) : null}
+                {verificationGaps.length ? (
+                  <p
+                    className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                    role="alert"
+                  >
+                    This verified record is incomplete. Record the missing
+                    details before saving it again: {verificationGaps.join(", ")}.
                   </p>
                 ) : null}
                 {payment ? (

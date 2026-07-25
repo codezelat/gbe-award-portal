@@ -6,6 +6,7 @@ import {
   eq,
   ilike,
   isNull,
+  ne,
   or,
   sql,
   type SQL,
@@ -25,6 +26,11 @@ import { updatePaymentAction } from "@/server/actions/application-actions";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  canPurgeIncompletePaymentShell,
+  missingPaymentVerificationFields,
+} from "@/lib/domain/payment-verification";
+import { RemoveIncompleteNominationButton } from "@/components/admin/remove-incomplete-nomination-button";
 
 const pageSizes = [25, 50, 100] as const;
 
@@ -36,6 +42,7 @@ export default async function PaymentsPage({
     status?: string;
     page?: string;
     pageSize?: string;
+    incomplete?: string;
   }>;
 }) {
   const query = await searchParams;
@@ -46,7 +53,14 @@ export default async function PaymentsPage({
   const pageSize = pageSizes.includes(requestedSize as 25 | 50 | 100)
     ? requestedSize
     : 25;
-  const filters: SQL[] = [isNull(applications.deletedAt)];
+  const isIncompleteView =
+    query.incomplete === "1" && membership.role === "super_admin";
+  const filters: SQL[] = [
+    isNull(applications.deletedAt),
+    isIncompleteView
+      ? eq(applications.workflowStatus, "uploading")
+      : ne(applications.workflowStatus, "uploading"),
+  ];
   if (
     query.status &&
     payments.status.enumValues.includes(query.status as never)
@@ -69,7 +83,7 @@ export default async function PaymentsPage({
     );
   const where = and(...filters);
   const db = getDb();
-  const [rows, [total]] = await Promise.all([
+  const [rows, [total], [incompleteTotal]] = await Promise.all([
     db
       .select({
         payment: payments,
@@ -98,6 +112,18 @@ export default async function PaymentsPage({
       .from(payments)
       .innerJoin(applications, eq(payments.applicationId, applications.id))
       .where(where),
+    membership.role === "super_admin"
+      ? db
+          .select({ value: count() })
+          .from(payments)
+          .innerJoin(applications, eq(payments.applicationId, applications.id))
+          .where(
+            and(
+              isNull(applications.deletedAt),
+              eq(applications.workflowStatus, "uploading"),
+            ),
+          )
+      : Promise.resolve([{ value: 0 }]),
   ]);
   const params = new URLSearchParams();
   if (query.search) params.set("search", query.search);
@@ -109,9 +135,13 @@ export default async function PaymentsPage({
   };
   return (
     <>
-      <h1 className="page-heading">Payment review</h1>
+      <h1 className="page-heading">
+        {isIncompleteView ? "Incomplete nominations" : "Payment review"}
+      </h1>
       <p className="mt-2 text-graphite">
-        Review private evidence, reconciliation details and payment decisions.
+        {isIncompleteView
+          ? "Remove abandoned nomination shells that have no retained evidence."
+          : "Review private evidence, reconciliation details and payment decisions."}
       </p>
       <form className="surface mt-6 grid gap-3 rounded-lg p-4 md:grid-cols-[minmax(0,1fr)_210px_120px_auto]">
         <label className="relative">
@@ -150,9 +180,17 @@ export default async function PaymentsPage({
       </form>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <p>{total.value} matching payment record(s)</p>
-        {query.search || query.status ? (
+        {isIncompleteView ? (
+          <Link href="/admin/payments" className="underline">
+            Back to payment review
+          </Link>
+        ) : query.search || query.status ? (
           <Link href="/admin/payments" className="underline">
             Clear filters
+          </Link>
+        ) : membership.role === "super_admin" && incompleteTotal.value ? (
+          <Link href="/admin/payments?incomplete=1" className="underline">
+            {incompleteTotal.value} incomplete nomination(s) awaiting cleanup
           </Link>
         ) : null}
       </div>
@@ -178,8 +216,39 @@ export default async function PaymentsPage({
                   proofFileId,
                   proofName,
                   proofVersions,
-                }) => (
-                  <tr
+                }) => {
+                  const verificationGaps =
+                    payment.status === "verified"
+                      ? missingPaymentVerificationFields({
+                          applicationReference: application.reference,
+                          applicationSubmittedAt: application.submittedAt,
+                          paymentReference: payment.paymentReference,
+                          proofApplicationFileId:
+                            payment.proofApplicationFileId,
+                          payerName: payment.payerName,
+                          bankReference: payment.bankReference,
+                          amountMinor: payment.amountMinor,
+                          currency: payment.currency,
+                          paidAt: payment.paidAt,
+                        })
+                      : [];
+                  const needsCorrection = verificationGaps.length > 0;
+                  const canRemove =
+                    membership.role === "super_admin" &&
+                    canPurgeIncompletePaymentShell({
+                      workflowStatus: application.workflowStatus,
+                      applicationReference: application.reference,
+                      applicationSubmittedAt: application.submittedAt,
+                      paymentReference: payment.paymentReference,
+                      proofApplicationFileId: payment.proofApplicationFileId,
+                      payerName: payment.payerName,
+                      bankReference: payment.bankReference,
+                      amountMinor: payment.amountMinor,
+                      currency: payment.currency,
+                      paidAt: payment.paidAt,
+                    });
+                  return (
+                    <tr
                     key={payment.id}
                     className="border-t align-top hover:bg-muted/40"
                   >
@@ -188,7 +257,7 @@ export default async function PaymentsPage({
                         href={`/admin/applications/${application.id}`}
                         className="font-mono text-xs font-semibold hover:underline"
                       >
-                        {application.reference}
+                        {application.reference ?? "Incomplete nomination"}
                       </Link>
                       <p className="mt-1 font-medium">
                         {application.nomineeName}
@@ -205,6 +274,11 @@ export default async function PaymentsPage({
                     </td>
                     <td className="px-4 py-4">
                       <StatusBadge status={payment.status} />
+                      {needsCorrection ? (
+                        <p className="mt-2 max-w-52 text-xs font-medium text-amber-800">
+                          Needs correction: {verificationGaps.join(", ")}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4">
                       <p className="max-w-48 truncate">
@@ -277,19 +351,26 @@ export default async function PaymentsPage({
                         ) : null}
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant={needsCorrection ? "outline" : "ghost"}
                           render={
                             <Link
                               href={`/admin/applications/${application.id}`}
                             />
                           }
                         >
-                          Full review
+                          {needsCorrection ? "Correct record" : "Full review"}
                         </Button>
+                        {canRemove ? (
+                          <RemoveIncompleteNominationButton
+                            applicationId={application.id}
+                            nomineeName={application.nomineeName}
+                          />
+                        ) : null}
                       </div>
                     </td>
-                  </tr>
-                ),
+                    </tr>
+                  );
+                },
               )
             ) : (
               <tr>
