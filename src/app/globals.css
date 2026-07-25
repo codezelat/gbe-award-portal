@@ -275,17 +275,17 @@
     letter-spacing: -0.035em;
   }
 
-  .workspace-shell .font-display,
-  .workspace-shell .font-heading {
-    font-family: var(--font-manrope), system-ui, sans-serif;
-  }
-
   .workspace-shell .section-title {
     font-size: 1.125rem;
     font-weight: 700;
     line-height: 1.35;
     letter-spacing: -0.015em;
   }
+}
+
+.workspace-shell .font-display,
+.workspace-shell .font-heading {
+  font-family: var(--font-manrope), system-ui, sans-serif;
 }
 
 @media (prefers-reduced-motion: reduce) {
