@@ -37,7 +37,7 @@ export function PortalShell({
         : "Staff"
       : "Approved applicant";
   return (
-    <div className="min-h-svh lg:grid lg:grid-cols-[240px_1fr]">
+    <div className="workspace-shell min-h-svh lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="glass-shell fixed inset-y-0 left-0 z-30 hidden w-60 flex-col px-4 py-6 lg:flex">
         <AppLogo className="px-2" />
         <div className="mt-8 flex items-center gap-3 border-y py-4">

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
@@ -19,6 +20,7 @@ import {
   profiles,
 } from "@/lib/db/schema";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ExternalValueLink } from "@/components/shared/external-value-link";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -145,11 +147,17 @@ export default async function AdminApplicationDetail({
   ]);
   const original = (versions.find((item) => item.version === 1)?.payload ??
     {}) as Record<string, unknown>;
-  const fields = [
+  const fields: Array<[string, ReactNode]> = [
     ["Nominee / organisation", application.nomineeName],
     ["Designation", application.designation || "Not provided"],
     ["Award nomination", application.awardNomination],
-    ["Website", application.businessWebsite || "Not provided"],
+    [
+      "Website",
+      <ExternalValueLink
+        key="business-website"
+        value={application.businessWebsite}
+      />,
+    ],
     ["Email", application.emailDisplay],
     ["Telephone", application.phoneDisplay],
     ["Category", application.categoryNameSnapshot],

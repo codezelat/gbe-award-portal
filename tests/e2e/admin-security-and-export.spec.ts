@@ -76,6 +76,22 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await expect(
     page.getByRole("heading", { name: "Operations overview" }),
   ).toBeVisible();
+  await expect(page.locator(".workspace-shell")).toBeVisible();
+  expect(
+    await page.locator(".workspace-shell").evaluate((element) => ({
+      background: getComputedStyle(element).backgroundColor,
+      headingFont: getComputedStyle(
+        element.querySelector("h1") as HTMLElement,
+      ).fontFamily,
+    })),
+  ).toEqual({
+    background: "rgb(245, 247, 248)",
+    headingFont: expect.stringContaining("Manrope"),
+  });
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-desktop.png"),
+    fullPage: false,
+  });
 
   await page.goto(
     `/admin/applications?search=${encodeURIComponent(E2E_APPLICATION_REFERENCE)}`,
@@ -113,6 +129,10 @@ test("enforces staff MFA, then permits search and a real filtered export", async
       page.getByRole("navigation", { name: "Mobile administration" }),
     ).toBeVisible();
   }
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-mobile.png"),
+    fullPage: false,
+  });
 
   const applicationHref = await page
     .getByRole("link", { name: E2E_APPLICATION_REFERENCE })
@@ -165,6 +185,20 @@ test("enforces staff MFA, then permits search and a real filtered export", async
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(applicationHref!);
+
+  const submittedNomination = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Submitted nomination" }),
+  });
+  const websiteLink = submittedNomination.locator(
+    'a[href="https://gbeaward.com/"]',
+  );
+  await expect(websiteLink).toBeVisible();
+  await expect(websiteLink).toHaveAttribute("target", "_blank");
+  await expect(websiteLink).toHaveAttribute("rel", "noopener noreferrer");
+  await page.screenshot({
+    path: testInfo.outputPath("workspace-application.png"),
+    fullPage: false,
+  });
 
   const documents = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Documents" }),

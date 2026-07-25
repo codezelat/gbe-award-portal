@@ -65,7 +65,7 @@ export default async function setup() {
     insert into applications (
       reference, cycle_id, category_id, workflow_status, payment_status,
       account_access_status, nominee_name, award_nomination, email_normalised,
-      email_display, phone_e164, phone_display, category_name_snapshot,
+      business_website, email_display, phone_e164, phone_display, category_name_snapshot,
       category_code_snapshot, declaration_accepted, declaration_text_snapshot,
       declaration_version, terms_version, privacy_version, form_schema_version,
       submitted_at, last_activity_at
@@ -73,8 +73,8 @@ export default async function setup() {
     select
       ${E2E_APPLICATION_REFERENCE}, cycle_id, category_id, 'submitted',
       'proof_submitted', 'not_created', 'Playwright Fixture Organisation',
-      'Recognising the fixture organisation for test excellence.', 'fixture@example.test', 'fixture@example.test',
-      '+94771234567', '+94 77 123 4567', category_name, category_code, true,
+      'Recognising the fixture organisation for test excellence.', 'fixture@example.test', 'https://gbeaward.com/',
+      'fixture@example.test', '+94771234567', '+94 77 123 4567', category_name, category_code, true,
       declaration_text, declaration_version, terms_version, privacy_version,
       form_schema_version, now(), now()
     from fixture

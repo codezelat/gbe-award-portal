@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,6 +12,7 @@ import {
 import { applicantVisibleStatus } from "@/lib/domain/outcome-visibility";
 import { requirePortalSession } from "@/server/dal/auth";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ExternalValueLink } from "@/components/shared/external-value-link";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -56,11 +58,14 @@ export default async function ApplicationDetail({
       ),
     )
     .limit(1);
-  const fields = [
+  const fields: Array<[string, ReactNode]> = [
     ["Official name / organisation", app.nomineeName],
     ["Designation", app.designation || "Not provided"],
     ["Award nomination", app.awardNomination],
-    ["Business website", app.businessWebsite || "Not provided"],
+    [
+      "Business website",
+      <ExternalValueLink key="business-website" value={app.businessWebsite} />,
+    ],
     ["Primary email", app.emailDisplay],
     ["Telephone", app.phoneDisplay],
     ["Award category", app.categoryNameSnapshot],

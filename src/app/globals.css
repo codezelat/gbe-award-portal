@@ -27,13 +27,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-ink: #171713;
-  --color-graphite: #45443e;
-  --color-mist: #e8e5dd;
-  --color-champagne: #c6a969;
-  --color-antique-gold: #76591f;
-  --color-gold-wash: #f4ecd8;
-  --color-bronze-ink: #6d552b;
+  --color-ink: var(--ink);
+  --color-graphite: var(--graphite);
+  --color-mist: var(--mist);
+  --color-champagne: var(--champagne);
+  --color-antique-gold: var(--antique-gold);
+  --color-gold-wash: var(--gold-wash);
+  --color-bronze-ink: var(--bronze-ink);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -79,6 +79,13 @@
   --sidebar-accent-foreground: #6d552b;
   --sidebar-border: rgba(218, 213, 202, 0.72);
   --sidebar-ring: #c6a969;
+  --ink: #171713;
+  --graphite: #45443e;
+  --mist: #e8e5dd;
+  --champagne: #c6a969;
+  --antique-gold: #76591f;
+  --gold-wash: #f4ecd8;
+  --bronze-ink: #6d552b;
 }
 
 @layer base {
@@ -122,7 +129,7 @@
 
 @layer components {
   .font-display {
-    font-family: var(--font-cormorant), serif;
+    font-family: var(--font-display), serif;
   }
   .glass-shell {
     background: rgba(255, 253, 248, 0.76);
@@ -152,14 +159,14 @@
     transform: translateY(-1px);
   }
   .page-heading {
-    font-family: var(--font-cormorant), serif;
+    font-family: var(--font-heading), serif;
     font-size: clamp(2.25rem, 4vw, 3.2rem);
     font-weight: 600;
     line-height: 1.06;
     letter-spacing: -0.025em;
   }
   .section-title {
-    font-family: var(--font-cormorant), serif;
+    font-family: var(--font-heading), serif;
     font-size: 1.6rem;
     font-weight: 600;
     line-height: 1.2;
@@ -199,6 +206,85 @@
     color: #873d3d;
     background: #f8eaea;
     border-color: #e9c8c8;
+  }
+
+  .workspace-shell {
+    --font-heading: var(--font-manrope);
+    --font-display: var(--font-manrope);
+    --background: #f5f7f8;
+    --foreground: #243139;
+    --card: #ffffff;
+    --card-foreground: #243139;
+    --popover: #ffffff;
+    --popover-foreground: #243139;
+    --primary: #176f67;
+    --primary-foreground: #ffffff;
+    --secondary: #edf2f2;
+    --secondary-foreground: #243139;
+    --muted-surface: #eef3f3;
+    --muted-foreground: #67757b;
+    --accent: #e6f4f1;
+    --accent-foreground: #155f59;
+    --border: #dce5e5;
+    --input: #cbd7d7;
+    --ring: #2c827a;
+    --sidebar: #fbfdfd;
+    --sidebar-foreground: #243139;
+    --sidebar-primary: #176f67;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e6f4f1;
+    --sidebar-accent-foreground: #155f59;
+    --sidebar-border: #dce5e5;
+    --sidebar-ring: #2c827a;
+    --ink: #243139;
+    --graphite: #43535a;
+    --mist: #dce5e5;
+    --champagne: #6bb3aa;
+    --antique-gold: #176f67;
+    --gold-wash: #e6f4f1;
+    --bronze-ink: #155f59;
+    min-height: 100svh;
+    background: #f5f7f8;
+    color: #243139;
+  }
+
+  .workspace-shell .glass-shell {
+    border-color: rgba(220, 229, 229, 0.9);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 1px 3px rgba(23, 46, 48, 0.06);
+    backdrop-filter: blur(12px);
+  }
+
+  .workspace-shell .glass-feature {
+    border-color: #dce5e5;
+    background: #ffffff;
+    box-shadow: 0 3px 14px rgba(23, 46, 48, 0.055);
+    backdrop-filter: none;
+  }
+
+  .workspace-shell .surface {
+    border-color: #dce5e5;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(23, 46, 48, 0.045);
+  }
+
+  .workspace-shell .page-heading {
+    font-size: clamp(1.75rem, 3vw, 2.35rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+  }
+
+  .workspace-shell .font-display,
+  .workspace-shell .font-heading {
+    font-family: var(--font-manrope), system-ui, sans-serif;
+  }
+
+  .workspace-shell .section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.015em;
   }
 }
 
