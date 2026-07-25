@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
-import { Eye, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { getDb } from "@/lib/db";
 import {
   applicationFiles,
@@ -31,6 +31,7 @@ import {
   missingPaymentVerificationFields,
 } from "@/lib/domain/payment-verification";
 import { RemoveIncompleteNominationButton } from "@/components/admin/remove-incomplete-nomination-button";
+import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
 
 const pageSizes = [25, 50, 100] as const;
 
@@ -288,20 +289,11 @@ export default async function PaymentsPage({
                         {proofVersions} retained version(s)
                       </p>
                       {proofFileId ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
+                        <ProtectedFilePreview
                           className="mt-2"
-                          render={
-                            <a
-                              href={`/api/files/${proofFileId}/download?view=1`}
-                              target="_blank"
-                              rel="noreferrer"
-                            />
-                          }
-                        >
-                          <Eye data-icon="inline-start" /> Preview
-                        </Button>
+                          fileId={proofFileId}
+                          fileName={proofName ?? "Payment proof"}
+                        />
                       ) : null}
                     </td>
                     <td className="px-4 py-4">

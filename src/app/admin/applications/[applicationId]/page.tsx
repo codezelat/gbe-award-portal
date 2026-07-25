@@ -19,6 +19,7 @@ import {
   profiles,
 } from "@/lib/db/schema";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -524,19 +525,12 @@ export default async function AdminApplicationDetail({
                     <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                       {file.mimeTypeDetected === "application/pdf" ||
                       file.mimeTypeDetected?.startsWith("image/") ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          render={
-                            <a
-                              href={`/api/files/${file.id}/download?view=1`}
-                              target="_blank"
-                              rel="noreferrer"
-                            />
+                        <ProtectedFilePreview
+                          fileId={file.id}
+                          fileName={
+                            file.safeDownloadFilename ?? "Protected file"
                           }
-                        >
-                          Preview
-                        </Button>
+                        />
                       ) : null}
                       <Button
                         size="sm"

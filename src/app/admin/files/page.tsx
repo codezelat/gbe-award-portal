@@ -2,11 +2,12 @@ import Link from "next/link";
 import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
-import { Download, Eye, Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { getDb } from "@/lib/db";
 import { applicationFiles, applications, files } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { FileDispositionButton } from "@/components/admin/file-disposition-button";
+import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -246,24 +247,23 @@ export default async function FilesPage({
                       <div className="flex max-w-72 flex-wrap gap-2">
                         {file.status === "ready" ? (
                           <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              render={
-                                <a
-                                  href={`/api/files/${file.id}/download${previewable ? "?view=1" : ""}`}
-                                  target={previewable ? "_blank" : undefined}
-                                  rel={previewable ? "noreferrer" : undefined}
-                                />
-                              }
-                            >
-                              {previewable ? (
-                                <Eye data-icon="inline-start" />
-                              ) : (
+                            {previewable ? (
+                              <ProtectedFilePreview
+                                fileId={file.id}
+                                fileName={
+                                  file.safeDownloadFilename ?? "Protected object"
+                                }
+                              />
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                render={<a href={`/api/files/${file.id}/download`} />}
+                              >
                                 <Download data-icon="inline-start" />
-                              )}
-                              {previewable ? "Preview" : "Download"}
-                            </Button>
+                                Download
+                              </Button>
+                            )}
                             {hasPermission(membership, "files.manage") ? (
                               <>
                                 <FileDispositionButton

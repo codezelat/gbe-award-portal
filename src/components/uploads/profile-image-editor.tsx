@@ -3,6 +3,17 @@ import { useState } from "react";
 import Image from "next/image";
 import Cropper, { type Area } from "react-easy-crop";
 import { Camera, CheckCircle2, LoaderCircle, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
@@ -79,14 +90,19 @@ export function ProfileImageEditor({
     }
   }
   async function remove() {
-    if (!window.confirm("Remove the current profile image?")) return;
-    const response = await fetch("/api/uploads/profile", { method: "DELETE" });
-    const result = await response.json();
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    setError("");
+    try {
+      const response = await fetch("/api/uploads/profile", { method: "DELETE" });
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.message);
+      window.location.reload();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The profile image could not be removed.",
+      );
     }
-    window.location.reload();
   }
   return (
     <div className="flex flex-col gap-4">
@@ -164,10 +180,33 @@ export function ProfileImageEditor({
         Save cropped image
       </Button>
       {currentUrl ? (
-        <Button type="button" variant="outline" onClick={remove}>
-          <Trash2 data-icon="inline-start" />
-          Remove current image
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger
+            render={<Button type="button" variant="outline" />}
+          >
+            <Trash2 data-icon="inline-start" />
+            Remove current image
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove profile image?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your current image will be removed from the portal. You can add
+                a new one at any time.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-4">
+              <AlertDialogCancel>Keep image</AlertDialogCancel>
+              <AlertDialogAction
+                type="button"
+                variant="destructive"
+                onClick={remove}
+              >
+                Remove image
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ) : null}
     </div>
   );
