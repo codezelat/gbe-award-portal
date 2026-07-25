@@ -93,7 +93,7 @@ bun run db:bootstrap-admin
 - Staff MFA is mandatory. Keep the existing QR/manual TOTP enrolment and challenge flows compatible with standard authenticator apps.
 - Email is a durable outbox. Queue mail through the established flow; do not send ad-hoc messages directly from a page/action when delivery tracking and retry are required.
 - Verify Resend webhook signatures before changing state.
-- Vercel Hobby uses exactly one scheduled entry: `/api/cron/daily` in `vercel.json`. Add work to the daily dispatcher or event-driven processing; do not add duplicate cron schedules.
+- Vercel Hobby uses exactly one scheduled entry: `/api/cron/daily` in `vercel.json`. Add work to the daily dispatcher or event-driven processing; do not add duplicate cron schedules. The daily upload cleanup may remove only expired, empty nomination shells; it must retain audit history and never delete a submitted nomination.
 
 ## 5. Security and environment rules
 

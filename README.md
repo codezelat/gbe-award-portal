@@ -39,7 +39,7 @@ The production portal for the **Global Business Excellence Awards 2026**. It giv
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Nominees**            | A four-step public nomination journey with category selection, supporting documents, payment choice and payment-proof upload. Every file is uploaded directly to private storage and every completed nomination gets a non-sequential `GBE-2026-######` reference. |
 | **Approved applicants** | Invitation-only access to applications, requested documents, payment status, messages, profile, password management and account security. A public nomination never creates an account by itself.                                                                  |
-| **Award staff**         | One focused Staff workspace for applications, applicants, payments, files, communications, exports and reports. Super admins also manage award cycles, categories, staff, settings and audit activity. Staff must enrol TOTP MFA before administration access.     |
+| **Award staff**         | One focused Staff workspace for applications, applicants, payments, files, communications and exports. Super admins also manage award cycles, categories, staff, settings and audit activity. Staff must enrol TOTP MFA before administration access.     |
 | **Operations**          | Controlled workflow transitions, reviewer assignment, change requests, payment verification, signed downloads, exports, delivery tracking, retention work and an auditable history of sensitive actions.                                                           |
 
 ## 🧭 Product flow
@@ -223,7 +223,7 @@ Application responses queue email in PostgreSQL. A Next.js `after()` callback at
 | Endpoint                    | Purpose                                                                                                  | Protection                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `POST /api/webhooks/resend` | Records verified Resend delivery events                                                                  | `RESEND_WEBHOOK_SECRET` signature verification               |
-| `GET /api/cron/daily`       | Runs email retries, stale-upload cleanup, expired-export cleanup, retention and stale rate-limit cleanup | Bearer authorization using the configured `CRON_SECRET`      |
+| `GET /api/cron/daily`       | Runs email retries, stale-upload and abandoned-intake cleanup, expired-export cleanup, retention and stale rate-limit cleanup | Bearer authorization using the configured `CRON_SECRET`      |
 | `GET /api/health`           | Reports database reachability                                                                            | No secrets returned; do not treat it as a public status page |
 
 Vercel Hobby supports one cron entry. [vercel.json](vercel.json) schedules the daily route at `23 2 * * *`; do not add overlapping Vercel cron entries for individual cleanup jobs.

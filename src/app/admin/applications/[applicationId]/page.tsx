@@ -532,13 +532,18 @@ export default async function AdminApplicationDetail({
                           }
                         />
                       ) : null}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        render={<a href={`/api/files/${file.id}/download`} />}
-                      >
-                        Download
-                      </Button>
+                      {file.mimeTypeDetected === "application/pdf" ||
+                      file.mimeTypeDetected?.startsWith("image/") ? null : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          render={
+                            <a href={`/api/files/${file.id}/download`} />
+                          }
+                        >
+                          Download
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))

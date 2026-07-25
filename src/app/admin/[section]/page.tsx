@@ -1,10 +1,9 @@
-import { and, asc, count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { getDb } from "@/lib/db";
 import {
   applicationFiles,
-  applicationMessages,
   applications,
   auditLogs,
   emailOutbox,
@@ -35,7 +34,6 @@ const descriptions: Record<string, string> = {
   files: "Private upload validation, purpose, size and retention state.",
   communications: "Queued, delivered and failed transactional communication.",
   exports: "Private permission-shaped Excel and CSV reports.",
-  reports: "Operational totals across application and payment workflows.",
   staff: "Invitation-only staff membership, role and MFA requirements.",
   activity: "Immutable business activity by actor, action and date.",
 };
@@ -73,7 +71,6 @@ export default async function AdminSection({
     files: "files.view",
     communications: "applications.view_all",
     exports: "exports.create",
-    reports: "applications.view_all",
     staff: "staff.manage",
     activity: "audit.view",
   };
@@ -331,33 +328,6 @@ export default async function AdminSection({
       audit.reason ?? "—",
     ]);
   }
-  if (section === "reports") {
-    const [[all], [review], [approved], [paymentQueue], [messages]] =
-      await Promise.all([
-        db.select({ value: count() }).from(applications),
-        db
-          .select({ value: count() })
-          .from(applications)
-          .where(eq(applications.workflowStatus, "under_review")),
-        db
-          .select({ value: count() })
-          .from(applications)
-          .where(eq(applications.workflowStatus, "approved")),
-        db
-          .select({ value: count() })
-          .from(payments)
-          .where(eq(payments.status, "proof_submitted")),
-        db.select({ value: count() }).from(applicationMessages),
-      ]);
-    headings = ["Metric", "Current value"];
-    rows = [
-      ["All applications", all.value],
-      ["Under review", review.value],
-      ["Approved", approved.value],
-      ["Payment proofs awaiting review", paymentQueue.value],
-      ["Application messages", messages.value],
-    ];
-  }
   return (
     <>
       <h1 className="page-heading capitalize">{section}</h1>
@@ -469,11 +439,10 @@ export default async function AdminSection({
         Showing page {page} with up to {pageSize} authorised records. Use
         dedicated exports for complete reporting.
       </p>
-      {section !== "reports" ? (
-        <nav
-          className="mt-4 flex flex-wrap items-center justify-between gap-3"
-          aria-label="Pagination"
-        >
+      <nav
+        className="mt-4 flex flex-wrap items-center justify-between gap-3"
+        aria-label="Pagination"
+      >
           <Button
             variant="outline"
             disabled={page === 1}
@@ -501,8 +470,7 @@ export default async function AdminSection({
           >
             Next
           </Button>
-        </nav>
-      ) : null}
+      </nav>
     </>
   );
 }

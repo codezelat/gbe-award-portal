@@ -41,7 +41,6 @@ async function AdminWorkspace({ children }: { children: React.ReactNode }) {
     "/admin/files": "files.view",
     "/admin/communications": "applications.view_all",
     "/admin/exports": "exports.create",
-    "/admin/reports": "applications.view_all",
     "/admin/categories": "configuration.manage",
     "/admin/cycles": "configuration.manage",
     "/admin/staff": "staff.manage",

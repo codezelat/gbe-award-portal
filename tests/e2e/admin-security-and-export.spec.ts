@@ -136,7 +136,6 @@ test("enforces staff MFA, then permits search and a real filtered export", async
       "/admin/files",
       "/admin/communications",
       "/admin/exports",
-      "/admin/reports",
       "/admin/categories",
       "/admin/cycles",
       "/admin/staff",
@@ -166,6 +165,24 @@ test("enforces staff MFA, then permits search and a real filtered export", async
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(applicationHref!);
+
+  const documents = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Documents" }),
+  });
+  const preview = documents.getByRole("button", { name: "Preview" });
+  await expect(preview).toBeVisible();
+  await preview.click();
+  const previewDialog = page.getByRole("dialog");
+  await expect(previewDialog).toBeVisible();
+  await expect(previewDialog.locator("iframe")).toHaveAttribute(
+    "src",
+    /\/api\/files\/.+\/download\?view=1/,
+  );
+  await expect(
+    previewDialog.getByRole("button", { name: "Download" }),
+  ).toBeVisible();
+  await previewDialog.getByRole("button", { name: "Close" }).click();
+  await expect(previewDialog).toBeHidden();
 
   const note = "Playwright verified the audited internal-note workflow.";
   const notes = page.locator("details").filter({

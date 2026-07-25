@@ -1,5 +1,4 @@
 "use server";
-import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -11,34 +10,22 @@ import {
 import { createOrRefreshApplicantInvitation } from "@/server/services/invitation-service";
 import {
   applicationNotes,
-  applicationChangeRequests,
-  applicationFieldAccess,
-  applicationFiles,
-  applicationMessages,
-  applicationStatusHistory,
-  applicationVersions,
   applications,
   auditLogs,
+  awardCycles,
   emailOutbox,
-  invitations,
   payments,
   profiles,
-  awardCycles,
   cycleSequences,
-  uploadSessions,
 } from "@/lib/db/schema";
 import { getAuth } from "@/lib/auth";
-import {
-  canPurgeIncompletePaymentShell,
-  paymentVerificationError,
-} from "@/lib/domain/payment-verification";
+import { paymentVerificationError } from "@/lib/domain/payment-verification";
 import { getDb } from "@/lib/db";
-import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
-import { env } from "@/lib/env";
-import { getR2, r2ObjectKey } from "@/lib/r2/client";
+import { purgeIncompleteNominationShell } from "@/server/services/incomplete-nomination-cleanup";
 
 const statusSchema = z.object({
   applicationId: z.uuid(),
@@ -183,139 +170,14 @@ export async function purgeIncompleteApplicationAction(formData: FormData) {
     })
     .parse(Object.fromEntries(formData));
   await enforceRateLimit(`purge-incomplete:${profile.id}`, 10, 3600);
-  const db = getDb();
-  await db.transaction(async (tx) => {
-    const [record] = await tx
-      .select({
-        application: applications,
-        payment: payments,
-        cycleYear: awardCycles.year,
-      })
-      .from(applications)
-      .innerJoin(payments, eq(payments.applicationId, applications.id))
-      .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-      .where(eq(applications.id, input.applicationId))
-      .limit(1);
-    if (!record)
-      throw new Error("The incomplete nomination is no longer available.");
-    if (
-      !canPurgeIncompletePaymentShell({
-        workflowStatus: record.application.workflowStatus,
-        applicationReference: record.application.reference,
-        applicationSubmittedAt: record.application.submittedAt,
-        paymentReference: record.payment.paymentReference,
-        proofApplicationFileId: record.payment.proofApplicationFileId,
-        payerName: record.payment.payerName,
-        bankReference: record.payment.bankReference,
-        amountMinor: record.payment.amountMinor,
-        currency: record.payment.currency,
-        paidAt: record.payment.paidAt,
-      })
-    )
-      throw new Error(
-        "Only an unfinished nomination with no payment evidence can be permanently removed.",
-      );
-    const [[linkedFileCount], sessions] = await Promise.all([
-      tx
-        .select({ value: count() })
-        .from(applicationFiles)
-        .where(eq(applicationFiles.applicationId, input.applicationId)),
-      tx
-        .select({ expectedManifest: uploadSessions.expectedManifest })
-        .from(uploadSessions)
-        .where(eq(uploadSessions.applicationId, input.applicationId)),
-    ]);
-    if (linkedFileCount.value > 0)
-      throw new Error(
-        "This nomination has retained files and cannot be removed from payment review.",
-      );
-    const stagedKeys = new Set<string>();
-    for (const session of sessions) {
-      const manifest = z
-        .array(
-          z.object({
-            id: z.uuid(),
-            kind: z.enum(["supporting_document", "payment_proof"]),
-          }),
-        )
-        .safeParse(session.expectedManifest);
-      if (!manifest.success)
-        throw new Error("The staged upload manifest is invalid.");
-      for (const item of manifest.data)
-        stagedKeys.add(
-          r2ObjectKey(
-            `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${record.cycleYear}/${input.applicationId}/${item.id}`,
-          ),
-        );
-    }
-    for (const key of stagedKeys)
-      await getR2().send(
-        new DeleteObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key }),
-      );
-    await tx
-      .delete(applicationFieldAccess)
-      .where(eq(applicationFieldAccess.applicationId, input.applicationId));
-    await tx
-      .delete(applicationChangeRequests)
-      .where(eq(applicationChangeRequests.applicationId, input.applicationId));
-    await tx
-      .delete(applicationMessages)
-      .where(eq(applicationMessages.applicationId, input.applicationId));
-    await tx
-      .delete(applicationNotes)
-      .where(eq(applicationNotes.applicationId, input.applicationId));
-    await tx
-      .delete(applicationStatusHistory)
-      .where(eq(applicationStatusHistory.applicationId, input.applicationId));
-    await tx
-      .delete(applicationVersions)
-      .where(eq(applicationVersions.applicationId, input.applicationId));
-    await tx
-      .delete(invitations)
-      .where(eq(invitations.applicationId, input.applicationId));
-    await tx
-      .delete(emailOutbox)
-      .where(eq(emailOutbox.applicationId, input.applicationId));
-    await tx
-      .delete(uploadSessions)
-      .where(eq(uploadSessions.applicationId, input.applicationId));
-    await tx
-      .delete(payments)
-      .where(eq(payments.applicationId, input.applicationId));
-    const now = new Date();
-    const removed = await tx
-      .update(applications)
-      .set({
-        deletedAt: now,
-        deletedBy: profile.id,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(applications.id, input.applicationId),
-          eq(applications.workflowStatus, "uploading"),
-          isNull(applications.deletedAt),
-        ),
-      )
-      .returning({ id: applications.id });
-    if (!removed.length)
-      throw new Error("The incomplete nomination changed. Refresh and try again.");
-    await tx.insert(auditLogs).values({
-      actorProfileId: profile.id,
-      actorType: "staff",
-      action: "incomplete nomination shell purged",
-      entityType: "application",
-      entityId: input.applicationId,
-      applicationId: input.applicationId,
-      beforeRedacted: { workflowStatus: "uploading" },
-      afterRedacted: { deleted: true, paymentRecordRemoved: true },
-      reason: "Empty nomination shell removed by super administrator.",
-      metadataRedacted: {},
-      requestId: crypto.randomUUID(),
-    });
+  await purgeIncompleteNominationShell(input.applicationId, {
+    profileId: profile.id,
+    type: "staff",
+    reason: "Empty nomination shell removed by super administrator.",
   });
   revalidatePath("/admin/payments");
   revalidatePath("/admin/applications");
+  revalidatePath("/admin");
 }
 export async function addInternalNoteAction(formData: FormData) {
   const { profile, membership } = await requireStaff();

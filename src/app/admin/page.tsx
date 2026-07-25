@@ -8,6 +8,7 @@ import {
   gt,
   inArray,
   isNull,
+  isNotNull,
   ne,
   type SQL,
 } from "drizzle-orm";
@@ -114,7 +115,15 @@ export default async function AdminDashboard() {
         submittedAt: applications.submittedAt,
       })
       .from(applications)
-      .where(scope)
+      .where(
+        scoped(
+          and(
+            ne(applications.workflowStatus, "uploading"),
+            isNotNull(applications.submittedAt),
+            isNull(applications.deletedAt),
+          )!,
+        ),
+      )
       .orderBy(desc(applications.submittedAt))
       .limit(6),
     db

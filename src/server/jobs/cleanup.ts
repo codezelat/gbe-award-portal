@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/schema";
 import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import { env } from "@/lib/env";
+import { purgeIncompleteNominationShell } from "@/server/services/incomplete-nomination-cleanup";
 export async function cleanupStaleUploads() {
   const db = getDb();
   const expired = await db
@@ -29,6 +30,9 @@ export async function cleanupStaleUploads() {
       ),
     )
     .limit(100);
+  let purgedIncompleteNominations = 0;
+  let retainedIncompleteNominations = 0;
+  const processedApplicationIds = new Set<string>();
   for (const session of expired) {
     const manifest = session.expectedManifest as Array<{
       id: string;
@@ -56,6 +60,23 @@ export async function cleanupStaleUploads() {
       .update(uploadSessions)
       .set({ status: "expired", updatedAt: new Date() })
       .where(eq(uploadSessions.id, session.id));
+    if (!application || processedApplicationIds.has(session.applicationId))
+      continue;
+    processedApplicationIds.add(session.applicationId);
+    try {
+      await purgeIncompleteNominationShell(
+        session.applicationId,
+        {
+          type: "system",
+          reason: "Expired upload session cleared automatically.",
+        },
+        { deleteStagedObjects: false },
+      );
+      purgedIncompleteNominations += 1;
+    } catch {
+      // A non-empty or changed record is retained for the normal staff workflow.
+      retainedIncompleteNominations += 1;
+    }
   }
   const pendingFiles = await db
     .select()
@@ -85,6 +106,8 @@ export async function cleanupStaleUploads() {
   return {
     expiredSessions: expired.length,
     deletedPendingFiles: pendingFiles.length,
+    purgedIncompleteNominations,
+    retainedIncompleteNominations,
   };
 }
 export async function cleanupExpiredExports() {

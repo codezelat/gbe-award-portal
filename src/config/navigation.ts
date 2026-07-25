@@ -23,7 +23,6 @@ export const adminNavigation = [
   { href: "/admin/files", label: "Files", icon: FolderOpen },
   { href: "/admin/communications", label: "Communications", icon: Mail },
   { href: "/admin/exports", label: "Exports", icon: BookOpen },
-  { href: "/admin/reports", label: "Reports", icon: Activity },
   { href: "/admin/categories", label: "Categories", icon: Tags },
   { href: "/admin/cycles", label: "Award cycles", icon: Award },
   { href: "/admin/staff", label: "Staff", icon: ShieldCheck },
