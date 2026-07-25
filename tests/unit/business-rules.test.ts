@@ -38,8 +38,6 @@ describe("business rules", () => {
       "completed nomination",
       "payment reference",
       "payment proof",
-      "payer name",
-      "bank reference",
       "paid amount",
       "currency",
       "paid date",

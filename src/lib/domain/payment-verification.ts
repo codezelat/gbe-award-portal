@@ -18,8 +18,6 @@ export function missingPaymentVerificationFields(
     missing.push("completed nomination");
   if (!record.paymentReference) missing.push("payment reference");
   if (!record.proofApplicationFileId) missing.push("payment proof");
-  if (!record.payerName) missing.push("payer name");
-  if (!record.bankReference) missing.push("bank reference");
   if (record.amountMinor === null || record.amountMinor <= 0)
     missing.push("paid amount");
   if (!record.currency) missing.push("currency");

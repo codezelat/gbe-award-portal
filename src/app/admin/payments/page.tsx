@@ -358,7 +358,7 @@ export default async function PaymentsPage({
                             />
                           }
                         >
-                          {needsCorrection ? "Correct record" : "Full review"}
+                          {needsCorrection ? "Update record" : "Full review"}
                         </Button>
                         {canRemove ? (
                           <RemoveIncompleteNominationButton

@@ -33,7 +33,7 @@ import {
   paymentVerificationError,
 } from "@/lib/domain/payment-verification";
 import { getDb } from "@/lib/db";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
@@ -277,25 +277,42 @@ export async function purgeIncompleteApplicationAction(formData: FormData) {
       .delete(emailOutbox)
       .where(eq(emailOutbox.applicationId, input.applicationId));
     await tx
-      .delete(auditLogs)
-      .where(eq(auditLogs.applicationId, input.applicationId));
-    await tx
       .delete(uploadSessions)
       .where(eq(uploadSessions.applicationId, input.applicationId));
     await tx
       .delete(payments)
       .where(eq(payments.applicationId, input.applicationId));
+    const now = new Date();
     const removed = await tx
-      .delete(applications)
+      .update(applications)
+      .set({
+        deletedAt: now,
+        deletedBy: profile.id,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(applications.id, input.applicationId),
           eq(applications.workflowStatus, "uploading"),
+          isNull(applications.deletedAt),
         ),
       )
       .returning({ id: applications.id });
     if (!removed.length)
       throw new Error("The incomplete nomination changed. Refresh and try again.");
+    await tx.insert(auditLogs).values({
+      actorProfileId: profile.id,
+      actorType: "staff",
+      action: "incomplete nomination shell purged",
+      entityType: "application",
+      entityId: input.applicationId,
+      applicationId: input.applicationId,
+      beforeRedacted: { workflowStatus: "uploading" },
+      afterRedacted: { deleted: true, paymentRecordRemoved: true },
+      reason: "Empty nomination shell removed by super administrator.",
+      metadataRedacted: {},
+      requestId: crypto.randomUUID(),
+    });
   });
   revalidatePath("/admin/payments");
   revalidatePath("/admin/applications");
