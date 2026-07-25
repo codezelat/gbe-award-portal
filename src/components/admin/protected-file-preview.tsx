@@ -44,6 +44,7 @@ export function ProtectedFilePreview({
       </DialogTrigger>
       <DialogContent
         className="w-[calc(100%-1rem)] max-w-4xl gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        showCloseButton={false}
       >
         <DialogHeader className="border-b px-4 py-3 pr-12">
           <DialogTitle className="truncate">{fileName}</DialogTitle>
