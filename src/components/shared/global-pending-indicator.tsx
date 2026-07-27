@@ -83,10 +83,10 @@ export function GlobalPendingIndicator() {
       );
     }
 
-    document.addEventListener("click", beginNavigation, true);
+    document.addEventListener("click", beginNavigation);
     window.addEventListener("popstate", beginHistoryNavigation);
     return () => {
-      document.removeEventListener("click", beginNavigation, true);
+      document.removeEventListener("click", beginNavigation);
       window.removeEventListener("popstate", beginHistoryNavigation);
     };
   }, [reset]);

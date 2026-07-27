@@ -39,18 +39,16 @@ describe("pending interaction feedback", () => {
     const { rerender } = render(
       <>
         <GlobalPendingIndicator />
-        <a
-          href="/__pending-test__"
-          onClick={(event) => event.preventDefault()}
-        >
-          Payments
-        </a>
+        <a href="/__pending-test__">Payments</a>
       </>,
     );
     const link = screen.getByRole("link", { name: "Payments" });
     const indicator = screen.getByTestId("global-pending-indicator");
+    const preventNavigation = (event: MouseEvent) => event.preventDefault();
+    window.addEventListener("click", preventNavigation);
 
     fireEvent.click(link);
+    window.removeEventListener("click", preventNavigation);
     expect(link).toHaveAttribute("aria-busy", "true");
     expect(indicator).toHaveAttribute("aria-hidden", "true");
 

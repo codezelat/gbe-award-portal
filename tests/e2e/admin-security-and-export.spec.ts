@@ -120,6 +120,27 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await paymentRow.getByRole("button", { name: "Verify" }).click();
   const paymentDialog = page.getByRole("dialog", { name: "Verify payment" });
   await expect(paymentDialog).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("payment-verification-dialog-desktop.png"),
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await paymentDialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return (
+        rect.left >= 0 &&
+        rect.right <= document.documentElement.clientWidth + 1 &&
+        element.scrollWidth <= element.clientWidth + 1
+      );
+    }),
+    "payment dialog should fit the mobile viewport",
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("payment-verification-dialog-mobile.png"),
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await expect(paymentDialog.getByLabel("Paid amount")).toHaveValue("");
   await expect(paymentDialog.getByLabel("Currency")).toHaveValue("LKR");
   await paymentDialog.getByLabel("Paid amount").fill("55000.00");
@@ -291,10 +312,10 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   const paymentReview = page.locator("details").filter({
     has: page.getByText("Payment review", { exact: true }),
   });
-  await paymentReview.locator("summary").click();
-  await paymentReview
-    .getByLabel("Payment decision")
-    .selectOption("under_review");
+  const paymentDecision = paymentReview.getByLabel("Payment decision");
+  if (!(await paymentDecision.isVisible()))
+    await paymentReview.locator("summary").click();
+  await paymentDecision.selectOption("under_review");
   await paymentReview.getByPlaceholder("Payer name").fill("Fixture payer");
   await paymentReview
     .getByPlaceholder("Bank reference")
@@ -303,15 +324,16 @@ test("enforces staff MFA, then permits search and a real filtered export", async
     .getByRole("button", { name: "Save payment decision" })
     .click();
   await expect(paymentReview.locator("summary")).toContainText("Under review");
-  await paymentReview.locator("summary").click();
-  await expect(paymentReview.getByText("Current: under review")).toBeVisible();
+  const currentUnderReview = paymentReview.getByText("Current: under review");
+  if (!(await currentUnderReview.isVisible()))
+    await paymentReview.locator("summary").click();
+  await expect(currentUnderReview).toBeVisible();
 
-  await paymentReview.getByLabel("Payment decision").selectOption("verified");
+  await paymentDecision.selectOption("verified");
   await paymentReview
     .getByRole("button", { name: "Save payment decision" })
     .click();
   await expect(paymentReview.locator("summary")).toContainText("Verified");
-  await paymentReview.locator("summary").click();
   await expect(
     paymentReview.locator('[data-slot="badge"]', { hasText: "Verified" }),
   ).toBeVisible();
