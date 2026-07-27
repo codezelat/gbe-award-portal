@@ -105,8 +105,8 @@ export default async function setup() {
       payer_name, bank_reference, payment_reference, paid_at
     )
     select
-      application_id, 'proof_submitted', 'LKR', 5500000, id,
-      'Playwright Fixture Payer', 'E2E-BANK-REFERENCE', 'PAY-E2E-2026', now()
+      application_id, 'proof_submitted', 'LKR', null, id,
+      'Playwright Fixture Payer', 'E2E-BANK-REFERENCE', 'PAY-E2E-2026', null
     from linked_proof
   `;
   const runtimeRole = new URL(e2eRuntimeDatabaseUrl()).username;

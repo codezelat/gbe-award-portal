@@ -32,6 +32,7 @@ import {
 } from "@/lib/domain/payment-verification";
 import { RemoveIncompleteNominationButton } from "@/components/admin/remove-incomplete-nomination-button";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
+import { PaymentVerificationDialog } from "@/components/admin/payment-verification-dialog";
 
 const pageSizes = [25, 50, 100] as const;
 
@@ -218,22 +219,24 @@ export default async function PaymentsPage({
                   proofName,
                   proofVersions,
                 }) => {
-                  const verificationGaps =
-                    payment.status === "verified"
-                      ? missingPaymentVerificationFields({
-                          applicationReference: application.reference,
-                          applicationSubmittedAt: application.submittedAt,
-                          paymentReference: payment.paymentReference,
-                          proofApplicationFileId:
-                            payment.proofApplicationFileId,
-                          payerName: payment.payerName,
-                          bankReference: payment.bankReference,
-                          amountMinor: payment.amountMinor,
-                          currency: payment.currency,
-                          paidAt: payment.paidAt,
-                        })
-                      : [];
-                  const needsCorrection = verificationGaps.length > 0;
+                  const verificationGaps = missingPaymentVerificationFields({
+                    applicationReference: application.reference,
+                    applicationSubmittedAt: application.submittedAt,
+                    paymentReference: payment.paymentReference,
+                    proofApplicationFileId: payment.proofApplicationFileId,
+                    payerName: payment.payerName,
+                    bankReference: payment.bankReference,
+                    amountMinor: payment.amountMinor,
+                    currency: payment.currency,
+                    paidAt: payment.paidAt,
+                  });
+                  const needsCorrection =
+                    payment.status === "verified" &&
+                    verificationGaps.length > 0;
+                  const dialogBlockingGaps = verificationGaps.filter(
+                    (gap) =>
+                      !["paid amount", "currency", "paid date"].includes(gap),
+                  );
                   const canRemove =
                     membership.role === "super_admin" &&
                     canPurgeIncompletePaymentShell({
@@ -316,9 +319,7 @@ export default async function PaymentsPage({
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-2">
                         {hasPermission(membership, "payments.verify") &&
-                        ["proof_submitted", "under_review"].includes(
-                          payment.status,
-                        ) ? (
+                        payment.status === "proof_submitted" ? (
                           <form action={updatePaymentAction}>
                             <input
                               type="hidden"
@@ -328,18 +329,41 @@ export default async function PaymentsPage({
                             <input
                               type="hidden"
                               name="status"
-                              value={
-                                payment.status === "proof_submitted"
-                                  ? "under_review"
-                                  : "verified"
-                              }
+                              value="under_review"
                             />
                             <Button size="sm" variant="outline">
-                              {payment.status === "proof_submitted"
-                                ? "Begin review"
-                                : "Verify"}
+                              Begin review
                             </Button>
                           </form>
+                        ) : null}
+                        {hasPermission(membership, "payments.verify") &&
+                        payment.status === "under_review" ? (
+                          <PaymentVerificationDialog
+                            applicationId={application.id}
+                            applicationReference={
+                              application.reference ?? "Pending reference"
+                            }
+                            paymentReference={payment.paymentReference}
+                            proofName={proofName}
+                            payerName={payment.payerName}
+                            bankReference={payment.bankReference}
+                            amount={
+                              payment.amountMinor === null
+                                ? ""
+                                : (payment.amountMinor / 100).toFixed(2)
+                            }
+                            currency={payment.currency}
+                            paidAt={
+                              payment.paidAt
+                                ? formatInTimeZone(
+                                    payment.paidAt,
+                                    "Asia/Colombo",
+                                    "yyyy-MM-dd'T'HH:mm",
+                                  )
+                                : ""
+                            }
+                            blockingGaps={dialogBlockingGaps}
+                          />
                         ) : null}
                         <Button
                           size="sm"

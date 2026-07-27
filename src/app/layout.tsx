@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { GlobalPendingIndicator } from "@/components/shared/global-pending-indicator";
 import { brand } from "@/config/brand";
 import "./globals.css";
 
@@ -55,6 +57,9 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
+        <Suspense fallback={null}>
+          <GlobalPendingIndicator />
+        </Suspense>
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster richColors position="top-right" />
       </body>

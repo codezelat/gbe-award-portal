@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
 import { turnstileActions } from "@/config/turnstile";
 import { Button } from "@/components/ui/button";
@@ -32,16 +32,25 @@ export function LoginForm() {
     setPending(true);
     setError("");
     const data = new FormData(event.currentTarget);
-    const result = await authClient.signIn.email(
-      {
-        email: String(data.get("email")),
-        password: String(data.get("password")),
-        rememberMe: true,
-      },
-      turnstileToken
-        ? { headers: { "x-captcha-response": turnstileToken } }
-        : undefined,
-    );
+    let result;
+    try {
+      result = await authClient.signIn.email(
+        {
+          email: String(data.get("email")),
+          password: String(data.get("password")),
+          rememberMe: true,
+        },
+        turnstileToken
+          ? { headers: { "x-captcha-response": turnstileToken } }
+          : undefined,
+      );
+    } catch {
+      setPending(false);
+      setError(
+        "Sign-in could not reach the secure service. Check your connection and try again.",
+      );
+      return;
+    }
     setPending(false);
     if (result.error) {
       if (result.error.code === "TURNSTILE_REQUIRED") {
@@ -118,12 +127,12 @@ export function LoginForm() {
           </Field>
         ) : null}
       </FieldGroup>
-      <Button className="h-12" disabled={pending}>
-        {pending ? (
-          <LoaderCircle className="animate-spin" data-icon="inline-start" />
-        ) : (
-          <LogIn data-icon="inline-start" />
-        )}
+      <Button
+        className="h-12"
+        disabled={pending}
+        loading={pending}
+      >
+        <LogIn data-icon="inline-start" />
         Sign in securely
       </Button>
     </form>

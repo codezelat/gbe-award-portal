@@ -8,21 +8,33 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export function TwoFactorChallenge() {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError("");
     const code = String(new FormData(event.currentTarget).get("code"));
-    const result = await authClient.twoFactor.verifyTotp({
-      code,
-      trustDevice: false,
-    });
-    if (result.error) {
+    try {
+      const result = await authClient.twoFactor.verifyTotp({
+        code,
+        trustDevice: false,
+      });
+      if (result.error) {
+        setError(
+          "The authenticator code was not accepted. Check the current code and try again.",
+        );
+        return;
+      }
+      router.push("/auth/continue");
+      router.refresh();
+    } catch {
       setError(
-        "The authenticator code was not accepted. Check the current code and try again.",
+        "Secure verification could not be reached. Check your connection and try again.",
       );
-      return;
+    } finally {
+      setPending(false);
     }
-    router.push("/auth/continue");
-    router.refresh();
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-5">
@@ -44,7 +56,13 @@ export function TwoFactorChallenge() {
           className="h-[50px] bg-white text-center font-mono text-xl tracking-[.35em]"
         />
       </label>
-      <Button>Verify secure access</Button>
+      <Button
+        disabled={pending}
+        loading={pending}
+        loadingLabel="Verifying"
+      >
+        Verify secure access
+      </Button>
     </form>
   );
 }

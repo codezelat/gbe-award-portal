@@ -16,6 +16,7 @@ export function AccountSecurity() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [pending, setPending] = useState<"password" | string | null>(null);
   useEffect(() => {
     authClient
       .listSessions()
@@ -23,32 +24,52 @@ export function AccountSecurity() {
   }, []);
   async function change(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
+    setPending("password");
     setError("");
     const form = event.currentTarget;
     const data = new FormData(form);
-    const response = await fetch("/api/account/change-password", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        currentPassword: String(data.get("currentPassword")),
-        newPassword: String(data.get("newPassword")),
-      }),
-    });
-    const result = await response.json();
-    if (!result.ok) {
+    try {
+      const response = await fetch("/api/account/change-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: String(data.get("currentPassword")),
+          newPassword: String(data.get("newPassword")),
+        }),
+      });
+      const result = await response.json();
+      if (!result.ok) {
+        setError(
+          "The current password was not accepted or the new password is invalid.",
+        );
+        return;
+      }
+      setMessage("Password updated and other sessions revoked.");
+      form.reset();
+    } catch {
       setError(
-        "The current password was not accepted or the new password is invalid.",
+        "The password service could not be reached. Check your connection and try again.",
       );
-      return;
+    } finally {
+      setPending(null);
     }
-    setMessage("Password updated and other sessions revoked.");
-    form.reset();
   }
   async function revoke(token: string) {
-    await authClient.revokeSession({ token });
-    setSessions((current) =>
-      current.filter((session) => session.token !== token),
-    );
+    if (pending) return;
+    setPending(token);
+    try {
+      await authClient.revokeSession({ token });
+      setSessions((current) =>
+        current.filter((session) => session.token !== token),
+      );
+    } catch {
+      setError(
+        "The session could not be revoked. Check your connection and try again.",
+      );
+    } finally {
+      setPending(null);
+    }
   }
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -87,7 +108,13 @@ export function AccountSecurity() {
               className="h-[50px] bg-white"
             />
           </label>
-          <Button>Update password</Button>
+          <Button
+            disabled={pending !== null}
+            loading={pending === "password"}
+            loadingLabel="Updating password"
+          >
+            Update password
+          </Button>
         </form>
       </section>
       <section className="surface rounded-lg p-6">
@@ -107,6 +134,9 @@ export function AccountSecurity() {
                 size="sm"
                 variant="outline"
                 className="mt-3"
+                disabled={pending !== null}
+                loading={pending === session.token}
+                loadingLabel="Revoking"
                 onClick={() => revoke(session.token)}
               >
                 Revoke session

@@ -288,6 +288,11 @@
   font-family: var(--font-manrope), system-ui, sans-serif;
 }
 
+[data-navigation-pending="true"] {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

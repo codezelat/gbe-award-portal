@@ -31,6 +31,7 @@ export function ProfileImageEditor({
   const [pixels, setPixels] = useState<Area>();
   const [progress, setProgress] = useState(0);
   const [state, setState] = useState<"idle" | "uploading" | "complete">("idle");
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState("");
   function chooseFile(next?: File) {
     if (source) URL.revokeObjectURL(source);
@@ -90,6 +91,8 @@ export function ProfileImageEditor({
     }
   }
   async function remove() {
+    if (removing) return;
+    setRemoving(true);
     setError("");
     try {
       const response = await fetch("/api/uploads/profile", { method: "DELETE" });
@@ -97,6 +100,7 @@ export function ProfileImageEditor({
       if (!result.ok) throw new Error(result.message);
       window.location.reload();
     } catch (reason) {
+      setRemoving(false);
       setError(
         reason instanceof Error
           ? reason.message
@@ -201,6 +205,9 @@ export function ProfileImageEditor({
                 type="button"
                 variant="destructive"
                 onClick={remove}
+                disabled={removing}
+                loading={removing}
+                loadingLabel="Removing"
               >
                 Remove image
               </AlertDialogAction>

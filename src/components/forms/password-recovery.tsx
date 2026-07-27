@@ -7,16 +7,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export function ForgotPasswordForm() {
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
-    const email = String(new FormData(event.currentTarget).get("email"));
-    await authClient.requestPasswordReset({
-      email,
-      redirectTo: "/auth/reset-password",
-    });
-    setPending(false);
-    setSent(true);
+    setError("");
+    try {
+      const email = String(new FormData(event.currentTarget).get("email"));
+      await authClient.requestPasswordReset({
+        email,
+        redirectTo: "/auth/reset-password",
+      });
+      setSent(true);
+    } catch {
+      setError(
+        "The reset service could not be reached. Check your connection and try again.",
+      );
+    } finally {
+      setPending(false);
+    }
   }
   if (sent)
     return (
@@ -29,6 +39,11 @@ export function ForgotPasswordForm() {
     );
   return (
     <form onSubmit={submit} className="flex flex-col gap-5">
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
       <label className="flex flex-col gap-2 text-sm font-medium">
         Email address
         <Input
@@ -39,8 +54,12 @@ export function ForgotPasswordForm() {
           className="h-[50px] bg-white"
         />
       </label>
-      <Button disabled={pending}>
-        {pending ? "Requesting…" : "Send reset link"}
+      <Button
+        disabled={pending}
+        loading={pending}
+        loadingLabel="Requesting"
+      >
+        Send reset link
       </Button>
     </form>
   );
@@ -48,6 +67,7 @@ export function ForgotPasswordForm() {
 export function ResetPasswordForm({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -57,15 +77,24 @@ export function ResetPasswordForm({ token }: { token: string }) {
       setError("Passwords do not match.");
       return;
     }
-    const result = await authClient.resetPassword({
-      token,
-      newPassword: password,
-    });
-    if (result.error) {
-      setError("This reset link is invalid, expired or already used.");
-      return;
+    setPending(true);
+    try {
+      const result = await authClient.resetPassword({
+        token,
+        newPassword: password,
+      });
+      if (result.error) {
+        setError("This reset link is invalid, expired or already used.");
+        return;
+      }
+      setMessage("Your password has been changed. Other sessions were revoked.");
+    } catch {
+      setError(
+        "The reset service could not be reached. Check your connection and try again.",
+      );
+    } finally {
+      setPending(false);
     }
-    setMessage("Your password has been changed. Other sessions were revoked.");
   }
   if (message)
     return (
@@ -110,7 +139,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
           className="h-[50px] bg-white"
         />
       </label>
-      <Button>Set new password</Button>
+      <Button
+        disabled={pending}
+        loading={pending}
+        loadingLabel="Updating password"
+      >
+        Set new password
+      </Button>
     </form>
   );
 }

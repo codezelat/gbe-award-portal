@@ -17,6 +17,9 @@ export function TwoFactorSetup({
   const [qrCode, setQrCode] = useState("");
   const [qrError, setQrError] = useState("");
   const [error, setError] = useState("");
+  const [pendingAction, setPendingAction] = useState<
+    "enable" | "verify" | null
+  >(null);
 
   useEffect(() => {
     if (!uri) return;
@@ -46,32 +49,53 @@ export function TwoFactorSetup({
 
   async function enable(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pendingAction) return;
+    setPendingAction("enable");
     setError("");
     const password = String(new FormData(event.currentTarget).get("password"));
-    const result = await authClient.twoFactor.enable({
-      password,
-      issuer: "GBE Awards Portal",
-    });
-    if (result.error) {
-      setError("The password could not be confirmed.");
-      return;
+    try {
+      const result = await authClient.twoFactor.enable({
+        password,
+        issuer: "GBE Awards Portal",
+      });
+      if (result.error) {
+        setError("The password could not be confirmed.");
+        return;
+      }
+      setUri(result.data.totpURI);
+      setCodes(result.data.backupCodes);
+    } catch {
+      setError(
+        "MFA enrolment could not be started. Check your connection and try again.",
+      );
+    } finally {
+      setPendingAction(null);
     }
-    setUri(result.data.totpURI);
-    setCodes(result.data.backupCodes);
   }
   async function verify(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pendingAction) return;
+    setPendingAction("verify");
+    setError("");
     const code = String(new FormData(event.currentTarget).get("code"));
-    const result = await authClient.twoFactor.verifyTotp({
-      code,
-      trustDevice: false,
-    });
-    if (result.error) {
-      setError("The authenticator code was not accepted.");
-      return;
+    try {
+      const result = await authClient.twoFactor.verifyTotp({
+        code,
+        trustDevice: false,
+      });
+      if (result.error) {
+        setError("The authenticator code was not accepted.");
+        return;
+      }
+      router.push(redirectTo);
+      router.refresh();
+    } catch {
+      setError(
+        "Secure verification could not be reached. Check your connection and try again.",
+      );
+    } finally {
+      setPendingAction(null);
     }
-    router.push(redirectTo);
-    router.refresh();
   }
   if (!uri)
     return (
@@ -91,7 +115,13 @@ export function TwoFactorSetup({
             className="h-[50px] bg-white"
           />
         </label>
-        <Button>Begin MFA enrolment</Button>
+        <Button
+          disabled={pendingAction !== null}
+          loading={pendingAction === "enable"}
+          loadingLabel="Preparing enrolment"
+        >
+          Begin MFA enrolment
+        </Button>
       </form>
     );
   return (
@@ -149,7 +179,13 @@ export function TwoFactorSetup({
           />
         </label>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button>Verify and enter administration</Button>
+        <Button
+          disabled={pendingAction !== null}
+          loading={pendingAction === "verify"}
+          loadingLabel="Verifying"
+        >
+          Verify and enter administration
+        </Button>
       </form>
     </div>
   );

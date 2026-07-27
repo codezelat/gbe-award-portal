@@ -50,7 +50,10 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   const signInResponse = page.waitForResponse((response) =>
     response.url().includes("/api/auth/sign-in/email"),
   );
-  await page.getByRole("button", { name: "Sign in securely" }).click();
+  const signInButton = page.getByRole("button", { name: "Sign in securely" });
+  await signInButton.click();
+  await expect(signInButton).toBeDisabled();
+  await expect(signInButton).toHaveAttribute("aria-busy", "true");
   const signIn = await signInResponse;
   expect(signIn.ok(), await signIn.text()).toBe(true);
   await expect(page).toHaveURL(/\/auth\/two-factor\/setup/, {
@@ -104,6 +107,41 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
   expect(await download.failure()).toBeNull();
+
+  await page.goto(
+    `/admin/payments?search=${encodeURIComponent(E2E_APPLICATION_REFERENCE)}`,
+  );
+  const paymentRow = page.locator("tr").filter({
+    has: page.getByRole("link", { name: E2E_APPLICATION_REFERENCE }),
+  });
+  await expect(paymentRow).toContainText("Not recorded");
+  await paymentRow.getByRole("button", { name: "Begin review" }).click();
+  await expect(paymentRow).toContainText("Under review");
+  await paymentRow.getByRole("button", { name: "Verify" }).click();
+  const paymentDialog = page.getByRole("dialog", { name: "Verify payment" });
+  await expect(paymentDialog).toBeVisible();
+  await expect(paymentDialog.getByLabel("Paid amount")).toHaveValue("");
+  await expect(paymentDialog.getByLabel("Currency")).toHaveValue("LKR");
+  await paymentDialog.getByLabel("Paid amount").fill("55000.00");
+  await paymentDialog
+    .getByLabel("Paid date and time")
+    .fill("2026-07-26T10:30");
+  const confirmPayment = paymentDialog.getByRole("button", {
+    name: "Confirm verification",
+  });
+  const verifyResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/admin/payments",
+  );
+  await confirmPayment.click();
+  expect((await verifyResponse).ok()).toBe(true);
+  await expect(paymentDialog).toBeHidden();
+  await expect(paymentRow).toContainText("Verified");
+  await page.screenshot({
+    path: testInfo.outputPath("payment-verification-complete.png"),
+    fullPage: false,
+  });
 
   for (const viewport of [
     { width: 1023, height: 900 },
@@ -253,6 +291,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   const paymentReview = page.locator("details").filter({
     has: page.getByText("Payment review", { exact: true }),
   });
+  await paymentReview.locator("summary").click();
   await paymentReview
     .getByLabel("Payment decision")
     .selectOption("under_review");

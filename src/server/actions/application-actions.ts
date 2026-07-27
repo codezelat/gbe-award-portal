@@ -406,6 +406,57 @@ export async function updatePaymentAction(formData: FormData) {
       });
   });
   revalidatePath(`/admin/applications/${input.applicationId}`);
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin");
+}
+
+export type PaymentActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+const expectedPaymentActionErrors = [
+  "You do not have finance permission.",
+  "Application not found or not assigned to you.",
+  "Elevated payment-override permission is required",
+  "Payment record not found.",
+  "A meaningful reason is required",
+  "Enter a valid payment date.",
+  "Cannot verify this payment until",
+  "Application not found.",
+  "The payment changed while you were reviewing it.",
+  "The application payment state changed.",
+];
+
+export async function updatePaymentWithStateAction(
+  _previousState: PaymentActionState,
+  formData: FormData,
+): Promise<PaymentActionState> {
+  try {
+    await updatePaymentAction(formData);
+    return {
+      status: "success",
+      message: "The payment decision was saved.",
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError)
+      return {
+        status: "error",
+        message: error.issues[0]?.message ?? "Check the payment details.",
+      };
+    if (
+      error instanceof Error &&
+      expectedPaymentActionErrors.some((message) =>
+        error.message.startsWith(message),
+      )
+    )
+      return { status: "error", message: error.message };
+    return {
+      status: "error",
+      message:
+        "The payment could not be updated. Refresh the record and try again.",
+    };
+  }
 }
 
 const editableApplicationFields = [
