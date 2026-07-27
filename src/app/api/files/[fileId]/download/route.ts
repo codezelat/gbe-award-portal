@@ -123,11 +123,24 @@ export async function GET(
           ? env.R2_PRIVATE_BUCKET
           : env.R2_PUBLIC_BUCKET,
       Key: record.file.objectKey,
-      ResponseContentDisposition: `${previewAllowed ? "inline" : "attachment"}; filename="${(record.file.safeDownloadFilename ?? "download").replace(/["\\]/g, "_")}"`,
+      ResponseContentDisposition: `attachment; filename="${(record.file.safeDownloadFilename ?? "download").replace(/["\\]/g, "_")}"`,
       ResponseContentType:
         record.file.mimeTypeDetected ?? "application/octet-stream",
     });
-    const url = await getSignedUrl(getR2(), command, { expiresIn: 180 });
+    const previewObject = previewAllowed
+      ? await getR2().send(
+          new GetObjectCommand({
+            Bucket:
+              record.file.bucket === "private"
+                ? env.R2_PRIVATE_BUCKET
+                : env.R2_PUBLIC_BUCKET,
+            Key: record.file.objectKey,
+          }),
+        )
+      : null;
+    const url = previewAllowed
+      ? null
+      : await getSignedUrl(getR2(), command, { expiresIn: 180 });
     await db.insert(auditLogs).values({
       actorProfileId: profile.id,
       actorType: profile.accountKind,
@@ -141,7 +154,25 @@ export async function GET(
       },
       requestId: crypto.randomUUID(),
     });
-    return NextResponse.redirect(url, 302);
+    if (previewAllowed) {
+      if (!previewObject?.Body)
+        return NextResponse.json(
+          { message: "The preview is not available." },
+          { status: 404 },
+        );
+      return new Response(previewObject.Body.transformToWebStream(), {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+          "Content-Disposition": `inline; filename="${(record.file.safeDownloadFilename ?? "preview").replace(/["\\]/g, "_")}"`,
+          "Content-Length": String(record.file.sizeBytes),
+          "Content-Security-Policy": "default-src 'none'; sandbox",
+          "Content-Type":
+            record.file.mimeTypeDetected ?? "application/octet-stream",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+    return NextResponse.redirect(url!, 302);
   } catch {
     return NextResponse.json(
       { message: "The secure download could not be prepared." },

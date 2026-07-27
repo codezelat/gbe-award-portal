@@ -264,18 +264,74 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   });
   const preview = documents.getByRole("button", { name: "Preview" });
   await expect(preview).toBeVisible();
+  const previewResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/files/") &&
+      response.url().endsWith("/download?view=1"),
+  );
   await preview.click();
+  const response = await previewResponse;
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("application/pdf");
   const previewDialog = page.getByRole("dialog");
   await expect(previewDialog).toBeVisible();
-  await expect(previewDialog.locator("iframe")).toHaveAttribute(
-    "src",
-    /\/api\/files\/.+\/download\?view=1/,
-  );
+  await expect(
+    previewDialog.getByRole("img", {
+      name: "fixture-payment-proof.pdf, page 1",
+    }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(previewDialog.getByText("1 / 1")).toBeVisible();
   await expect(
     previewDialog.getByRole("button", { name: "Download" }),
   ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("protected-pdf-preview-desktop.png"),
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(previewDialog).toBeVisible();
+  expect(
+    await previewDialog.evaluate(
+      (element) =>
+        element.getBoundingClientRect().right <= window.innerWidth &&
+        element.getBoundingClientRect().left >= 0,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("protected-pdf-preview-mobile.png"),
+    fullPage: false,
+  });
   await previewDialog.getByRole("button", { name: "Close" }).click();
   await expect(previewDialog).toBeHidden();
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const correction = page.locator("details").filter({
+    has: page.getByText("Correct submitted application data", { exact: true }),
+  });
+  await correction.locator("summary").click();
+  await correction
+    .getByLabel("Mandatory correction reason")
+    .fill("Playwright verified the audited correction workflow.");
+  await correction
+    .getByRole("button", { name: "Save audited correction" })
+    .click();
+  await expect(
+    correction.getByText("No application values were changed."),
+  ).toBeVisible({ timeout: 15_000 });
+  await correction
+    .getByLabel("Nominee / organisation")
+    .fill("Playwright Fixture Organisation Updated");
+  await correction
+    .getByRole("button", { name: "Save audited correction" })
+    .click();
+  await expect(
+    page.getByText("The nomination correction was saved and audited."),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("heading", {
+      name: "Playwright Fixture Organisation Updated",
+    }),
+  ).toBeVisible({ timeout: 15_000 });
 
   const note = "Playwright verified the audited internal-note workflow.";
   const notes = page.locator("details").filter({
@@ -304,10 +360,10 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await page.getByRole("button", { name: "Confirm status change" }).click();
   await expect(
     page.getByText("Nomination approved", { exact: true }).first(),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   await expect(
     page.getByText("invited", { exact: true }).first(),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 
   const paymentReview = page.locator("details").filter({
     has: page.getByText("Payment review", { exact: true }),

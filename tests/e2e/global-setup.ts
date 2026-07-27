@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { execFileSync } from "node:child_process";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
@@ -8,12 +9,65 @@ import {
   E2E_ADMIN_EMAIL,
   E2E_ADMIN_PASSWORD,
   E2E_APPLICATION_REFERENCE,
+  E2E_R2_PREFIX,
   databaseUrlFor,
   e2eDatabaseUrl,
   e2eRuntimeDatabaseUrl,
 } from "./database";
 
+function createFixturePdf() {
+  const stream = "BT /F1 18 Tf 72 720 Td (GBE secure preview test) Tj ET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(body));
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(body);
+  body += `xref\n0 ${objects.length + 1}\n`;
+  body += "0000000000 65535 f \n";
+  for (const offset of offsets.slice(1))
+    body += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(body);
+}
+
+async function uploadFixturePdf(body: Buffer) {
+  if (
+    !process.env.R2_ENDPOINT ||
+    !process.env.R2_ACCESS_KEY_ID ||
+    !process.env.R2_SECRET_ACCESS_KEY ||
+    !process.env.R2_PRIVATE_BUCKET
+  )
+    throw new Error("R2 is required for the protected-preview E2E fixture.");
+  const client = new S3Client({
+    region: "auto",
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+  });
+  await client.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_PRIVATE_BUCKET,
+      Key: `${E2E_R2_PREFIX}/fixture-payment-proof.pdf`,
+      Body: body,
+      ContentType: "application/pdf",
+    }),
+  );
+}
+
 export default async function setup() {
+  const fixturePdf = createFixturePdf();
+  await uploadFixturePdf(fixturePdf);
   const admin = postgres(databaseUrlFor("neondb"), { max: 1 });
   await admin.unsafe(
     `DROP DATABASE IF EXISTS "${E2E_DATABASE_NAME}" WITH (FORCE)`,
@@ -92,7 +146,7 @@ export default async function setup() {
         'private', 'e2e/playwright/fixture-payment-proof.pdf',
         'payment_proof', 'ready', 'fixture-payment-proof.pdf',
         'fixture-payment-proof.pdf', 'pdf', 'application/pdf',
-        'application/pdf', 1024, now()
+        'application/pdf', ${fixturePdf.byteLength}, now()
       )
       returning id
     ), linked_proof as (

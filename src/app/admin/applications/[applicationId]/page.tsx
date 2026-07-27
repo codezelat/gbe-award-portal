@@ -22,6 +22,7 @@ import {
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ExternalValueLink } from "@/components/shared/external-value-link";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
+import { ApplicationCorrectionForm } from "@/components/admin/application-correction-form";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,6 @@ import { hasPermission, requireStaff } from "@/server/dal/auth";
 import {
   addInternalNoteAction,
   changeStatusAction,
-  editApplicationAction,
   issuePortalAccessAction,
   setApplicationDeletionAction,
   requestChangesAction,
@@ -381,10 +381,7 @@ export default async function AdminApplicationDetail({
                 Every correction creates a new version. Primary email and
                 category changes require super-administrator permission.
               </p>
-              <form
-                action={editApplicationAction}
-                className="mt-6 grid gap-5 md:grid-cols-2"
-              >
+              <ApplicationCorrectionForm className="mt-6 grid gap-5 md:grid-cols-2">
                 <input
                   type="hidden"
                   name="applicationId"
@@ -401,6 +398,8 @@ export default async function AdminApplicationDetail({
                     name="nomineeName"
                     defaultValue={application.nomineeName}
                     required
+                    minLength={2}
+                    maxLength={180}
                     className="h-11 bg-white"
                   />
                 </label>
@@ -409,6 +408,7 @@ export default async function AdminApplicationDetail({
                   <Input
                     name="designation"
                     defaultValue={application.designation ?? ""}
+                    maxLength={120}
                     className="h-11 bg-white"
                   />
                 </label>
@@ -418,6 +418,8 @@ export default async function AdminApplicationDetail({
                     name="awardNomination"
                     defaultValue={application.awardNomination}
                     required
+                    minLength={10}
+                    maxLength={4000}
                     className="min-h-28 bg-white"
                   />
                 </label>
@@ -446,6 +448,8 @@ export default async function AdminApplicationDetail({
                     name="phoneDisplay"
                     defaultValue={application.phoneDisplay}
                     required
+                    minLength={5}
+                    maxLength={40}
                     className="h-11 bg-white"
                   />
                 </label>
@@ -492,7 +496,7 @@ export default async function AdminApplicationDetail({
                 <div className="flex justify-end md:col-span-2">
                   <Button>Save audited correction</Button>
                 </div>
-              </form>
+              </ApplicationCorrectionForm>
             </details>
           ) : null}
           <section className="surface rounded-lg p-6">

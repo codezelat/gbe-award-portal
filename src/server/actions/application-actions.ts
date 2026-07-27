@@ -626,6 +626,15 @@ export async function editApplicationAction(formData: FormData) {
         throw new Error(
           "The selected category does not belong to this award cycle.",
         );
+      const correctedValues = {
+        nomineeName: input.nomineeName,
+        designation: input.designation || null,
+        awardNomination: input.awardNomination,
+        businessWebsite: input.businessWebsite || null,
+        email: input.email.trim().toLowerCase(),
+        phoneDisplay: input.phoneDisplay,
+        categoryId: input.categoryId,
+      };
       const changedFields = [
         "nomineeName",
         "designation",
@@ -639,7 +648,7 @@ export async function editApplicationAction(formData: FormData) {
           key === "email"
             ? current.emailNormalised
             : current[key as keyof typeof current];
-        return before !== input[key as keyof typeof input];
+        return before !== correctedValues[key as keyof typeof correctedValues];
       });
       if (!changedFields.length)
         throw new Error("No application values were changed.");
@@ -651,8 +660,14 @@ export async function editApplicationAction(formData: FormData) {
         source: "staff_correction",
         payload: {
           ...current,
-          ...input,
-          emailNormalised: input.email.toLowerCase(),
+          nomineeName: correctedValues.nomineeName,
+          designation: correctedValues.designation,
+          awardNomination: correctedValues.awardNomination,
+          businessWebsite: correctedValues.businessWebsite,
+          emailNormalised: correctedValues.email,
+          emailDisplay: input.email,
+          phoneDisplay: correctedValues.phoneDisplay,
+          categoryId: correctedValues.categoryId,
           categoryNameSnapshot: category.name,
           categoryCodeSnapshot: category.code,
         },
@@ -664,10 +679,10 @@ export async function editApplicationAction(formData: FormData) {
         .update(applications)
         .set({
           nomineeName: input.nomineeName,
-          designation: input.designation || null,
+          designation: correctedValues.designation,
           awardNomination: input.awardNomination,
-          businessWebsite: input.businessWebsite || null,
-          emailNormalised: input.email.toLowerCase(),
+          businessWebsite: correctedValues.businessWebsite,
+          emailNormalised: correctedValues.email,
           emailDisplay: input.email,
           phoneDisplay: input.phoneDisplay,
           categoryId: category.id,
@@ -702,7 +717,10 @@ export async function editApplicationAction(formData: FormData) {
           ]),
         ),
         afterRedacted: Object.fromEntries(
-          changedFields.map((key) => [key, input[key as keyof typeof input]]),
+          changedFields.map((key) => [
+            key,
+            correctedValues[key as keyof typeof correctedValues],
+          ]),
         ),
         reason: input.reason,
         metadataRedacted: { version: nextVersion },
@@ -750,6 +768,63 @@ export async function editApplicationAction(formData: FormData) {
   }
   revalidatePath(`/admin/applications/${input.applicationId}`);
   revalidatePath("/admin/applications");
+}
+
+export type ApplicationCorrectionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+const expectedApplicationCorrectionErrors = [
+  "Application editing permission is required.",
+  "Application not found or not assigned to you.",
+  "Application not found.",
+  "Primary email and category corrections require super-administrator permission.",
+  "Confirm your current password before changing primary identity or category data.",
+  "The linked applicant identity could not be found.",
+  "This application changed while you were editing it.",
+  "The selected category does not belong to this award cycle.",
+  "No application values were changed.",
+  "The application changed while you were editing it.",
+] as const;
+
+export async function editApplicationWithStateAction(
+  _previousState: ApplicationCorrectionState,
+  formData: FormData,
+): Promise<ApplicationCorrectionState> {
+  try {
+    await editApplicationAction(formData);
+    return {
+      status: "success",
+      message: "The nomination correction was saved and audited.",
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError)
+      return {
+        status: "error",
+        message:
+          error.issues[0]?.message ??
+          "Check the nomination details and try again.",
+      };
+    if (
+      error instanceof Error &&
+      expectedApplicationCorrectionErrors.some((message) =>
+        error.message.startsWith(message),
+      )
+    )
+      return { status: "error", message: error.message };
+    if (String(formData.get("reauthPassword") ?? "").length)
+      return {
+        status: "error",
+        message:
+          "The correction could not be authorised. Confirm your current password and try again.",
+      };
+    return {
+      status: "error",
+      message:
+        "The nomination correction could not be saved. Refresh the record and try again.",
+    };
+  }
 }
 
 export async function sendStaffMessageAction(formData: FormData) {
