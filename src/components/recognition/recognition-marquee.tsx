@@ -33,7 +33,7 @@ const recognitionPartners = [
     flag: "/recognition/flag-sri-lanka.svg",
     flagAlt: "Sri Lanka flag",
     country: "Sri Lanka",
-    role: "Academic review",
+    role: "SITC Campus - Business Faculty (Business Validation Review)",
   },
 ] as const;
 
@@ -94,7 +94,7 @@ export function RecognitionMarquee() {
             id="recognition-heading"
             className="font-heading text-2xl leading-tight text-ink md:text-[1.75rem]"
           >
-            Recognition across the UK and Sri Lanka
+            Recognition from the UK and Sri Lanka, with Global Reach
           </h2>
         </div>
         <a

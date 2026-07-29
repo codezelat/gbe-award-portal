@@ -118,7 +118,7 @@ test("recognition strip follows the verified partner order", async ({
   const recognition = page.getByTestId("recognition-marquee");
   await expect(
     recognition.getByRole("heading", {
-      name: "Recognition across the UK and Sri Lanka",
+      name: "Recognition from the UK and Sri Lanka, with Global Reach",
     }),
   ).toBeVisible();
   await expect(
@@ -143,7 +143,9 @@ test("recognition strip follows the verified partner order", async ({
     "alt",
     "SITC Campus logo",
   );
-  await expect(primaryCards.nth(2)).toContainText("Academic review");
+  await expect(primaryCards.nth(2)).toContainText(
+    "SITC Campus - Business Faculty (Business Validation Review)",
+  );
 
   const track = page.getByTestId("recognition-track");
   await expect(track).toHaveCSS("animation-name", "recognition-marquee");
