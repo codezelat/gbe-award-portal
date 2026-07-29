@@ -304,6 +304,19 @@ export function PublicNominationSkeleton() {
               <Skeleton className="ml-auto mt-8 h-11 w-28" />
             </div>
           </section>
+          <section className="mt-14 border-t border-mist pt-10 md:mt-16 md:pt-12">
+            <Skeleton className="h-3 w-36" />
+            <Skeleton className="mt-4 h-8 w-72 max-w-full" />
+            <Skeleton className="mt-4 h-5 w-full max-w-xl" />
+            <div className="mt-7 flex gap-4 overflow-hidden">
+              {Array.from({ length: 3 }, (_, index) => (
+                <Skeleton
+                  key={index}
+                  className="h-48 w-[16.5rem] shrink-0 rounded-xl sm:w-[18.5rem]"
+                />
+              ))}
+            </div>
+          </section>
         </section>
       </main>
       <PublicFooter />

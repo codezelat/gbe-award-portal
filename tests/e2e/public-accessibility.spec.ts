@@ -110,6 +110,46 @@ test("programme details load Facebook media only after the visitor requests it",
   await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/post\.php/);
 });
 
+test("recognition framework follows the verified partner order", async ({
+  page,
+}) => {
+  await page.goto("/apply");
+
+  const recognition = page.getByTestId("recognition-marquee");
+  await expect(
+    recognition.getByRole("heading", {
+      name: "Recognition across the UK and Sri Lanka",
+    }),
+  ).toBeVisible();
+  await expect(
+    recognition.getByRole("link", { name: /view recognition details/i }),
+  ).toHaveAttribute("href", "https://gbeaward.com/recognition");
+
+  const primaryCards = recognition.locator("ul").first().getByRole("listitem");
+  await expect(primaryCards).toHaveCount(3);
+  await expect(primaryCards.nth(0).getByRole("img").first()).toHaveAttribute(
+    "alt",
+    "London Business Consultancy logo",
+  );
+  await expect(primaryCards.nth(0)).toContainText("Programme administration");
+  await expect(primaryCards.nth(1).getByRole("img").first()).toHaveAttribute(
+    "alt",
+    "DEC logo",
+  );
+  await expect(primaryCards.nth(1)).toContainText("Institutional recognition");
+  await expect(primaryCards.nth(2).getByRole("img").first()).toHaveAttribute(
+    "alt",
+    "SITC Campus logo",
+  );
+  await expect(primaryCards.nth(2)).toContainText("Academic review");
+
+  const track = page.getByTestId("recognition-track");
+  await expect(track).toHaveCSS("animation-name", "recognition-marquee");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(track).toHaveCSS("animation-name", "none");
+  await expect(track.locator('ul[aria-hidden="true"]')).toBeHidden();
+});
+
 test("public routes and footer links remain available", async ({ page }) => {
   for (const path of ["/apply", "/apply/submitted", "/help", "/privacy", "/terms"]) {
     const response = await page.goto(path);

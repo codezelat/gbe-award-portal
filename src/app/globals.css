@@ -293,6 +293,41 @@
   opacity: 0.7;
 }
 
+.recognition-marquee {
+  overflow: hidden;
+  padding-block: 0.25rem 1rem;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 5%,
+    black 95%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 5%,
+    black 95%,
+    transparent
+  );
+}
+
+.recognition-marquee-track {
+  animation: recognition-marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.recognition-marquee:hover .recognition-marquee-track,
+.recognition-marquee:focus-within .recognition-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes recognition-marquee {
+  to {
+    transform: translateX(calc(-50% - 0.5rem));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -301,6 +336,23 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .recognition-marquee {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  .recognition-marquee-track {
+    animation: none !important;
+    transform: none;
+    will-change: auto;
+  }
+
+  .recognition-marquee-track > [aria-hidden="true"] {
+    display: none;
   }
 }
 @supports not (

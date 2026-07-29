@@ -4,6 +4,7 @@ import { PublicHeader } from "@/components/shared/public-header";
 import { PublicFooter } from "@/components/shared/public-footer";
 import { NominationForm } from "@/components/forms/nomination-form";
 import { ProgrammeDetailsButton } from "@/components/programme/programme-details-button";
+import { RecognitionMarquee } from "@/components/recognition/recognition-marquee";
 import { brand } from "@/config/brand";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
@@ -119,6 +120,7 @@ export default async function ApplyPage() {
             currency={cycle?.currency ?? undefined}
             paymentInstructions={paymentInstructions ?? undefined}
           />
+          <RecognitionMarquee />
         </section>
       </main>
       <PublicFooter />
