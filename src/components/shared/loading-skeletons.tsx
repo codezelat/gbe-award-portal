@@ -305,9 +305,7 @@ export function PublicNominationSkeleton() {
             </div>
           </section>
           <section className="mt-14 border-t border-mist pt-10 md:mt-16 md:pt-12">
-            <Skeleton className="h-3 w-36" />
-            <Skeleton className="mt-4 h-8 w-72 max-w-full" />
-            <Skeleton className="mt-4 h-5 w-full max-w-xl" />
+            <Skeleton className="h-8 w-72 max-w-full" />
             <div className="mt-7 flex gap-4 overflow-hidden">
               {Array.from({ length: 3 }, (_, index) => (
                 <Skeleton

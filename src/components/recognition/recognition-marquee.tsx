@@ -11,7 +11,7 @@ const recognitionPartners = [
     flag: "/recognition/flag-united-kingdom.svg",
     flagAlt: "United Kingdom flag",
     country: "United Kingdom",
-    role: "Programme administration",
+    role: "LBC Group",
   },
   {
     name: "DEC",
@@ -22,7 +22,7 @@ const recognitionPartners = [
     flag: "/recognition/flag-sri-lanka.svg",
     flagAlt: "Sri Lanka flag",
     country: "Sri Lanka",
-    role: "Institutional recognition",
+    role: "Government-backed DEC under the Ministry of Industry",
   },
   {
     name: "SITC Campus",
@@ -90,19 +90,12 @@ export function RecognitionMarquee() {
     >
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-antique-gold">
-            Recognition framework
-          </p>
           <h2
             id="recognition-heading"
-            className="mt-3 font-heading text-2xl leading-tight text-ink md:text-[1.75rem]"
+            className="font-heading text-2xl leading-tight text-ink md:text-[1.75rem]"
           >
             Recognition across the UK and Sri Lanka
           </h2>
-          <p className="mt-3 text-sm leading-6 text-graphite sm:text-base">
-            Programme administration, institutional recognition and academic
-            review.
-          </p>
         </div>
         <a
           href="https://gbeaward.com/recognition"

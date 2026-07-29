@@ -110,7 +110,7 @@ test("programme details load Facebook media only after the visitor requests it",
   await expect(embed).toHaveAttribute("src", /facebook\.com\/plugins\/post\.php/);
 });
 
-test("recognition framework follows the verified partner order", async ({
+test("recognition strip follows the verified partner order", async ({
   page,
 }) => {
   await page.goto("/apply");
@@ -131,12 +131,14 @@ test("recognition framework follows the verified partner order", async ({
     "alt",
     "London Business Consultancy logo",
   );
-  await expect(primaryCards.nth(0)).toContainText("Programme administration");
+  await expect(primaryCards.nth(0)).toContainText("LBC Group");
   await expect(primaryCards.nth(1).getByRole("img").first()).toHaveAttribute(
     "alt",
     "DEC logo",
   );
-  await expect(primaryCards.nth(1)).toContainText("Institutional recognition");
+  await expect(primaryCards.nth(1)).toContainText(
+    "Government-backed DEC under the Ministry of Industry",
+  );
   await expect(primaryCards.nth(2).getByRole("img").first()).toHaveAttribute(
     "alt",
     "SITC Campus logo",
