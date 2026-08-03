@@ -143,7 +143,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(paymentDialog.getByLabel("Paid amount")).toHaveValue("");
   await expect(paymentDialog.getByLabel("Currency")).toHaveValue("LKR");
-  await paymentDialog.getByLabel("Paid amount").fill("55000.00");
+  await paymentDialog.getByLabel("Paid amount").fill("65000.00");
   await paymentDialog
     .getByLabel("Paid date and time")
     .fill("2026-07-26T10:30");

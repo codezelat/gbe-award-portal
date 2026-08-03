@@ -673,7 +673,7 @@ export function NominationForm({
               </div>
               {standardFee ? (
                 <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-antique-gold">
-                  Early-bird fee
+                  Limited offer
                 </p>
               ) : null}
               <p className="mt-2 leading-6">

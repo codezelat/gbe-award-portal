@@ -51,7 +51,7 @@ describe("business rules", () => {
         proofApplicationFileId: "proof-1",
         payerName: "Del Shad Hanefa",
         bankReference: "BANK-REF",
-        amountMinor: 5_500_000,
+        amountMinor: 6_500_000,
         currency: "LKR",
         paidAt: new Date("2026-07-26T00:00:00.000Z"),
       }),

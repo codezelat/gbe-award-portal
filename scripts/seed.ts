@@ -32,6 +32,8 @@ const [cycle] = existing
         opensAt: new Date(opensAt),
         closesAt: new Date(closesAt),
         supportEmail: "info@gbeaward.com",
+        nominationFeeMinor: 6_500_000,
+        currency: "LKR",
         heading: "Global Business Excellence Awards 2026",
         introCopy:
           "Recognising outstanding businesses and visionaries across the world.",
