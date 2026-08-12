@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   editApplicationWithStateAction,
@@ -28,6 +29,7 @@ export function ApplicationCorrectionForm({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const submittedValues = useRef<Map<string, string>>(new Map());
+  const router = useRouter();
   const [state, action] = useActionState(
     editApplicationWithStateAction,
     initialState,
@@ -37,6 +39,7 @@ export function ApplicationCorrectionForm({
     if (state.status === "success") {
       submittedValues.current.clear();
       toast.success(state.message);
+      router.refresh();
       return;
     }
     if (state.status !== "error" || !formRef.current) return;
@@ -49,7 +52,7 @@ export function ApplicationCorrectionForm({
       )
         control.value = value;
     }
-  }, [state.message, state.status]);
+  }, [router, state.message, state.status]);
 
   function rememberSubmittedValues(event: FormEvent<HTMLFormElement>) {
     const values = new Map<string, string>();
@@ -67,8 +70,11 @@ export function ApplicationCorrectionForm({
       className={className}
       onSubmit={rememberSubmittedValues}
     >
-      {state.status === "error" ? (
-        <Alert className="md:col-span-2" variant="destructive">
+      {state.status !== "idle" ? (
+        <Alert
+          className="md:col-span-2"
+          variant={state.status === "error" ? "destructive" : "default"}
+        >
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}

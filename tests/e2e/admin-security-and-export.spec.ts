@@ -83,9 +83,8 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   expect(
     await page.locator(".workspace-shell").evaluate((element) => ({
       background: getComputedStyle(element).backgroundColor,
-      headingFont: getComputedStyle(
-        element.querySelector("h1") as HTMLElement,
-      ).fontFamily,
+      headingFont: getComputedStyle(element.querySelector("h1") as HTMLElement)
+        .fontFamily,
     })),
   ).toEqual({
     background: "rgb(245, 247, 248)",
@@ -144,9 +143,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await expect(paymentDialog.getByLabel("Paid amount")).toHaveValue("");
   await expect(paymentDialog.getByLabel("Currency")).toHaveValue("LKR");
   await paymentDialog.getByLabel("Paid amount").fill("65000.00");
-  await paymentDialog
-    .getByLabel("Paid date and time")
-    .fill("2026-07-26T10:30");
+  await paymentDialog.getByLabel("Paid date and time").fill("2026-07-26T10:30");
   const confirmPayment = paymentDialog.getByRole("button", {
     name: "Confirm verification",
   });
@@ -313,25 +310,21 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await expect(previewDialog).toBeHidden();
   await page.setViewportSize({ width: 1280, height: 900 });
 
-  const correction = page.locator("details").filter({
-    has: page.getByText("Correct submitted application data", { exact: true }),
+  await page.getByRole("button", { name: "Edit details" }).click();
+  const correction = page.getByRole("dialog", {
+    name: "Edit nomination details",
   });
-  await correction.locator("summary").click();
   await correction
-    .getByLabel("Mandatory correction reason")
+    .getByLabel("Reason for this correction")
     .fill("Playwright verified the audited correction workflow.");
-  await correction
-    .getByRole("button", { name: "Save audited correction" })
-    .click();
+  await correction.getByRole("button", { name: "Save changes" }).click();
   await expect(
     correction.getByText("No application values were changed."),
   ).toBeVisible({ timeout: 15_000 });
   await correction
     .getByLabel("Nominee / organisation")
     .fill("Playwright Fixture Organisation Updated");
-  await correction
-    .getByRole("button", { name: "Save audited correction" })
-    .click();
+  await correction.getByRole("button", { name: "Save changes" }).click();
   await expect(
     page.getByText("The nomination correction was saved and audited."),
   ).toBeVisible({ timeout: 15_000 });
@@ -352,26 +345,40 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await notes.getByRole("button", { name: "Add note" }).click();
   await expect(notes.getByText(note, { exact: true })).toBeVisible();
 
-  await page.getByLabel("Next workflow status").selectOption("under_review");
-  await page
+  const reviewActions = page.locator("details").filter({
+    has: page.getByText("Update review status", { exact: true }),
+  });
+  await reviewActions.locator("summary").click();
+  await reviewActions
+    .getByLabel("Next workflow status")
+    .selectOption("under_review");
+  await reviewActions
     .getByLabel("Internal status change reason")
     .fill("Playwright verified the review transition.");
-  await page.getByRole("button", { name: "Confirm status change" }).click();
+  await reviewActions
+    .getByRole("button", { name: "Save review status" })
+    .click();
   await expect(
     page.getByText("Under review", { exact: true }).first(),
   ).toBeVisible();
 
-  await page.getByLabel("Next workflow status").selectOption("approved");
-  await page
+  if (!(await reviewActions.getByLabel("Next workflow status").isVisible()))
+    await reviewActions.locator("summary").click();
+  await reviewActions
+    .getByLabel("Next workflow status")
+    .selectOption("approved");
+  await reviewActions
     .getByLabel("Internal status change reason")
     .fill("Playwright verified the approval transition.");
-  await page.getByRole("button", { name: "Confirm status change" }).click();
+  await reviewActions
+    .getByRole("button", { name: "Save review status" })
+    .click();
   await expect(
     page.getByText("Nomination approved", { exact: true }).first(),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(
-    page.getByText("invited", { exact: true }).first(),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("invited", { exact: true }).first()).toBeVisible({
+    timeout: 15_000,
+  });
 
   const paymentReview = page.locator("details").filter({
     has: page.getByText("Payment review", { exact: true }),

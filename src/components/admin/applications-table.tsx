@@ -88,7 +88,12 @@ export function ApplicationsTable({
             >
               {row.original.reference ?? "Pending reference"}
             </Link>
-            <p className="mt-1 font-semibold">{row.original.nomineeName}</p>
+            <Link
+              href={`/admin/applications/${row.original.id}`}
+              className="mt-1 block w-fit max-w-full truncate font-semibold hover:text-primary hover:underline"
+            >
+              {row.original.nomineeName}
+            </Link>
             {row.original.designation ? (
               <p className="max-w-64 truncate text-xs text-muted-foreground">
                 {row.original.designation}
@@ -255,9 +260,12 @@ export function ApplicationsTable({
                   >
                     {row.original.reference ?? "Pending reference"}
                   </Link>
-                  <h2 className="mt-1 font-semibold leading-snug">
+                  <Link
+                    href={`/admin/applications/${row.original.id}`}
+                    className="mt-1 block font-semibold leading-snug hover:text-primary hover:underline"
+                  >
                     {row.original.nomineeName}
-                  </h2>
+                  </Link>
                   <p className="mt-1 text-xs font-medium text-muted-foreground">
                     {row.original.categoryNameSnapshot}
                   </p>
