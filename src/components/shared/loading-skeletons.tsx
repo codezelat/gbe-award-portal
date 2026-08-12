@@ -26,7 +26,10 @@ function FieldSkeleton({ tall = false }: { tall?: boolean }) {
 
 function PortalShellSkeleton({ label }: { label: string }) {
   return (
-    <div className="min-h-svh lg:grid lg:grid-cols-[240px_1fr]" aria-busy>
+    <div
+      className="workspace-shell min-h-svh lg:grid lg:grid-cols-[240px_1fr]"
+      aria-busy
+    >
       <aside className="glass-shell fixed inset-y-0 left-0 hidden w-60 px-6 py-8 lg:block">
         <Skeleton className="h-12 w-36" />
         <div className="mt-8 flex items-center gap-3 border-y py-4">
@@ -63,7 +66,11 @@ export function ApplicantShellLoading() {
   return <PortalShellSkeleton label="Loading applicant portal" />;
 }
 
-export function DashboardSkeleton({ label = "Loading dashboard" }: { label?: string }) {
+export function DashboardSkeleton({
+  label = "Loading dashboard",
+}: {
+  label?: string;
+}) {
   return (
     <div aria-busy>
       <LoadingStatus label={label} />
@@ -151,7 +158,10 @@ export function TablePageSkeleton({
             ))}
           </div>
           {Array.from({ length: 7 }, (_, index) => (
-            <div key={index} className="grid grid-cols-2 gap-4 border-b px-5 py-5 sm:grid-cols-4 last:border-0">
+            <div
+              key={index}
+              className="grid grid-cols-2 gap-4 border-b px-5 py-5 sm:grid-cols-4 last:border-0"
+            >
               <Skeleton className="h-4 w-4/5" />
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-5 w-20" />
@@ -164,7 +174,11 @@ export function TablePageSkeleton({
   );
 }
 
-export function DetailPageSkeleton({ label = "Loading details" }: { label?: string }) {
+export function DetailPageSkeleton({
+  label = "Loading details",
+}: {
+  label?: string;
+}) {
   return (
     <div aria-busy>
       <LoadingStatus label={label} />
@@ -220,14 +234,21 @@ export function FormPageSkeleton({
   );
 }
 
-export function ListPageSkeleton({ label = "Loading records" }: { label?: string }) {
+export function ListPageSkeleton({
+  label = "Loading records",
+}: {
+  label?: string;
+}) {
   return (
     <div aria-busy>
       <LoadingStatus label={label} />
       <PageHeadingSkeleton />
       <div className="mt-7 flex flex-col gap-3">
         {Array.from({ length: 5 }, (_, index) => (
-          <section key={index} className="surface flex items-center justify-between gap-4 rounded-lg p-5">
+          <section
+            key={index}
+            className="surface flex items-center justify-between gap-4 rounded-lg p-5"
+          >
             <div className="min-w-0 flex-1">
               <Skeleton className="h-3 w-28" />
               <Skeleton className="mt-3 h-5 w-2/5" />
@@ -276,7 +297,10 @@ export function PublicNominationSkeleton() {
     <div className="flex min-h-svh flex-col">
       <PublicHeader />
       <main id="main-content" className="flex-1">
-        <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18" aria-busy>
+        <section
+          className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18"
+          aria-busy
+        >
           <LoadingStatus label="Loading nomination form" />
           <div className="mb-9 border-b border-mist pb-9">
             <Skeleton className="h-3 w-32" />
@@ -322,7 +346,11 @@ export function PublicNominationSkeleton() {
   );
 }
 
-export function PublicContentSkeleton({ label = "Loading page" }: { label?: string }) {
+export function PublicContentSkeleton({
+  label = "Loading page",
+}: {
+  label?: string;
+}) {
   return (
     <div className="flex min-h-svh flex-col">
       <PublicHeader />
@@ -335,7 +363,10 @@ export function PublicContentSkeleton({ label = "Loading page" }: { label?: stri
         <PageHeadingSkeleton />
         <section className="surface mt-7 rounded-lg p-6 md:p-9">
           {Array.from({ length: 7 }, (_, index) => (
-            <Skeleton key={index} className={`mb-4 h-4 ${index === 6 ? "w-2/5" : "w-full"}`} />
+            <Skeleton
+              key={index}
+              className={`mb-4 h-4 ${index === 6 ? "w-2/5" : "w-full"}`}
+            />
           ))}
         </section>
       </main>
@@ -370,9 +401,17 @@ export function PublicCompletionSkeleton() {
   );
 }
 
-export function AuthPageSkeleton({ label = "Loading sign-in" }: { label?: string }) {
+export function AuthPageSkeleton({
+  label = "Loading sign-in",
+}: {
+  label?: string;
+}) {
   return (
-    <main id="main-content" className="grid min-h-screen place-items-center px-5 py-10" aria-busy>
+    <main
+      id="main-content"
+      className="grid min-h-screen place-items-center px-5 py-10"
+      aria-busy
+    >
       <LoadingStatus label={label} />
       <section className="glass-feature w-full max-w-md rounded-2xl p-7 md:p-10">
         <Skeleton className="h-12 w-36" />

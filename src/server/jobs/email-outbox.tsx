@@ -16,15 +16,49 @@ function htmlToPlainText(html: string) {
 }
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, (character) =>
-    ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "'": "&#39;",
-      '"': "&quot;",
-    })[character]!,
+  return value.replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+      })[character]!,
   );
+}
+
+function compactEmailValue(value: string | undefined, maximum = 720) {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return "Not provided";
+  const compact = trimmed.replace(/\s+/g, " ");
+  return compact.length > maximum
+    ? `${compact.slice(0, maximum).trimEnd()}…`
+    : compact;
+}
+
+function formatAdminSubmittedAt(value: string | undefined) {
+  if (!value) return "Just now";
+  const submittedAt = new Date(value);
+  if (Number.isNaN(submittedAt.valueOf())) return "Just now";
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Colombo",
+  }).format(submittedAt);
+}
+
+function renderAdminNominationEmail(payload: Record<string, string>) {
+  const detail = (label: string, value: string, emphasis = false) =>
+    `<div style="padding:14px 0${label === "Reference" ? ";border-bottom:1px solid #e8e5dd" : ""}"><p style="margin:0 0 4px;color:#747168;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">${label}</p><p style="margin:0;color:#171713;font-family:${emphasis ? "ui-monospace,SFMono-Regular,Menlo,monospace" : "Arial,sans-serif"};font-size:${emphasis ? "15px" : "16px"};font-weight:${emphasis ? "700" : "400"};line-height:1.55">${escapeHtml(value)}</p></div>`;
+  return renderEmail({
+    title: "New nomination received",
+    content: `<p style="margin:0 0 18px">A new nomination is ready for review.</p><div style="border:1px solid #e8e5dd;border-radius:12px;background:#ffffff;padding:4px 18px">${detail("Reference", compactEmailValue(payload.reference), true)}${detail("Nominee", compactEmailValue(payload.nomineeName))}${detail("Award category", compactEmailValue(payload.categoryName))}${detail("Award nomination", compactEmailValue(payload.awardNomination))}${detail("Submitted", formatAdminSubmittedAt(payload.submittedAt))}</div>`,
+    action: payload.url
+      ? { label: "View nomination", url: payload.url }
+      : undefined,
+  });
 }
 
 function renderEmail({
@@ -113,16 +147,18 @@ export async function processEmailOutbox(limit = 25) {
               title: "Nomination received",
               content: `<p>Dear ${escapeHtml(payload.nomineeName ?? "Applicant")},</p><p>Thank you. Your nomination has been received and is now in the GBE Awards administrative review queue.</p><p style="border-radius:10px;background:#f4ecd8;padding:14px 18px;font-family:monospace;font-size:18px;font-weight:700">${escapeHtml(payload.reference ?? "")}</p><p>No portal account has been created at this stage. If the nomination is approved, we will send a secure invitation separately.</p>`,
             })
-          : renderEmail({
-              title,
-              content: `<p>Dear ${escapeHtml(payload.name ?? "Applicant")},</p><p>${escapeHtml(message)}</p>`,
-              action: payload.url
-                ? {
-                    label: defaults.actionLabel ?? "Open secure portal",
-                    url: payload.url,
-                  }
-                : undefined,
-            });
+          : item.templateKey === "admin_nomination_received"
+            ? renderAdminNominationEmail(payload)
+            : renderEmail({
+                title,
+                content: `<p>Dear ${escapeHtml(payload.name ?? "Applicant")},</p><p>${escapeHtml(message)}</p>`,
+                action: payload.url
+                  ? {
+                      label: defaults.actionLabel ?? "Open secure portal",
+                      url: payload.url,
+                    }
+                  : undefined,
+              });
       const text = htmlToPlainText(html);
       const result = await resend.emails.send(
         {

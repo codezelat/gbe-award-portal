@@ -13,7 +13,7 @@ export const emailTemplateDefaults: Record<string, EmailTemplateCopy> = {
   admin_nomination_received: {
     title: "New GBE Awards nomination",
     message: "A new nomination is ready for administrative review.",
-    actionLabel: "Review nomination",
+    actionLabel: "View nomination",
   },
   application_under_review: {
     title: "Your GBE Awards nomination is under review",
