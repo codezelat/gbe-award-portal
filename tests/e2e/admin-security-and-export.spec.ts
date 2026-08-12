@@ -246,7 +246,7 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await page.goto(applicationHref!);
 
   const submittedNomination = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "Submitted nomination" }),
+    has: page.getByRole("heading", { name: "Award nomination" }),
   });
   const websiteLink = submittedNomination.locator(
     'a[href="https://gbeaward.com/"]',
@@ -254,6 +254,14 @@ test("enforces staff MFA, then permits search and a real filtered export", async
   await expect(websiteLink).toBeVisible();
   await expect(websiteLink).toHaveAttribute("target", "_blank");
   await expect(websiteLink).toHaveAttribute("rel", "noopener noreferrer");
+  await page.getByRole("button", { name: "Edit details" }).click();
+  const editDialog = page.getByRole("dialog", {
+    name: "Edit nomination details",
+  });
+  await expect(editDialog).toBeVisible();
+  await expect(editDialog.getByLabel("Award nomination")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(editDialog).toBeHidden();
   await page.screenshot({
     path: testInfo.outputPath("workspace-application.png"),
     fullPage: false,

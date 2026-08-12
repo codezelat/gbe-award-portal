@@ -279,6 +279,7 @@ export default async function ApplicationsPage({
     if (params[key]) exportQuery.set(key, params[key]);
   if (activeCycleFilter) exportQuery.set("cycle", activeCycleFilter);
   const advancedFilterKeys = [
+    "category",
     "paymentStatus",
     "accountStatus",
     "cycle",
@@ -302,11 +303,11 @@ export default async function ApplicationsPage({
   }).length;
   return (
     <>
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="page-heading">Applications</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {total.value} applications found
+            {total.value} nominations
           </p>
         </div>
         <Button
@@ -317,7 +318,7 @@ export default async function ApplicationsPage({
           Export current view
         </Button>
       </div>
-      <form className="glass-shell mb-4 rounded-lg p-4">
+      <form className="surface mb-5 rounded-xl p-3 sm:p-4">
         <div className="flex flex-wrap gap-3">
           <DebouncedApplicationSearch defaultValue={params.search} />
           <select
@@ -335,22 +336,8 @@ export default async function ApplicationsPage({
                 </option>
               ))}
           </select>
-          <select
-            name="category"
-            aria-label="Award category"
-            defaultValue={params.category ?? ""}
-            className="h-11 min-w-48 rounded-md border bg-white px-3 text-sm"
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <Button type="submit">Apply</Button>
-          <Button variant="ghost" render={<Link href="/admin/applications" />}>
-            Clear
+          <Button type="submit" size="lg">
+            Filter
           </Button>
         </div>
         <details className="group mt-3" open={advancedFilterCount > 0}>
@@ -369,6 +356,19 @@ export default async function ApplicationsPage({
             </span>
           </summary>
           <div className="mt-3 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <select
+              name="category"
+              aria-label="Award category"
+              defaultValue={params.category ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
             <select
               name="paymentStatus"
               aria-label="Payment status"
@@ -496,6 +496,16 @@ export default async function ApplicationsPage({
             />
           </div>
         </details>
+        {params.search || params.status || advancedFilterCount ? (
+          <Button
+            className="mt-2"
+            size="sm"
+            variant="ghost"
+            render={<Link href="/admin/applications" />}
+          >
+            Clear filters
+          </Button>
+        ) : null}
       </form>
       <div className="surface min-w-0 overflow-hidden rounded-lg">
         <ApplicationsTable
@@ -505,6 +515,7 @@ export default async function ApplicationsPage({
             nomineeName: row.nomineeName,
             designation: row.designation,
             categoryNameSnapshot: row.categoryNameSnapshot,
+            awardNomination: row.awardNomination,
             emailDisplay: row.emailDisplay,
             phoneDisplay: row.phoneDisplay,
             workflowStatus: row.workflowStatus,

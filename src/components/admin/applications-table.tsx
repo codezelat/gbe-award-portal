@@ -21,6 +21,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   bulkAssignReviewerAction,
   bulkChangeSafeStatusAction,
   bulkSendTemplateAction,
@@ -31,6 +36,7 @@ export type ApplicationTableRow = {
   nomineeName: string;
   designation: string | null;
   categoryNameSnapshot: string;
+  awardNomination: string;
   emailDisplay: string;
   phoneDisplay: string;
   workflowStatus: string;
@@ -73,16 +79,16 @@ export function ApplicationsTable({
       },
       {
         id: "nomination",
-        header: "Nomination",
+        header: "Nominee",
         cell: ({ row }) => (
-          <div className="min-w-56 py-1">
+          <div className="min-w-52 py-1">
             <Link
               href={`/admin/applications/${row.original.id}`}
               className="font-mono text-xs font-semibold text-antique-gold hover:underline"
             >
               {row.original.reference ?? "Pending reference"}
             </Link>
-            <p className="font-medium">{row.original.nomineeName}</p>
+            <p className="mt-1 font-semibold">{row.original.nomineeName}</p>
             {row.original.designation ? (
               <p className="max-w-64 truncate text-xs text-muted-foreground">
                 {row.original.designation}
@@ -92,19 +98,31 @@ export function ApplicationsTable({
         ),
       },
       {
-        id: "entry",
-        header: "Category & contact",
+        id: "nomination-summary",
+        header: "Award nomination",
         cell: ({ row }) => (
-          <div className="min-w-52 py-1">
-            <p className="max-w-64 truncate text-sm font-medium">
+          <div className="min-w-72 max-w-md py-1">
+            <p className="truncate text-sm font-medium">
               {row.original.categoryNameSnapshot}
             </p>
-            <p className="mt-1 max-w-64 truncate text-xs text-muted-foreground">
-              {row.original.emailDisplay}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {row.original.phoneDisplay}
-            </p>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    className="mt-1 block max-w-full truncate text-left text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                }
+              >
+                {row.original.awardNomination}
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md items-start whitespace-pre-wrap px-4 py-3 text-left leading-5">
+                <span className="font-medium text-background">
+                  {row.original.categoryNameSnapshot}
+                </span>
+                <span>{row.original.awardNomination}</span>
+              </TooltipContent>
+            </Tooltip>
           </div>
         ),
       },
@@ -112,38 +130,24 @@ export function ApplicationsTable({
         id: "state",
         header: "Status",
         cell: ({ row }) => (
-          <div className="flex min-w-36 flex-col items-start gap-1.5 py-1">
+          <div className="flex min-w-32 flex-col items-start gap-1.5 py-1">
             <StatusBadge status={row.original.workflowStatus} />
             <StatusBadge status={row.original.paymentStatus} />
           </div>
         ),
       },
       {
-        id: "activity",
-        header: "Review activity",
+        id: "submitted",
+        header: "Submitted",
         cell: ({ row }) => (
-          <div className="min-w-44 py-1 text-xs">
-            <p className="font-medium">{row.original.reviewerName}</p>
-            <p className="mt-1 text-muted-foreground">
-              Submitted {row.original.submittedLabel}
-            </p>
-            <p className="text-muted-foreground">
-              Updated {row.original.updatedLabel}
+          <div className="min-w-36 py-1 text-xs">
+            <p className="text-foreground">{row.original.submittedLabel}</p>
+            <p className="mt-1 truncate text-muted-foreground">
+              {row.original.reviewerName === "Unassigned"
+                ? "Unassigned"
+                : `Reviewer: ${row.original.reviewerName}`}
             </p>
           </div>
-        ),
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <Button
-            size="sm"
-            variant="ghost"
-            render={<Link href={`/admin/applications/${row.original.id}`} />}
-          >
-            Open
-          </Button>
         ),
       },
     ],
@@ -168,7 +172,7 @@ export function ApplicationsTable({
   return (
     <>
       <div className="hidden xl:block">
-        <Table className="min-w-[940px]">
+        <Table className="min-w-[780px]">
           <TableHeader className="sticky top-0 z-10 bg-white">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
@@ -232,7 +236,10 @@ export function ApplicationsTable({
       <div className="divide-y xl:hidden">
         {table.getRowModel().rows.length ? (
           table.getRowModel().rows.map((row) => (
-            <article key={row.id} className="p-4">
+            <article
+              key={row.id}
+              className="p-4 transition-colors hover:bg-muted/35"
+            >
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
@@ -251,19 +258,13 @@ export function ApplicationsTable({
                   <h2 className="mt-1 font-semibold leading-snug">
                     {row.original.nomineeName}
                   </h2>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">
                     {row.original.categoryNameSnapshot}
                   </p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {row.original.awardNomination}
+                  </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  render={
-                    <Link href={`/admin/applications/${row.original.id}`} />
-                  }
-                >
-                  Open
-                </Button>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 pl-7">
                 <StatusBadge status={row.original.workflowStatus} />

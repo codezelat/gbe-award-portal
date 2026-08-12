@@ -1,8 +1,14 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
-import { FileText, MessageSquareText, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  MessageSquareText,
+  ShieldCheck,
+} from "lucide-react";
 import { getDb } from "@/lib/db";
 import {
   applicationChangeRequests,
@@ -22,7 +28,7 @@ import {
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ExternalValueLink } from "@/components/shared/external-value-link";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
-import { ApplicationCorrectionForm } from "@/components/admin/application-correction-form";
+import { ApplicationEditDialog } from "@/components/admin/application-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -147,10 +153,9 @@ export default async function AdminApplicationDetail({
   ]);
   const original = (versions.find((item) => item.version === 1)?.payload ??
     {}) as Record<string, unknown>;
-  const fields: Array<[string, ReactNode]> = [
+  const details: Array<[string, ReactNode]> = [
     ["Nominee / organisation", application.nomineeName],
     ["Designation", application.designation || "Not provided"],
-    ["Award nomination", application.awardNomination],
     [
       "Website",
       <ExternalValueLink
@@ -199,24 +204,55 @@ export default async function AdminApplicationDetail({
       : [];
   return (
     <>
-      <div className="glass-shell sticky top-16 z-10 -mx-3 flex flex-wrap items-end justify-between gap-4 rounded-lg px-3 py-3">
-        <div>
-          <p className="font-mono text-sm text-antique-gold">
-            {application.reference ?? "Provisional upload"}
-          </p>
-          <h1 className="page-heading mt-1">{application.nomineeName}</h1>
+      <header className="mb-7 border-b pb-6">
+        <Link
+          href="/admin/applications"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Applications
+        </Link>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-mono text-sm text-antique-gold">
+              {application.reference ?? "Provisional upload"}
+            </p>
+            <h1 className="page-heading mt-1 break-words">
+              {application.nomineeName}
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={application.workflowStatus} />
+            <StatusBadge status={application.paymentStatus} />
+            {hasPermission(membership, "applications.edit") ? (
+              <ApplicationEditDialog
+                application={application}
+                categories={categories}
+                requiresElevatedConfirmation={membership.role === "super_admin"}
+              />
+            ) : null}
+          </div>
         </div>
-        <div className="flex gap-2">
-          <StatusBadge status={application.workflowStatus} />
-          <StatusBadge status={application.paymentStatus} />
-        </div>
-      </div>
-      <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      </header>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-6">
-          <section className="surface rounded-lg p-6">
-            <h2 className="section-title">Submitted nomination</h2>
-            <dl className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-2">
-              {fields.map(([label, value]) => (
+          <section className="surface rounded-xl p-5 sm:p-7">
+            <div className="border-b pb-6">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Award category
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {application.categoryNameSnapshot}
+              </p>
+            </div>
+            <div className="py-6">
+              <h2 className="section-title">Award nomination</h2>
+              <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-foreground">
+                {application.awardNomination}
+              </p>
+            </div>
+            <dl className="grid gap-x-8 gap-y-5 border-t pt-6 md:grid-cols-2">
+              {details.map(([label, value]) => (
                 <div key={label} className="border-b pb-4">
                   <dt className="text-xs uppercase tracking-wider text-muted-foreground">
                     {label}
@@ -225,10 +261,6 @@ export default async function AdminApplicationDetail({
                 </div>
               ))}
             </dl>
-            <p className="mt-5 text-xs text-muted-foreground">
-              Original version 1 is immutable. Administrative corrections must
-              create a new version with a reason.
-            </p>
           </section>
           <details className="surface group rounded-lg">
             <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 px-6 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
@@ -306,199 +338,77 @@ export default async function AdminApplicationDetail({
               </table>
             </div>
           </details>
-          <section className="surface rounded-lg p-6">
-            <h2 className="section-title">Applicant and account access</h2>
-            <dl className="mt-5 grid gap-4 md:grid-cols-2">
-              <div>
-                <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Linked profile
-                </dt>
-                <dd className="mt-1 font-medium">
-                  {owner?.displayName ?? "No applicant account linked"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Access state
-                </dt>
-                <dd className="mt-1">
-                  <StatusBadge status={application.accountAccessStatus} />
-                </dd>
-              </div>
-            </dl>
-            {membership.role === "super_admin" ? (
-              <details className="mt-5 border-t pt-4">
-                <summary className="cursor-pointer text-sm font-medium">
-                  Link or reassign applicant account
-                </summary>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  Enter an existing active applicant login email. This elevated
-                  correction requires your current password and is fully
-                  audited.
-                </p>
-                <form
-                  action={reassignApplicationOwnerAction}
-                  className="mt-4 grid gap-3"
-                >
-                  <input
-                    type="hidden"
-                    name="applicationId"
-                    value={application.id}
-                  />
-                  <Input
-                    name="applicantEmail"
-                    type="email"
-                    required
-                    placeholder="Existing applicant login email"
-                    className="h-11 bg-white"
-                  />
-                  <Textarea
-                    name="reason"
-                    required
-                    minLength={12}
-                    placeholder="Mandatory account-link correction reason"
-                    className="bg-white"
-                  />
-                  <Input
-                    name="reauthPassword"
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                    placeholder="Confirm your current password"
-                    className="h-11 bg-white"
-                  />
-                  <Button variant="outline">Save audited account link</Button>
-                </form>
-              </details>
-            ) : null}
-          </section>
-          {hasPermission(membership, "applications.edit") ? (
-            <details className="surface rounded-lg p-6">
-              <summary className="cursor-pointer text-lg font-semibold">
-                Correct submitted application data
-              </summary>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Every correction creates a new version. Primary email and
-                category changes require super-administrator permission.
-              </p>
-              <ApplicationCorrectionForm className="mt-6 grid gap-5 md:grid-cols-2">
-                <input
-                  type="hidden"
-                  name="applicationId"
-                  value={application.id}
-                />
-                <input
-                  type="hidden"
-                  name="version"
-                  value={application.currentVersion}
-                />
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Nominee / organisation
-                  <Input
-                    name="nomineeName"
-                    defaultValue={application.nomineeName}
-                    required
-                    minLength={2}
-                    maxLength={180}
-                    className="h-11 bg-white"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Designation
-                  <Input
-                    name="designation"
-                    defaultValue={application.designation ?? ""}
-                    maxLength={120}
-                    className="h-11 bg-white"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
-                  Award nomination
-                  <Textarea
-                    name="awardNomination"
-                    defaultValue={application.awardNomination}
-                    required
-                    minLength={10}
-                    maxLength={4000}
-                    className="min-h-28 bg-white"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Website
-                  <Input
-                    name="businessWebsite"
-                    type="url"
-                    defaultValue={application.businessWebsite ?? ""}
-                    className="h-11 bg-white"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Primary email
-                  <Input
-                    name="email"
-                    type="email"
-                    defaultValue={application.emailDisplay}
-                    required
-                    className="h-11 bg-white"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Telephone
-                  <Input
-                    name="phoneDisplay"
-                    defaultValue={application.phoneDisplay}
-                    required
-                    minLength={5}
-                    maxLength={40}
-                    className="h-11 bg-white"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
-                  Category
-                  <select
-                    name="categoryId"
-                    defaultValue={application.categoryId}
-                    className="h-11 rounded-md border bg-white px-3"
+          <details className="surface group rounded-xl">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <span>Applicant access</span>
+              <StatusBadge status={application.accountAccessStatus} />
+            </summary>
+            <div className="border-t px-5 pb-5 pt-4">
+              <dl className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Linked profile
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {owner?.displayName ?? "No applicant account linked"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Access state
+                  </dt>
+                  <dd className="mt-1">
+                    <StatusBadge status={application.accountAccessStatus} />
+                  </dd>
+                </div>
+              </dl>
+              {membership.role === "super_admin" ? (
+                <details className="mt-5 border-t pt-4">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Link or reassign applicant account
+                  </summary>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    Enter an existing active applicant login email. This
+                    elevated correction requires your current password and is
+                    fully audited.
+                  </p>
+                  <form
+                    action={reassignApplicationOwnerAction}
+                    className="mt-4 grid gap-3"
                   >
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
-                  Mandatory correction reason
-                  <Textarea
-                    name="reason"
-                    required
-                    minLength={8}
-                    maxLength={1000}
-                    className="bg-white"
-                  />
-                </label>
-                {membership.role === "super_admin" ? (
-                  <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
-                    Current password for primary email or category changes
+                    <input
+                      type="hidden"
+                      name="applicationId"
+                      value={application.id}
+                    />
+                    <Input
+                      name="applicantEmail"
+                      type="email"
+                      required
+                      placeholder="Existing applicant login email"
+                      className="h-11 bg-white"
+                    />
+                    <Textarea
+                      name="reason"
+                      required
+                      minLength={12}
+                      placeholder="Mandatory account-link correction reason"
+                      className="bg-white"
+                    />
                     <Input
                       name="reauthPassword"
                       type="password"
+                      required
                       autoComplete="current-password"
+                      placeholder="Confirm your current password"
                       className="h-11 bg-white"
                     />
-                    <span className="font-normal text-muted-foreground">
-                      Required only when changing the primary email or award
-                      category. A linked applicant will be signed out and must
-                      verify the new address.
-                    </span>
-                  </label>
-                ) : null}
-                <div className="flex justify-end md:col-span-2">
-                  <Button>Save audited correction</Button>
-                </div>
-              </ApplicationCorrectionForm>
-            </details>
-          ) : null}
+                    <Button variant="outline">Save audited account link</Button>
+                  </form>
+                </details>
+              ) : null}
+            </div>
+          </details>
           <section className="surface rounded-lg p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="section-title">Documents</h2>
@@ -549,9 +459,7 @@ export default async function AdminApplicationDetail({
                         <Button
                           size="sm"
                           variant="outline"
-                          render={
-                            <a href={`/api/files/${file.id}/download`} />
-                          }
+                          render={<a href={`/api/files/${file.id}/download`} />}
                         >
                           Download
                         </Button>
@@ -872,11 +780,17 @@ export default async function AdminApplicationDetail({
               </div>
             </details>
           ) : null}
-          <section className="glass-feature rounded-lg p-5">
-            <h2 className="text-lg font-semibold">Review actions</h2>
+          <details
+            className="surface group rounded-xl"
+            open={application.workflowStatus === "changes_requested"}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              <span>Update review status</span>
+              <StatusBadge status={application.workflowStatus} />
+            </summary>
             <form
               action={changeStatusAction}
-              className="mt-4 flex flex-col gap-3"
+              className="flex flex-col gap-3 border-t px-5 pb-5 pt-4"
             >
               <input type="hidden" name="applicationId" value={applicationId} />
               <select
@@ -897,16 +811,16 @@ export default async function AdminApplicationDetail({
               <Textarea
                 name="applicantMessage"
                 aria-label="Applicant-facing status message"
-                placeholder="Applicant-facing message when needed"
+                placeholder="Message to applicant (only when needed)"
               />
               <Textarea
                 name="reason"
                 aria-label="Internal status change reason"
                 placeholder="Internal reason (required for rejection/backward actions)"
               />
-              <Button>Confirm status change</Button>
+              <Button>Save review status</Button>
             </form>
-          </section>
+          </details>
           {(visibleAllowed as readonly string[]).includes(
             "changes_requested",
           ) ? (
@@ -1001,7 +915,8 @@ export default async function AdminApplicationDetail({
                     role="alert"
                   >
                     This verified record is incomplete. Record the missing
-                    details before saving it again: {verificationGaps.join(", ")}.
+                    details before saving it again:{" "}
+                    {verificationGaps.join(", ")}.
                   </p>
                 ) : null}
                 {payment ? (
