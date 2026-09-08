@@ -187,6 +187,7 @@ export function NominationForm({
   const [turnstileReset, setTurnstileReset] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const submissionCompleteRef = useRef(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const form = useForm<PublicApplicationInput>({
@@ -247,7 +248,7 @@ export function NominationForm({
   useEffect(() => {
     if (!busy) return;
     const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
+      if (!submissionCompleteRef.current) event.preventDefault();
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
@@ -297,6 +298,7 @@ export function NominationForm({
   }
 
   async function runSubmission(values: PublicApplicationInput) {
+    submissionCompleteRef.current = false;
     if (paymentMethod === "bank_transfer" && payment.length !== 1) {
       setFileError("Choose one payment slip or screenshot.");
       errorSummaryRef.current?.focus();
@@ -393,6 +395,9 @@ export function NominationForm({
       };
       if (!result.ok || !result.data?.reference)
         throw new Error(result.message ?? "Final confirmation failed.");
+      // The nomination is durable. Allow the intentional payment redirect
+      // immediately, before React removes the upload-protection listener.
+      submissionCompleteRef.current = true;
       if (result.data.paymentUrl) {
         window.location.assign(result.data.paymentUrl);
         return;

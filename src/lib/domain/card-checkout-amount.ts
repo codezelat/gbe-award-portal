@@ -1,5 +1,6 @@
-// Owner-approved live test. Set to null after the owner requests normal pricing.
-export const CARD_TEST_AMOUNT_MINOR: number | null = 1000;
+// Normal pricing restored after the owner confirmed the live payment test.
+// Keep historical attempt and receipt amounts unchanged.
+export const CARD_TEST_AMOUNT_MINOR: number | null = null;
 
 export function cardCheckoutAmount(feeMinor: number, currency: string) {
   return currency === "LKR" ? (CARD_TEST_AMOUNT_MINOR ?? feeMinor) : feeMinor;

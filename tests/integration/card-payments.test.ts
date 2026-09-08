@@ -191,12 +191,12 @@ async function attempt(paymentId: string) {
   ).at(-1)!;
 }
 describe("durable Genie reconciliation", () => {
-  it("uses the temporary card amount without changing the bank fee snapshot", async () => {
+  it("uses the saved nomination fee for both payment methods", async () => {
     const { app, payment } = await fixture();
     await startCardCheckout(app.id);
     const row = await attempt(payment.id);
-    expect(row.amountMinor).toBe(1000);
-    expect(remote.get(row.transactionId!)!.amount).toBe(1000);
+    expect(row.amountMinor).toBe(6500000);
+    expect(remote.get(row.transactionId!)!.amount).toBe(6500000);
     remote.get(row.transactionId!)!.state = "CANCELLED";
     await reconcileCardAttempt(row.id);
     const response = await paymentAction(
@@ -208,7 +208,7 @@ describe("durable Genie reconciliation", () => {
     );
     const { data } = await response.json();
     expect(data.amountMinor).toBe(6500000);
-    expect(data.cardAmountMinor).toBe(1000);
+    expect(data.cardAmountMinor).toBe(6500000);
     expect(
       (
         await db
@@ -218,19 +218,19 @@ describe("durable Genie reconciliation", () => {
       )[0].expectedAmountMinor,
     ).toBe(6500000);
   });
-  it("resumes an existing full-price checkout without repricing or creating another", async () => {
+  it("resumes an existing test checkout without repricing or creating another", async () => {
     const { app, payment } = await fixture();
     await startCardCheckout(app.id);
     const row = await attempt(payment.id);
-    // Represents an active transaction created before the temporary setting.
+    // Represents a transaction created during the completed live test period.
     await db
       .update(schema.paymentAttempts)
-      .set({ amountMinor: 6500000 })
+      .set({ amountMinor: 1000 })
       .where(eq(schema.paymentAttempts.id, row.id));
-    remote.get(row.transactionId!)!.amount = 6500000;
+    remote.get(row.transactionId!)!.amount = 1000;
     await startCardCheckout(app.id);
     expect(createCount).toBe(1);
-    expect((await attempt(payment.id)).amountMinor).toBe(6500000);
+    expect((await attempt(payment.id)).amountMinor).toBe(1000);
     const response = await paymentAction(
       new Request("https://example.test", {
         method: "POST",
@@ -239,8 +239,8 @@ describe("durable Genie reconciliation", () => {
       { params: Promise.resolve({ applicationId: app.id }) },
     );
     const { data } = await response.json();
-    expect(data.amountMinor).toBe(6500000);
-    expect(data.cardAmountMinor).toBe(6500000);
+    expect(data.amountMinor).toBe(1000);
+    expect(data.cardAmountMinor).toBe(1000);
   });
   it("accepts one validated bank slip, rejects oversize and foreign uploads, and makes completion idempotent", async () => {
     const { app, payment } = await fixture();
@@ -405,7 +405,7 @@ describe("durable Genie reconciliation", () => {
       .from(schema.payments)
       .where(eq(schema.payments.id, payment.id));
     expect(paid.status).toBe("verified");
-    expect(paid.amountMinor).toBe(1000);
+    expect(paid.amountMinor).toBe(6500000);
     expect(paid.expectedAmountMinor).toBe(6500000);
     expect(paid.proofApplicationFileId).toBeNull();
     expect(paid.receiptReference).toBeTruthy();
