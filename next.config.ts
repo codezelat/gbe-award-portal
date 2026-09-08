@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins:
+    process.env.NODE_ENV === "development" && process.env.GENIE_LOCAL_PUBLIC_URL
+      ? [new URL(process.env.GENIE_LOCAL_PUBLIC_URL).hostname]
+      : undefined,
   poweredByHeader: false,
   outputFileTracingIncludes: {
     "/api/portal/applications/*/summary": [
@@ -66,6 +70,13 @@ const nextConfig: NextConfig = {
         source: "/apply/submitted",
         headers: [
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
+        source: "/apply/payment/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          { key: "Cache-Control", value: "private, no-store" },
         ],
       },
     ];

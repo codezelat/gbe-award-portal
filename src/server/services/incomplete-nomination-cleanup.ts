@@ -17,6 +17,7 @@ import {
   emailOutbox,
   invitations,
   payments,
+  paymentAttempts,
   uploadSessions,
 } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
@@ -57,6 +58,15 @@ export async function purgeIncompleteNominationShell(
       .limit(1);
     if (!record)
       throw new Error("The incomplete nomination is no longer available.");
+    const [attempt] = await tx
+      .select({ id: paymentAttempts.id })
+      .from(paymentAttempts)
+      .where(eq(paymentAttempts.paymentId, record.payment.id))
+      .limit(1);
+    if (attempt)
+      throw new Error(
+        "This nomination has a gateway payment attempt and must be retained for reconciliation.",
+      );
     if (
       !canPurgeIncompletePaymentShell({
         workflowStatus: record.application.workflowStatus,
@@ -155,7 +165,9 @@ export async function purgeIncompleteNominationShell(
       )
       .returning({ id: applications.id });
     if (!removed.length)
-      throw new Error("The incomplete nomination changed. Refresh and try again.");
+      throw new Error(
+        "The incomplete nomination changed. Refresh and try again.",
+      );
 
     await tx.insert(auditLogs).values({
       actorProfileId: actor.profileId,

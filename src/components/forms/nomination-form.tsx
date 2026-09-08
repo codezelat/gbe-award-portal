@@ -110,7 +110,7 @@ type SubmissionStage =
 const FORM_STEPS = [
   { title: "Nominee", description: "Who you are nominating" },
   { title: "Contact", description: "Contact, category and documents" },
-  { title: "Payment", description: "Payment and proof" },
+  { title: "Payment", description: "Choose your payment method" },
   { title: "Confirm", description: "Review and submit" },
 ] as const;
 
@@ -160,15 +160,20 @@ export function NominationForm({
   feeMinor,
   currency,
   paymentInstructions,
+  cardEnabled = false,
 }: {
   categories: Category[];
   unavailable?: boolean;
   feeMinor?: number;
   currency?: string;
   paymentInstructions?: PaymentInstructions;
+  cardEnabled?: boolean;
 }) {
   const [supporting, setSupporting] = useState<SelectedUpload[]>([]);
   const [payment, setPayment] = useState<SelectedUpload[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<"bank_transfer" | "card">(
+    "bank_transfer",
+  );
   const [fileError, setFileError] = useState<string>();
   const [stage, setStage] = useState<SubmissionStage>("idle");
   const [reference, setReference] = useState("");
@@ -203,8 +208,11 @@ export function NominationForm({
   });
 
   const allFiles = useMemo(
-    () => [...supporting, ...payment],
-    [supporting, payment],
+    () => [
+      ...supporting,
+      ...(paymentMethod === "bank_transfer" ? payment : []),
+    ],
+    [supporting, payment, paymentMethod],
   );
   const overallProgress = allFiles.length
     ? Math.round(
@@ -280,7 +288,7 @@ export function NominationForm({
   }
 
   async function runSubmission(values: PublicApplicationInput) {
-    if (payment.length !== 1) {
+    if (paymentMethod === "bank_transfer" && payment.length !== 1) {
       setFileError("Choose one payment slip or screenshot.");
       errorSummaryRef.current?.focus();
       return;
@@ -296,6 +304,7 @@ export function NominationForm({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             ...values,
+            paymentMethod,
             files: allFiles.map(({ id, file, kind }) => ({
               id,
               name: file.name,
@@ -371,10 +380,14 @@ export function NominationForm({
       const result = (await complete.json()) as {
         ok: boolean;
         message?: string;
-        data?: { reference: string };
+        data?: { reference: string; paymentUrl?: string };
       };
       if (!result.ok || !result.data?.reference)
         throw new Error(result.message ?? "Final confirmation failed.");
+      if (result.data.paymentUrl) {
+        window.location.assign(result.data.paymentUrl);
+        return;
+      }
       setReference(result.data.reference);
       setStage("success");
       form.reset();
@@ -409,7 +422,7 @@ export function NominationForm({
       return;
     }
     setFileError(
-      payment.length === 1
+      paymentMethod === "card" || payment.length === 1
         ? undefined
         : "Choose one payment slip or screenshot.",
     );
@@ -427,7 +440,11 @@ export function NominationForm({
       shouldFocus: true,
     });
     if (!valid) return;
-    if (currentStep === 2 && payment.length !== 1) {
+    if (
+      currentStep === 2 &&
+      paymentMethod === "bank_transfer" &&
+      payment.length !== 1
+    ) {
       setFileError("Choose one payment slip or screenshot.");
       errorSummaryRef.current?.focus();
       return;
@@ -683,31 +700,71 @@ export function NominationForm({
                   : ""}
               </p>
               <div className="mt-4 border-t border-champagne/40 pt-4">
-                <PaymentMethodDialog
-                  paymentInstructions={paymentInstructions}
-                />
+                <fieldset className="mb-4 grid gap-3 sm:grid-cols-2">
+                  <legend className="sr-only">Payment method</legend>
+                  {[
+                    ...(cardEnabled ? ["card" as const] : []),
+                    "bank_transfer" as const,
+                  ].map((method) => (
+                    <label
+                      key={method}
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white p-4 ${paymentMethod === method ? "border-antique-gold" : "border-mist"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={paymentMethod === method}
+                        disabled={busy}
+                        onChange={() => {
+                          if (session) beginFreshUploadSession();
+                          setPaymentMethod(method);
+                          setFileError(undefined);
+                        }}
+                      />
+                      {method === "card" ? (
+                        <CreditCard aria-hidden className="size-4" />
+                      ) : (
+                        <Landmark aria-hidden className="size-4" />
+                      )}
+                      <span>
+                        {method === "card" ? "Pay by card" : "Bank transfer"}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+                {paymentMethod === "card" ? (
+                  <p className="text-sm">
+                    Secure checkout follows submission. No payment slip needed.
+                  </p>
+                ) : (
+                  <PaymentMethodDialog
+                    paymentInstructions={paymentInstructions}
+                  />
+                )}
               </div>
             </div>
-            <Field data-invalid={Boolean(fileError)}>
-              <FieldLabel>
-                Payment proof{" "}
-                <span aria-hidden className="text-destructive">
-                  *
-                </span>
-              </FieldLabel>
-              <FieldDescription>
-                After paying by card or bank transfer, add one payment slip,
-                receipt or screenshot. Maximum 5 MB.
-              </FieldDescription>
-              <FilePicker
-                kind="payment_proof"
-                files={payment}
-                onChange={(files) => changeFiles("payment_proof", files)}
-                error={fileError}
-                disabled={busy}
-                onRetry={retry}
-              />
-            </Field>
+            {paymentMethod === "bank_transfer" ? (
+              <Field data-invalid={Boolean(fileError)}>
+                <FieldLabel>
+                  Payment proof{" "}
+                  <span aria-hidden className="text-destructive">
+                    *
+                  </span>
+                </FieldLabel>
+                <FieldDescription>
+                  After paying by bank transfer, add one payment slip, receipt
+                  or screenshot. Maximum 5 MB.
+                </FieldDescription>
+                <FilePicker
+                  kind="payment_proof"
+                  files={payment}
+                  onChange={(files) => changeFiles("payment_proof", files)}
+                  error={fileError}
+                  disabled={busy}
+                  onRetry={retry}
+                />
+              </Field>
+            ) : null}
           </FieldGroup>
         </FormSection>
       ) : null}
@@ -836,7 +893,9 @@ export function NominationForm({
                 ? "Retry failed files"
                 : stage === "completion_failed"
                   ? "Retry final confirmation"
-                  : "Submit nomination"}
+                  : paymentMethod === "card"
+                    ? "Continue to payment"
+                    : "Submit nomination"}
               <ArrowRight data-icon="inline-end" />
             </Button>
             {stage === "uploading" ? (
@@ -902,9 +961,8 @@ function PaymentMethodDialog({
 }: {
   paymentInstructions?: PaymentInstructions;
 }) {
-  const cardPaymentUrl = paymentInstructions?.cardPaymentUrl;
   const bankTransfer = paymentInstructions?.bankTransfer;
-  if (!cardPaymentUrl && !bankTransfer)
+  if (!bankTransfer)
     return (
       <p className="text-sm text-muted-foreground">
         Payment instructions will be provided by the GBE Awards team.
@@ -915,50 +973,17 @@ function PaymentMethodDialog({
       <DialogTrigger
         render={<Button type="button" variant="outline" size="sm" />}
       >
-        Choose payment method
+        View bank details
       </DialogTrigger>
       <DialogContent className="gap-5 p-5 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Choose payment method</DialogTitle>
+          <DialogTitle>Bank transfer</DialogTitle>
           <DialogDescription>
-            Pay securely by card or use the bank-transfer details below. When
-            payment is complete, return here and upload one receipt, slip or
-            screenshot.
+            Use the bank-transfer details below. When payment is complete,
+            return here and upload one receipt, slip or screenshot.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
-          {cardPaymentUrl ? (
-            <div className="rounded-md border border-mist bg-white p-4">
-              <div className="flex gap-3">
-                <CreditCard
-                  className="mt-0.5 size-5 shrink-0 text-antique-gold"
-                  aria-hidden
-                />
-                <div className="min-w-0">
-                  <p className="font-medium text-foreground">Card payment</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Opens the secure payment page in a new tab.
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="mt-3"
-                    nativeButton={false}
-                    render={
-                      <a
-                        href={cardPaymentUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      />
-                    }
-                  >
-                    Pay securely by card
-                    <ArrowRight data-icon="inline-end" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
           {bankTransfer ? (
             <div className="rounded-md border border-mist bg-white p-4">
               <div className="flex gap-3">
@@ -1019,7 +1044,9 @@ function PaymentDetail({
       <dt className="text-muted-foreground">{label}</dt>
       <dd
         className={
-          mono ? "font-mono font-medium text-foreground" : "font-medium text-foreground"
+          mono
+            ? "font-mono font-medium text-foreground"
+            : "font-medium text-foreground"
         }
       >
         {children}

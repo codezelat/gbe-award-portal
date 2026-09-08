@@ -1,4 +1,5 @@
 export type PaymentVerificationRecord = {
+  gatewayTransactionId?: string | null;
   applicationReference: string | null;
   applicationSubmittedAt: Date | null;
   paymentReference: string | null;
@@ -17,7 +18,8 @@ export function missingPaymentVerificationFields(
   if (!record.applicationReference || !record.applicationSubmittedAt)
     missing.push("completed nomination");
   if (!record.paymentReference) missing.push("payment reference");
-  if (!record.proofApplicationFileId) missing.push("payment proof");
+  if (!record.proofApplicationFileId && !record.gatewayTransactionId)
+    missing.push("payment proof");
   if (record.amountMinor === null || record.amountMinor <= 0)
     missing.push("paid amount");
   if (!record.currency) missing.push("currency");
@@ -42,6 +44,7 @@ export function canPurgeIncompletePaymentShell(
     !record.applicationReference &&
     !record.applicationSubmittedAt &&
     !record.paymentReference &&
+    !record.gatewayTransactionId &&
     !record.proofApplicationFileId &&
     !record.payerName &&
     !record.bankReference &&

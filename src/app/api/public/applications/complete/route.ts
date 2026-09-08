@@ -28,6 +28,7 @@ import { enforceRateLimit } from "@/server/security/rate-limit";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import { z } from "zod";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
+import { setPaymentSession } from "@/server/security/payment-session";
 
 export const runtime = "nodejs";
 const inputSchema = z.object({
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
         session: uploadSessions,
         application: applications,
         cycle: awardCycles,
+        payment: payments,
       })
       .from(uploadSessions)
       .innerJoin(
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
         eq(uploadSessions.applicationId, applications.id),
       )
       .innerJoin(awardCycles, eq(applications.cycleId, awardCycles.id))
+      .innerJoin(payments, eq(payments.applicationId, applications.id))
       .where(
         and(
           eq(uploadSessions.applicationId, applicationId),
@@ -78,11 +81,20 @@ export async function POST(request: Request) {
     const row = rows[0];
     if (!row || row.session.publicTokenHash !== hash(token))
       throw new Error("The upload session is invalid or expired.");
-    if (row.session.status === "completed" && row.application.reference)
+    if (row.session.status === "completed" && row.application.reference) {
+      if (row.payment.method === "card" && row.session.expiresAt > new Date())
+        await setPaymentSession(applicationId, token);
       return NextResponse.json({
         ok: true,
-        data: { reference: row.application.reference },
+        data: {
+          reference: row.application.reference,
+          paymentUrl:
+            row.payment.method === "card"
+              ? `/apply/payment/${applicationId}`
+              : undefined,
+        },
       });
+    }
     if (row.session.expiresAt < new Date())
       throw new Error(
         "The upload session expired. Your entered details remain on this page; please submit again.",
@@ -294,6 +306,9 @@ export async function POST(request: Request) {
         .set({
           status: "completed",
           completedAt: submittedAt,
+          ...(row.payment.method === "card"
+            ? { expiresAt: new Date(Date.now() + 7 * 86400_000) }
+            : {}),
           updatedAt: submittedAt,
         })
         .where(eq(uploadSessions.id, row.session.id));
@@ -335,7 +350,18 @@ export async function POST(request: Request) {
       });
       return reference;
     });
-    return NextResponse.json({ ok: true, data: { reference } });
+    if (row.payment.method === "card")
+      await setPaymentSession(applicationId, token);
+    return NextResponse.json({
+      ok: true,
+      data: {
+        reference,
+        paymentUrl:
+          row.payment.method === "card"
+            ? `/apply/payment/${applicationId}`
+            : undefined,
+      },
+    });
   } catch (error) {
     console.error(
       JSON.stringify({

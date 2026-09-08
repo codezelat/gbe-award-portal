@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 const map: Record<string, { label: string; className: string }> = {
+  awaiting_payment: { label: "Awaiting payment", className: "status-action" },
   submitted: { label: "Nomination received", className: "status-info" },
   under_review: { label: "Under review", className: "status-review" },
   changes_requested: { label: "Action required", className: "status-action" },

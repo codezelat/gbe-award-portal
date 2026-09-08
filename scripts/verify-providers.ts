@@ -9,11 +9,40 @@ import { sql } from "drizzle-orm";
 import { Resend } from "resend";
 import { env, publicEnv, requireProvider } from "../src/lib/env";
 import { getDb } from "../src/lib/db";
-import { getR2 } from "../src/lib/r2/client";
+import { getR2, r2ObjectKey } from "../src/lib/r2/client";
 
 for (const provider of ["database", "r2", "auth", "email"] as const)
   requireProvider(provider);
 await getDb().execute(sql`select 1 as ok`);
+if (env.GENIE_ENABLED === "true") {
+  const result = await getDb().execute(sql`select
+    has_table_privilege(current_user, 'public.payment_attempts', 'SELECT')
+    and has_table_privilege(current_user, 'public.payment_attempts', 'INSERT')
+    and has_table_privilege(current_user, 'public.payment_attempts', 'UPDATE') as "canUse"`);
+  if (result.rows[0]?.canUse !== true)
+    throw new Error(
+      "Apply migration 0010 and grant the runtime role SELECT, INSERT and UPDATE on payment_attempts before enabling Genie.",
+    );
+  const host =
+    env.GENIE_ENVIRONMENT === "sandbox"
+      ? "https://api.uat.geniebiz.lk"
+      : "https://api.geniebiz.lk";
+  const response = await fetch(
+    `${host}/public/transactions/000000000000000000000000`,
+    {
+      headers: { Authorization: env.GENIE_API_KEY ?? "" },
+      signal: AbortSignal.timeout(15000),
+      redirect: "error",
+    },
+  );
+  if (response.status !== 404)
+    throw new Error(
+      "Genie authentication check failed. Confirm the API key and environment.",
+    );
+  console.log(
+    "Genie API authentication and runtime table permissions verified (no transaction created).",
+  );
+}
 const rateLimitTable = await getDb().execute(sql<{
   tableName: string | null;
   canUse: boolean;
@@ -37,7 +66,9 @@ const r2 = getR2();
 await r2.send(
   new ListObjectsV2Command({ Bucket: env.R2_PRIVATE_BUCKET, MaxKeys: 1 }),
 );
-const verificationKey = `provider-verification/${crypto.randomUUID()}.txt`;
+const verificationKey = r2ObjectKey(
+  `provider-verification/${crypto.randomUUID()}.txt`,
+);
 await r2.send(
   new PutObjectCommand({
     Bucket: env.R2_PRIVATE_BUCKET,
@@ -57,7 +88,7 @@ const presignedUpload = await getSignedUrl(
   r2,
   new PutObjectCommand({
     Bucket: env.R2_PRIVATE_BUCKET,
-    Key: `provider-verification/${crypto.randomUUID()}.txt`,
+    Key: r2ObjectKey(`provider-verification/${crypto.randomUUID()}.txt`),
     ContentType: "text/plain",
   }),
   { expiresIn: 60 },

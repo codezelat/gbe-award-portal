@@ -61,7 +61,7 @@ The public form is deliberately short and guided:
 
 1. **Nominee** — company name or full name.
 2. **Contact** — contact details, award category, mandatory nomination statement and optional supporting documents.
-3. **Payment** — card or bank-transfer instructions and one payment-proof file.
+3. **Payment**: secure Genie card checkout (when enabled), or bank transfer with one payment-proof file. Card payments never require a slip.
 4. **Confirm** — declaration review, Turnstile verification and submission.
 
 Supporting documents and payment proof are independently limited to **5 MB per file**. The browser gives upload progress, cancellation and retry feedback; the server repeats validation before accepting a completion request.
@@ -174,6 +174,7 @@ Copy [.env.example](.env.example); it is the complete, non-secret contract. Keep
 | R2             | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_PRIVATE_BUCKET`, `R2_PUBLIC_BUCKET`, `R2_OBJECT_PREFIX`, `R2_PUBLIC_ASSET_BASE_URL` | Keep uploads/exports in the private bucket. Use `R2_OBJECT_PREFIX` to isolate preview, test and production objects.             |
 | Turnstile      | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME`, `TURNSTILE_APPLICATION_ACTION`                                             | Use Cloudflare’s test keys only outside production. The portal verifies `gbe_nomination_submit` for nominations and `gbe_login` after two failed sign-ins. |
 | Resend         | `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `EMAIL_FROM`, `EMAIL_REPLY_TO`                                                                                           | `EMAIL_FROM` must use a verified Resend domain. Configure the signed Resend webhook at `/api/webhooks/resend`.                  |
+| Genie Business | `GENIE_ENABLED`, `GENIE_ENVIRONMENT`, `GENIE_API_KEY`, `GENIE_APP_ID`, `GENIE_WEBHOOK_BASE_URL` | Disabled by default. Use `sandbox` with UAT credentials, and `production` with the live app credentials. The optional webhook origin defaults to the public app URL. All credentials stay server-side. |
 | Operations     | `CRON_SECRET`                                                                                                                                                       | Required and at least 24 characters. Authorizes maintenance routes; Vercel invokes only `/api/cron/daily` on the scheduled job. |
 | First admin    | `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`                                                                                         | Temporary only. Remove immediately after the initial account has been created and secured.                                      |
 | Seed           | `SEED_CYCLE_OPENS_AT`, `SEED_CYCLE_CLOSES_AT`                                                                                                                       | Required only by `bun run db:seed`; use approved ISO 8601 timestamps.                                                           |
@@ -186,6 +187,26 @@ bun run providers:verify
 ```
 
 `env:verify` rejects unsafe configuration such as matching runtime/owner database URLs, production Turnstile test keys or leftover bootstrap credentials. `providers:verify` proves database access, runtime rate-limit permissions, private R2 read/write/delete plus browser CORS, Resend sender status and Turnstile hostname policy.
+
+## 💳 Genie Business card payments
+
+Card checkout uses Genie Business hosted payment pages, not an embedded card form. The portal never receives card numbers or CVVs. New nominations snapshot the cycle fee; existing payment amounts and evidence are unchanged. A saved card nomination gets a secure, HTTP-only payment session for seven days, without creating an account. Invited applicants can also resume their own eligible payment from `/portal/payment`.
+
+- Only an authenticated Genie transaction lookup with matching transaction ID, local reference, App ID, currency and amount can verify payment. Browser redirects and webhook payloads cannot mark a payment as paid.
+- `/api/webhooks/genie` verifies Genie's SHA-256 signature headers and then fetches the authoritative transaction. `CONFIRMED` settles the payment once and allocates one receipt. `AUTHORIZED` is not a completed payment.
+- One active checkout is allowed per payment. Repeated clicks resume it. An uncertain timeout keeps the attempt pending rather than risking a second charge. Staff can use **Check Genie status** in the nomination's payment section and recover a missing transaction ID using the attempt reference shown there.
+- Applicants can switch methods while no checkout is active. After starting checkout, wait for provider-confirmed cancellation or expiry (the checkout window is 15 minutes), then check status before selecting bank transfer. This prevents a second payment while a card payment may still succeed. Bank proof enters the normal staff-review workflow; it is not automatically verified.
+- Return-page status checks are bounded (eight automatic checks, then a manual button). The existing daily job checks at most five older active attempts. No extra cron or Redis service is required.
+- Full `REFUNDED`/`VOIDED` states on the settled transaction are recorded when reconciled. Refunds are initiated in Genie, not this portal. Partial refunds represented as separate Genie child transactions require staff reconciliation in Genie.
+
+Before enabling this on Vercel:
+
+1. Take a Neon restore point or branch, then run the reviewed additive migration with `bun run db:migrate` using `DATABASE_URL_DIRECT` locally. Include migration `0010_known_paladin.sql`, its generated snapshot and journal entry in the release. Do not seed or backfill existing nominations.
+2. Confirm the runtime database role has `SELECT`, `INSERT` and `UPDATE` on `public.payment_attempts`. Existing permissions on applications, payments, receipt sequences and audit records remain necessary. `bun run providers:verify` checks the new table when Genie is enabled.
+3. In the production Vercel environment set `GENIE_ENABLED=true`, `GENIE_ENVIRONMENT=production`, `GENIE_APP_ID` and `GENIE_API_KEY` from the **GBE Awards Portal** app in the Genie dashboard. Never put these keys in `NEXT_PUBLIC_*`. Keep `NEXT_PUBLIC_APP_URL` and `BETTER_AUTH_URL` at `https://access.gbeaward.com`. Leave `GENIE_WEBHOOK_BASE_URL` unset unless using a separate public callback origin.
+4. Deploy only after migration and configuration. The create-transaction request supplies `https://access.gbeaward.com/api/webhooks/genie` for each checkout; no additional scheduler is needed. Verify a controlled production transaction and its receipt after the owner approves going live.
+
+For isolated local UAT, PostgreSQL must be running on `127.0.0.1:5432` with local-user access. Run `bun scripts/dev-genie.mjs /path/to/the-provided-test-api-keys.txt`. This helper migrates only `gbe_award_portal_test_genie`, uses the `e2e/genie` storage prefix, disables email and starts port 3101. It does not modify `.env`. Set `GENIE_LOCAL_PUBLIC_URL` to your temporary HTTPS tunnel origin before starting the helper to test Genie return URLs and callbacks. The exact tunnel hostname is allowed only in Next.js development. R2 CORS must allow that origin to exercise bank uploads through the tunnel; do not broaden production CORS to a wildcard. Never use live cards or production keys in this helper.
 
 ## 🧪 Quality checks
 

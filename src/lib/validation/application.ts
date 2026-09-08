@@ -106,36 +106,55 @@ export const fileManifestItemSchema = z.object({
   type: z.string(),
   kind: z.enum(["supporting_document", "payment_proof"]),
 });
-export const initiateApplicationSchema = publicApplicationSchema.extend({
-  files: z
-    .array(fileManifestItemSchema)
-    .max(6)
-    .superRefine((files, ctx) => {
-      const support = files.filter((f) => f.kind === "supporting_document");
-      const payments = files.filter((f) => f.kind === "payment_proof");
-      if (support.length > 5)
-        ctx.addIssue({
-          code: "custom",
-          message: "Choose no more than five supporting files.",
-        });
-      if (payments.length !== 1)
-        ctx.addIssue({
-          code: "custom",
-          message: "Choose exactly one payment proof.",
-        });
-      for (const file of files) {
-        const allowed =
-          file.kind === "payment_proof" ? paymentTypes : supportTypes;
-        if (
-          !(allowed as readonly string[]).includes(file.type) ||
-          !isExtensionAllowed(file.name, file.type)
-        )
+export const initiateApplicationSchema = publicApplicationSchema
+  .extend({
+    paymentMethod: z.enum(["bank_transfer", "card"]).default("bank_transfer"),
+    files: z
+      .array(fileManifestItemSchema)
+      .max(6)
+      .superRefine((files, ctx) => {
+        const support = files.filter((f) => f.kind === "supporting_document");
+        const payments = files.filter((f) => f.kind === "payment_proof");
+        if (support.length > 5)
           ctx.addIssue({
             code: "custom",
-            message: `${file.name} is not an accepted file type.`,
+            message: "Choose no more than five supporting files.",
           });
-      }
-    }),
-});
+        if (payments.length > 1)
+          ctx.addIssue({
+            code: "custom",
+            message: "Choose exactly one payment proof.",
+          });
+        for (const file of files) {
+          const allowed =
+            file.kind === "payment_proof" ? paymentTypes : supportTypes;
+          if (
+            !(allowed as readonly string[]).includes(file.type) ||
+            !isExtensionAllowed(file.name, file.type)
+          )
+            ctx.addIssue({
+              code: "custom",
+              message: `${file.name} is not an accepted file type.`,
+            });
+        }
+      }),
+  })
+  .superRefine((input, ctx) => {
+    const count = input.files.filter(
+      (file) => file.kind === "payment_proof",
+    ).length;
+    if (input.paymentMethod === "bank_transfer" && count !== 1)
+      ctx.addIssue({
+        code: "custom",
+        path: ["files"],
+        message: "Choose exactly one payment proof.",
+      });
+    if (input.paymentMethod === "card" && count !== 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["files"],
+        message: "Card payments do not require a payment proof.",
+      });
+  });
 
 export type PublicApplicationInput = z.input<typeof publicApplicationSchema>;

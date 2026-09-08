@@ -7,6 +7,7 @@ import {
 } from "@/server/jobs/cleanup";
 import { processEmailOutbox } from "@/server/jobs/email-outbox";
 import { runTrackedJob } from "@/server/jobs/tracked-job";
+import { reconcilePendingCardPayments } from "@/server/services/card-payments";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Unauthorised" }, { status: 401 });
 
   const jobs: Array<[string, () => Promise<Record<string, unknown>>]> = [
+    ["card-payments", reconcilePendingCardPayments],
     ["cleanup-uploads", cleanupStaleUploads],
     ["cleanup-exports", cleanupExpiredExports],
     ["cleanup-retention", cleanupRetention],

@@ -93,6 +93,8 @@ bun run db:bootstrap-admin
 - Staff MFA is mandatory. Keep the existing QR/manual TOTP enrolment and challenge flows compatible with standard authenticator apps.
 - Email is a durable outbox. Queue mail through the established flow; do not send ad-hoc messages directly from a page/action when delivery tracking and retry are required.
 - Verify Resend webhook signatures before changing state.
+- Genie card payments use the server-only client and `card-payments` service. Never trust a return URL or webhook state as proof of payment: verify the signature and fetch the transaction, matching App ID, local reference, amount and currency. Only `CONFIRMED` settles payment. Preserve the one-active-attempt lock, idempotent receipt allocation and ambiguous-timeout protection.
+- Migration 0010 is additive; never backfill old payment amounts or methods. Enable Genie only after the migration and runtime permissions are verified. Keep card data on Genie's hosted page. UAT uses the isolated `scripts/dev-genie.mjs` helper, test credentials and `e2e/genie` storage prefix, never production nominations.
 - Vercel Hobby uses exactly one scheduled entry: `/api/cron/daily` in `vercel.json`. Add work to the daily dispatcher or event-driven processing; do not add duplicate cron schedules. The daily upload cleanup may remove only expired, empty nomination shells; it must retain audit history and never delete a submitted nomination.
 
 ## 5. Security and environment rules

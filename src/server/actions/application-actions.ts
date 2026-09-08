@@ -243,6 +243,10 @@ export async function updatePaymentAction(formData: FormData) {
     .where(eq(payments.applicationId, input.applicationId))
     .limit(1);
   if (!before) throw new Error("Payment record not found.");
+  if (before.method === "card" || before.gatewayTransactionId)
+    throw new Error(
+      "Card payments are verified by Genie. Check the provider transaction rather than changing its payment evidence manually.",
+    );
   const statusChanged = before.status !== input.status;
   if (
     ["rejected", "waived", "refunded"].includes(input.status) &&

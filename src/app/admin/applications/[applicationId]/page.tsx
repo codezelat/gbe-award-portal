@@ -23,6 +23,7 @@ import {
   awardCycles,
   files,
   payments,
+  paymentAttempts,
   profiles,
 } from "@/lib/db/schema";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -49,6 +50,7 @@ import {
   type WorkflowStatus,
 } from "@/lib/domain/application-status";
 import { missingPaymentVerificationFields } from "@/lib/domain/payment-verification";
+import { CardPaymentCheck } from "@/components/admin/card-payment-check";
 export default async function AdminApplicationDetail({
   params,
 }: {
@@ -81,6 +83,7 @@ export default async function AdminApplicationDetail({
     audits,
     reviewers,
     cycle,
+    latestAttempt,
   ] = await Promise.all([
     db
       .select()
@@ -150,6 +153,18 @@ export default async function AdminApplicationDetail({
       .where(eq(awardCycles.id, application.cycleId))
       .limit(1)
       .then((rows) => rows[0]),
+    db
+      .select({
+        id: paymentAttempts.id,
+        transactionId: paymentAttempts.transactionId,
+        state: paymentAttempts.state,
+      })
+      .from(paymentAttempts)
+      .innerJoin(payments, eq(payments.id, paymentAttempts.paymentId))
+      .where(eq(payments.applicationId, applicationId))
+      .orderBy(desc(paymentAttempts.createdAt))
+      .limit(1)
+      .then((rows) => rows[0]),
   ]);
   const original = (versions.find((item) => item.version === 1)?.payload ??
     {}) as Record<string, unknown>;
@@ -191,6 +206,7 @@ export default async function AdminApplicationDetail({
   const verificationGaps =
     payment?.status === "verified"
       ? missingPaymentVerificationFields({
+          gatewayTransactionId: payment.gatewayTransactionId,
           applicationReference: application.reference,
           applicationSubmittedAt: application.submittedAt,
           paymentReference: payment.paymentReference,
@@ -919,7 +935,28 @@ export default async function AdminApplicationDetail({
                     {verificationGaps.join(", ")}.
                   </p>
                 ) : null}
-                {payment ? (
+                {payment?.method === "card" ? (
+                  <div className="mt-4">
+                    <p className="text-sm">
+                      {payment.status === "verified"
+                        ? "Card payment verified by Genie."
+                        : payment.status === "refunded"
+                          ? "Card payment reversed by Genie."
+                          : "Card payment has not been completed."}
+                    </p>
+                    {latestAttempt &&
+                      (latestAttempt.transactionId ||
+                        ["CREATING", "UNKNOWN"].includes(
+                          latestAttempt.state,
+                        )) && (
+                        <CardPaymentCheck
+                          applicationId={applicationId}
+                          attemptId={latestAttempt.id}
+                          needsTransactionId={!latestAttempt.transactionId}
+                        />
+                      )}
+                  </div>
+                ) : payment && payment.status !== "awaiting_payment" ? (
                   <form
                     action={updatePaymentAction}
                     className="mt-4 flex flex-col gap-3"

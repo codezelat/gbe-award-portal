@@ -31,7 +31,7 @@ export default async function PaymentPage() {
     <>
       <h1 className="page-heading">Payment</h1>
       <p className="mt-2 text-graphite">
-        Manual payment-proof verification for {row.application.reference}.
+        Payment details for {row.application.reference}.
       </p>
       <section
         className={`glass-feature mt-7 rounded-xl p-6 md:p-9 ${rejected ? "border-[#ebcfc5]" : ""}`}
@@ -40,19 +40,33 @@ export default async function PaymentPage() {
           <div>
             <Banknote className="text-antique-gold" />
             <h2 className="mt-4 font-display text-3xl font-semibold">
-              {rejected ? "Replacement proof required" : "Payment proof status"}
+              {row.payment.method === "card"
+                ? "Card payment"
+                : rejected
+                  ? "Replacement proof required"
+                  : "Payment status"}
             </h2>
             <div className="mt-3">
               <StatusBadge status={row.payment.status} />
             </div>
             <p className="mt-4 max-w-2xl leading-7 text-graphite">
-              {rejected
-                ? (row.payment.rejectedReason ??
-                  "The submitted proof could not be verified. Contact the team before uploading a replacement.")
-                : "The finance team reviews payment evidence manually. Any required action will be shown here and sent by email."}
+              {row.payment.method === "card"
+                ? row.payment.status === "verified"
+                  ? "Your card payment is verified by Genie. No payment slip is needed."
+                  : "Your card payment status is updated from Genie."
+                : rejected
+                  ? (row.payment.rejectedReason ??
+                    "The submitted proof could not be verified. Contact the team before uploading a replacement.")
+                  : "The finance team reviews payment evidence manually. Any required action will be shown here and sent by email."}
             </p>
           </div>
-          {rejected ? (
+          {row.payment.status === "awaiting_payment" ? (
+            <Button
+              render={<Link href={`/apply/payment/${row.application.id}`} />}
+            >
+              Complete payment
+            </Button>
+          ) : rejected ? (
             <Button
               className="h-12"
               render={
@@ -68,7 +82,11 @@ export default async function PaymentPage() {
         {row.payment.bankReference ? (
           <div className="mt-7 border-t pt-5 text-sm">
             <p>
-              <span className="text-muted-foreground">Bank reference:</span>{" "}
+              <span className="text-muted-foreground">
+                {row.payment.method === "card"
+                  ? "Transaction:"
+                  : "Bank reference:"}
+              </span>{" "}
               {row.payment.bankReference}
             </p>
           </div>

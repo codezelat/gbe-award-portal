@@ -32,6 +32,26 @@ if (!result.success) {
   process.exit(1);
 }
 const url = new URL(result.data.NEXT_PUBLIC_APP_URL);
+if (process.env.GENIE_ENABLED === "true") {
+  const production = result.data.APP_ENV === "production";
+  if (
+    !process.env.GENIE_API_KEY ||
+    !process.env.GENIE_APP_ID ||
+    !["sandbox", "production"].includes(process.env.GENIE_ENVIRONMENT ?? "") ||
+    (production && process.env.GENIE_ENVIRONMENT !== "production")
+  ) {
+    console.error(
+      "- Enabled Genie checkout requires its API key, App ID and the correct environment (production on the live site).",
+    );
+    process.exit(1);
+  }
+  if (url.protocol !== "https:") {
+    console.error(
+      "- Genie checkout needs a public HTTPS return URL. Use an HTTPS tunnel for local UAT.",
+    );
+    process.exit(1);
+  }
+}
 if (result.data.APP_ENV === "production" && url.protocol !== "https:") {
   console.error("- NEXT_PUBLIC_APP_URL must use HTTPS in production.");
   process.exit(1);

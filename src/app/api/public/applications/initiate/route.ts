@@ -22,6 +22,7 @@ import { assertSameOrigin } from "@/server/security/request";
 import { verifyTurnstile } from "@/server/security/turnstile";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
+import { requireGenie } from "@/server/services/genie-client";
 
 export const runtime = "nodejs";
 const hash = (value: string) =>
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
     requireProvider("auth");
     requireProvider("r2");
     const input = initiateApplicationSchema.parse(await request.json());
+    if (input.paymentMethod === "card") requireGenie();
     if (Date.now() - input.startedAt < 1500)
       throw new Error("Please review the nomination before submitting.");
     const ip = requestHeaders.get("x-forwarded-for")?.split(",")[0] ?? "local";
@@ -141,6 +143,15 @@ export async function POST(request: Request) {
       throw new Error(
         "The selected category is not available in the current open award cycle.",
       );
+    if (
+      input.paymentMethod === "card" &&
+      (!match.cycle.nominationFeeMinor ||
+        match.cycle.nominationFeeMinor <= 0 ||
+        match.cycle.currency !== "LKR")
+    )
+      throw new Error(
+        "Card payment is unavailable for this cycle. Please contact the GBE Awards team.",
+      );
     const now = new Date();
     if (now < match.cycle.opensAt || now > match.cycle.closesAt)
       throw new Error("Nominations are not currently open.");
@@ -182,11 +193,20 @@ export async function POST(request: Request) {
           privacyVersion: match.cycle.privacyVersion,
           formSchemaVersion: match.cycle.formSchemaVersion,
           lastActivityAt: now,
+          paymentStatus:
+            input.paymentMethod === "card"
+              ? "awaiting_payment"
+              : "proof_submitted",
         })
         .returning({ id: applications.id });
       await tx.insert(payments).values({
         applicationId: created.id,
-        status: "proof_submitted",
+        status:
+          input.paymentMethod === "card"
+            ? "awaiting_payment"
+            : "proof_submitted",
+        method: input.paymentMethod,
+        expectedAmountMinor: match.cycle.nominationFeeMinor,
         currency: match.cycle.currency,
       });
       const rawToken = sessionToken(created.id, input.idempotencyKey);

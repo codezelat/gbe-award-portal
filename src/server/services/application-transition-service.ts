@@ -62,6 +62,7 @@ export async function changeApplicationStatusWithTx(
       status: applications.workflowStatus,
       email: applications.emailNormalised,
       reference: applications.reference,
+      paymentStatus: applications.paymentStatus,
       resultsReleaseAt: awardCycles.resultsReleaseAt,
     })
     .from(applications)
@@ -69,6 +70,11 @@ export async function changeApplicationStatusWithTx(
     .where(eq(applications.id, input.applicationId))
     .limit(1);
   if (!current) throw new Error("Application not found.");
+  if (
+    input.to === "entry_confirmed" &&
+    !["verified", "waived", "not_required"].includes(current.paymentStatus)
+  )
+    throw new Error("Confirm the payment before confirming this entry.");
   if (current.status === input.to) return;
   if (!canTransition(current.status, input.to))
     throw new Error(

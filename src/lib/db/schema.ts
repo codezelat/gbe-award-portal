@@ -40,6 +40,7 @@ export const applicationStatus = pgEnum("application_status", [
   "archived",
 ]);
 export const paymentStatus = pgEnum("payment_status", [
+  "awaiting_payment",
   "proof_submitted",
   "under_review",
   "verified",
@@ -463,6 +464,9 @@ export const payments = pgTable(
       .unique()
       .references(() => applications.id),
     status: paymentStatus("status").notNull(),
+    method: text("method", { enum: ["bank_transfer", "card"] }),
+    expectedAmountMinor: bigint("expected_amount_minor", { mode: "number" }),
+    gatewayTransactionId: text("gateway_transaction_id").unique(),
     currency: char("currency", { length: 3 }),
     amountMinor: bigint("amount_minor", { mode: "number" }),
     proofApplicationFileId: uuid("proof_application_file_id").references(
@@ -487,6 +491,35 @@ export const payments = pgTable(
     ),
   ],
 );
+export const paymentAttempts = pgTable(
+  "payment_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id),
+    environment: text("environment", {
+      enum: ["sandbox", "production"],
+    }).notNull(),
+    transactionId: text("transaction_id").unique(),
+    checkoutUrl: text("checkout_url"),
+    state: text("state").notNull().default("CREATING"),
+    active: boolean("active").notNull().default(true),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("payment_attempts_one_active_idx")
+      .on(t.paymentId)
+      .where(sql`${t.active} = true`),
+    index("payment_attempts_payment_idx").on(t.paymentId),
+    check("payment_attempts_amount_positive", sql`${t.amountMinor} > 0`),
+  ],
+);
+
 export const auditLogs = pgTable(
   "audit_logs",
   {

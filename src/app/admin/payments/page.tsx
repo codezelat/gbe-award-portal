@@ -220,6 +220,7 @@ export default async function PaymentsPage({
                   proofVersions,
                 }) => {
                   const verificationGaps = missingPaymentVerificationFields({
+                    gatewayTransactionId: payment.gatewayTransactionId,
                     applicationReference: application.reference,
                     applicationSubmittedAt: application.submittedAt,
                     paymentReference: payment.paymentReference,
@@ -253,137 +254,158 @@ export default async function PaymentsPage({
                     });
                   return (
                     <tr
-                    key={payment.id}
-                    className="border-t align-top hover:bg-muted/40"
-                  >
-                    <td className="px-4 py-4">
-                      <Link
-                        href={`/admin/applications/${application.id}`}
-                        className="font-mono text-xs font-semibold hover:underline"
-                      >
-                        {application.reference ?? "Incomplete nomination"}
-                      </Link>
-                      <p className="mt-1 font-medium">
-                        {application.nomineeName}
-                      </p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">
-                        {payment.paymentReference ?? "Reference pending"}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p>{payment.payerName ?? "Not recorded"}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {payment.bankReference ?? "No bank reference"}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <StatusBadge status={payment.status} />
-                      {needsCorrection ? (
-                        <p className="mt-2 max-w-52 text-xs font-medium text-amber-800">
-                          Needs correction: {verificationGaps.join(", ")}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="max-w-48 truncate">
-                        {proofName ?? "No current proof"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {proofVersions} retained version(s)
-                      </p>
-                      {proofFileId ? (
-                        <ProtectedFilePreview
-                          className="mt-2"
-                          fileId={proofFileId}
-                          fileName={proofName ?? "Payment proof"}
-                        />
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4">
-                      {payment.amountMinor === null
-                        ? "Not recorded"
-                        : `${payment.currency ?? ""} ${(payment.amountMinor / 100).toFixed(2)}`}
-                      {payment.receiptReference ? (
-                        <p className="mt-1 font-mono text-xs">
-                          {payment.receiptReference}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-4 text-xs">
-                      {formatInTimeZone(
-                        payment.updatedAt,
-                        "Asia/Colombo",
-                        "dd MMM yyyy, HH:mm",
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {hasPermission(membership, "payments.verify") &&
-                        payment.status === "proof_submitted" ? (
-                          <form action={updatePaymentAction}>
-                            <input
-                              type="hidden"
-                              name="applicationId"
-                              value={application.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="status"
-                              value="under_review"
-                            />
-                            <Button size="sm" variant="outline">
-                              Begin review
-                            </Button>
-                          </form>
-                        ) : null}
-                        {hasPermission(membership, "payments.verify") &&
-                        payment.status === "under_review" ? (
-                          <PaymentVerificationDialog
-                            applicationId={application.id}
-                            applicationReference={
-                              application.reference ?? "Pending reference"
-                            }
-                            paymentReference={payment.paymentReference}
-                            proofName={proofName}
-                            payerName={payment.payerName}
-                            bankReference={payment.bankReference}
-                            amount={
-                              payment.amountMinor === null
-                                ? ""
-                                : (payment.amountMinor / 100).toFixed(2)
-                            }
-                            currency={payment.currency}
-                            paidAt={
-                              payment.paidAt
-                                ? formatInTimeZone(
-                                    payment.paidAt,
-                                    "Asia/Colombo",
-                                    "yyyy-MM-dd'T'HH:mm",
-                                  )
-                                : ""
-                            }
-                            blockingGaps={dialogBlockingGaps}
-                          />
-                        ) : null}
-                        <Button
-                          size="sm"
-                          variant={needsCorrection ? "outline" : "ghost"}
-                          render={
-                            <Link
-                              href={`/admin/applications/${application.id}`}
-                            />
-                          }
+                      key={payment.id}
+                      className="border-t align-top hover:bg-muted/40"
+                    >
+                      <td className="px-4 py-4">
+                        <Link
+                          href={`/admin/applications/${application.id}`}
+                          className="font-mono text-xs font-semibold hover:underline"
                         >
-                          {needsCorrection ? "Update record" : "Full review"}
-                        </Button>
-                        {canRemove ? (
-                          <RemoveIncompleteNominationButton
-                            applicationId={application.id}
-                            nomineeName={application.nomineeName}
+                          {application.reference ?? "Incomplete nomination"}
+                        </Link>
+                        <p className="mt-1 font-medium">
+                          {application.nomineeName}
+                        </p>
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">
+                          {payment.paymentReference ?? "Reference pending"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p>
+                          {payment.method === "card"
+                            ? "Card · Genie"
+                            : (payment.payerName ?? "Not recorded")}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {payment.gatewayTransactionId ??
+                            payment.bankReference ??
+                            (payment.method === "card"
+                              ? "Awaiting confirmation"
+                              : "No bank reference")}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <StatusBadge status={payment.status} />
+                        {needsCorrection ? (
+                          <p className="mt-2 max-w-52 text-xs font-medium text-amber-800">
+                            Needs correction: {verificationGaps.join(", ")}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="max-w-48 truncate">
+                          {payment.gatewayTransactionId
+                            ? "Verified by Genie"
+                            : payment.method === "card"
+                              ? "No slip required"
+                              : (proofName ?? "No current proof")}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {payment.method === "card"
+                            ? "Secure card payment"
+                            : `${proofVersions} retained version(s)`}
+                        </p>
+                        {proofFileId ? (
+                          <ProtectedFilePreview
+                            className="mt-2"
+                            fileId={proofFileId}
+                            fileName={proofName ?? "Payment proof"}
                           />
                         ) : null}
-                      </div>
-                    </td>
+                      </td>
+                      <td className="px-4 py-4">
+                        {payment.amountMinor === null &&
+                        payment.expectedAmountMinor === null
+                          ? "Not recorded"
+                          : `${payment.currency ?? ""} ${((payment.amountMinor ?? payment.expectedAmountMinor ?? 0) / 100).toFixed(2)}`}
+                        {payment.amountMinor === null &&
+                          payment.expectedAmountMinor !== null && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Expected amount
+                            </p>
+                          )}
+                        {payment.receiptReference ? (
+                          <p className="mt-1 font-mono text-xs">
+                            {payment.receiptReference}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-4 text-xs">
+                        {formatInTimeZone(
+                          payment.updatedAt,
+                          "Asia/Colombo",
+                          "dd MMM yyyy, HH:mm",
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {hasPermission(membership, "payments.verify") &&
+                          payment.status === "proof_submitted" ? (
+                            <form action={updatePaymentAction}>
+                              <input
+                                type="hidden"
+                                name="applicationId"
+                                value={application.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="status"
+                                value="under_review"
+                              />
+                              <Button size="sm" variant="outline">
+                                Begin review
+                              </Button>
+                            </form>
+                          ) : null}
+                          {hasPermission(membership, "payments.verify") &&
+                          payment.status === "under_review" ? (
+                            <PaymentVerificationDialog
+                              applicationId={application.id}
+                              applicationReference={
+                                application.reference ?? "Pending reference"
+                              }
+                              paymentReference={payment.paymentReference}
+                              proofName={proofName}
+                              payerName={payment.payerName}
+                              bankReference={payment.bankReference}
+                              amount={
+                                payment.amountMinor === null
+                                  ? ""
+                                  : (payment.amountMinor / 100).toFixed(2)
+                              }
+                              currency={payment.currency}
+                              paidAt={
+                                payment.paidAt
+                                  ? formatInTimeZone(
+                                      payment.paidAt,
+                                      "Asia/Colombo",
+                                      "yyyy-MM-dd'T'HH:mm",
+                                    )
+                                  : ""
+                              }
+                              blockingGaps={dialogBlockingGaps}
+                            />
+                          ) : null}
+                          <Button
+                            size="sm"
+                            variant={needsCorrection ? "outline" : "ghost"}
+                            render={
+                              <Link
+                                href={`/admin/applications/${application.id}`}
+                              />
+                            }
+                          >
+                            {needsCorrection ? "Update record" : "Full review"}
+                          </Button>
+                          {canRemove ? (
+                            <RemoveIncompleteNominationButton
+                              applicationId={application.id}
+                              nomineeName={application.nomineeName}
+                            />
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
                   );
                 },

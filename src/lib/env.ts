@@ -22,10 +22,16 @@ const serverSchema = z.object({
   R2_PUBLIC_ASSET_BASE_URL: z.url().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
   TURNSTILE_EXPECTED_HOSTNAME: z.string().default("localhost"),
-  TURNSTILE_APPLICATION_ACTION: z
-    .string()
-    .default(turnstileActions.nomination),
+  TURNSTILE_APPLICATION_ACTION: z.string().default(turnstileActions.nomination),
   RESEND_API_KEY: z.string().optional(),
+  GENIE_ENABLED: z.enum(["true", "false"]).default("false"),
+  GENIE_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+  GENIE_API_KEY: z.string().optional(),
+  GENIE_APP_ID: z.string().optional(),
+  GENIE_WEBHOOK_BASE_URL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.url().optional(),
+  ),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_FROM: z.string().default("GBE Awards <info@gbeaward.com>"),
   EMAIL_REPLY_TO: z.email().default("info@gbeaward.com"),

@@ -8,6 +8,7 @@ import { RecognitionMarquee } from "@/components/recognition/recognition-marquee
 import { brand } from "@/config/brand";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
+import { genieAvailable } from "@/server/services/genie-client";
 
 const description =
   "Submit a nomination for the Global Business Excellence Awards 2026 and showcase outstanding achievement, innovation and impact.";
@@ -114,6 +115,7 @@ export default async function ApplyPage() {
             </div>
           </div>
           <NominationForm
+            cardEnabled={genieAvailable()}
             categories={categories}
             unavailable={unavailable}
             feeMinor={cycle?.nominationFeeMinor ?? undefined}
