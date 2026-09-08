@@ -33,6 +33,7 @@ import {
 import { RemoveIncompleteNominationButton } from "@/components/admin/remove-incomplete-nomination-button";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
 import { PaymentVerificationDialog } from "@/components/admin/payment-verification-dialog";
+import { paymentDisplayAmount } from "@/lib/domain/card-checkout-amount";
 
 const pageSizes = [25, 50, 100] as const;
 
@@ -92,6 +93,11 @@ export default async function PaymentsPage({
         application: applications,
         proofFileId: files.id,
         proofName: files.safeDownloadFilename,
+        activeCardAmount: sql<number | null>`(
+          select amount_minor::float8 from payment_attempts pa
+          where pa.payment_id = ${payments.id} and pa.active = true
+          limit 1
+        )`,
         proofVersions: sql<number>`(
           select count(*)::int from application_files af
           where af.application_id = ${applications.id}
@@ -218,6 +224,7 @@ export default async function PaymentsPage({
                   proofFileId,
                   proofName,
                   proofVersions,
+                  activeCardAmount,
                 }) => {
                   const verificationGaps = missingPaymentVerificationFields({
                     gatewayTransactionId: payment.gatewayTransactionId,
@@ -318,7 +325,7 @@ export default async function PaymentsPage({
                         {payment.amountMinor === null &&
                         payment.expectedAmountMinor === null
                           ? "Not recorded"
-                          : `${payment.currency ?? ""} ${((payment.amountMinor ?? payment.expectedAmountMinor ?? 0) / 100).toFixed(2)}`}
+                          : `${payment.currency ?? ""} ${(paymentDisplayAmount(payment, activeCardAmount) / 100).toFixed(2)}`}
                         {payment.amountMinor === null &&
                           payment.expectedAmountMinor !== null && (
                             <p className="mt-1 text-xs text-muted-foreground">

@@ -192,6 +192,9 @@ bun run providers:verify
 
 Card checkout uses Genie Business hosted payment pages, not an embedded card form. The portal never receives card numbers or CVVs. New nominations snapshot the cycle fee; existing payment amounts and evidence are unchanged. A saved card nomination gets a secure, HTTP-only payment session for seven days, without creating an account. Invited applicants can also resume their own eligible payment from `/portal/payment`.
 
+> [!WARNING]
+> Owner-approved live testing is temporarily enabled: every new LKR card checkout charges **LKR 10**, while bank transfer retains the nomination fee (currently LKR 65,000). The form and payment page show the applicable amount before payment. This is not restricted to staff. Existing active checkouts retain their original amount, and receipts record the amount actually paid. After the owner confirms testing is complete, set `CARD_TEST_AMOUNT_MINOR` to `null` in `src/lib/domain/card-checkout-amount.ts` and deploy to restore the saved nomination fee for new card checkouts. Do not rewrite previous payments or receipts. No additional environment variable is required for this temporary setting.
+
 - Only an authenticated Genie transaction lookup with matching transaction ID, local reference, App ID, currency and amount can verify payment. Browser redirects and webhook payloads cannot mark a payment as paid.
 - `/api/webhooks/genie` verifies Genie's SHA-256 signature headers and then fetches the authoritative transaction. `CONFIRMED` settles the payment once and allocates one receipt. `AUTHORIZED` is not a completed payment.
 - One active checkout is allowed per payment. Repeated clicks resume it. An uncertain timeout keeps the attempt pending rather than risking a second charge. Staff can use **Check Genie status** in the nomination's payment section and recover a missing transaction ID using the attempt reference shown there.

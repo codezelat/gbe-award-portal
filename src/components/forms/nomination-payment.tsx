@@ -10,6 +10,8 @@ type PaymentState = {
   status: string;
   method: string | null;
   receipt?: string | null;
+  amountMinor: number;
+  cardAmountMinor: number;
   attempt?: { state: string; active: boolean; expiresAt: string } | null;
 };
 type Bank = {
@@ -21,7 +23,7 @@ type Bank = {
 export function NominationPayment({
   applicationId,
   reference,
-  amountMinor,
+  bankAmountMinor,
   currency,
   initial,
   bank,
@@ -29,7 +31,7 @@ export function NominationPayment({
 }: {
   applicationId: string;
   reference: string;
-  amountMinor: number;
+  bankAmountMinor: number;
   currency: string;
   initial: PaymentState;
   bank?: Bank;
@@ -196,7 +198,7 @@ export function NominationPayment({
             style: "currency",
             currency,
             maximumFractionDigits: 0,
-          }).format(amountMinor / 100)}
+          }).format(payment.amountMinor / 100)}
         </p>
       </div>
       {settled || reviewing ? (
@@ -256,6 +258,11 @@ export function NominationPayment({
               </Button>
             )}
           </div>
+          {cardEnabled && payment.cardAmountMinor !== bankAmountMinor && !waiting && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Card test: {currency} {(payment.cardAmountMinor / 100).toLocaleString("en-LK")}. Bank transfer: {currency} {(bankAmountMinor / 100).toLocaleString("en-LK")}.
+            </p>
+          )}
           {payment.method === "bank_transfer" && bank && (
             <div className="mt-6 border-t pt-5">
               <dl className="grid gap-3 text-sm sm:grid-cols-2">

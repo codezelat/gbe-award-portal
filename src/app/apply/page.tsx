@@ -9,6 +9,7 @@ import { brand } from "@/config/brand";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
 import { genieAvailable } from "@/server/services/genie-client";
+import { cardCheckoutAmount } from "@/lib/domain/card-checkout-amount";
 
 const description =
   "Submit a nomination for the Global Business Excellence Awards 2026 and showcase outstanding achievement, innovation and impact.";
@@ -116,6 +117,7 @@ export default async function ApplyPage() {
           </div>
           <NominationForm
             cardEnabled={genieAvailable()}
+            cardFeeMinor={cycle ? cardCheckoutAmount(cycle.nominationFeeMinor ?? 0, cycle.currency ?? "LKR") : undefined}
             categories={categories}
             unavailable={unavailable}
             feeMinor={cycle?.nominationFeeMinor ?? undefined}

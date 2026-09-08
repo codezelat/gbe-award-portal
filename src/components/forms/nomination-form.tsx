@@ -161,6 +161,7 @@ export function NominationForm({
   currency,
   paymentInstructions,
   cardEnabled = false,
+  cardFeeMinor,
 }: {
   categories: Category[];
   unavailable?: boolean;
@@ -168,6 +169,7 @@ export function NominationForm({
   currency?: string;
   paymentInstructions?: PaymentInstructions;
   cardEnabled?: boolean;
+  cardFeeMinor?: number;
 }) {
   const [supporting, setSupporting] = useState<SelectedUpload[]>([]);
   const [payment, setPayment] = useState<SelectedUpload[]>([]);
@@ -224,7 +226,8 @@ export function NominationForm({
       )
     : 0;
   const busy = ["preparing", "uploading", "finalising"].includes(stage);
-  const fee = formatFee(feeMinor, currency);
+  const cardTest = paymentMethod === "card" && cardFeeMinor !== undefined && cardFeeMinor !== feeMinor;
+  const fee = formatFee(paymentMethod === "card" ? (cardFeeMinor ?? feeMinor) : feeMinor, currency);
   const standardFee = formatFee(
     paymentInstructions?.standardFeeMinor,
     currency,
@@ -674,9 +677,9 @@ export function NominationForm({
           <FieldGroup>
             <div className="rounded-md border border-champagne/50 bg-gold-wash/55 p-4 text-sm text-graphite">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <p className="font-medium text-foreground">Application fee</p>
+                <p className="font-medium text-foreground">{cardTest ? "Card test payment" : "Application fee"}</p>
                 <div className="flex items-baseline gap-2">
-                  {standardFee ? (
+                  {standardFee && !cardTest ? (
                     <span className="text-sm text-muted-foreground line-through">
                       {standardFee}
                     </span>
@@ -688,17 +691,17 @@ export function NominationForm({
                   ) : null}
                 </div>
               </div>
-              {standardFee ? (
+              {standardFee && !cardTest ? (
                 <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-antique-gold">
                   Limited offer
                 </p>
               ) : null}
-              <p className="mt-2 leading-6">
+              {cardTest ? <p className="mt-2 leading-6">Temporary card checkout test amount. Bank transfer remains at {formatFee(feeMinor, currency)}.</p> : <p className="mt-2 leading-6">
                 Covers nomination processing and document verification.
                 {paymentInstructions?.refundableIfNotAwarded
                   ? " Fully refundable if the nominee is not awarded."
                   : ""}
-              </p>
+              </p>}
               <div className="mt-4 border-t border-champagne/40 pt-4">
                 <fieldset className="mb-4 grid gap-3 sm:grid-cols-2">
                   <legend className="sr-only">Payment method</legend>

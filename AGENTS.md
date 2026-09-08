@@ -95,6 +95,7 @@ bun run db:bootstrap-admin
 - Verify Resend webhook signatures before changing state.
 - Genie card payments use the server-only client and `card-payments` service. Never trust a return URL or webhook state as proof of payment: verify the signature and fetch the transaction, matching App ID, local reference, amount and currency. Only `CONFIRMED` settles payment. Preserve the one-active-attempt lock, idempotent receipt allocation and ambiguous-timeout protection.
 - Migration 0010 is additive; never backfill old payment amounts or methods. Enable Genie only after the migration and runtime permissions are verified. Keep card data on Genie's hosted page. UAT uses the isolated `scripts/dev-genie.mjs` helper, test credentials and `e2e/genie` storage prefix, never production nominations.
+- A temporary owner-approved LKR 10 card checkout amount is configured in `src/lib/domain/card-checkout-amount.ts`. Bank transfer keeps the saved nomination fee. Do not remove the override until the owner requests it; then set `CARD_TEST_AMOUNT_MINOR` to `null` and deploy. Never reprice active attempts or rewrite settled amounts. The override applies to every new LKR card checkout, not only staff tests.
 - Vercel Hobby uses exactly one scheduled entry: `/api/cron/daily` in `vercel.json`. Add work to the daily dispatcher or event-driven processing; do not add duplicate cron schedules. The daily upload cleanup may remove only expired, empty nomination shells; it must retain audit history and never delete a submitted nomination.
 
 ## 5. Security and environment rules

@@ -10,6 +10,7 @@ import {
   payments,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { cardCheckoutAmount } from "@/lib/domain/card-checkout-amount";
 import {
   assertGenieMatch,
   isGenieTerminalFailure,
@@ -239,7 +240,7 @@ export async function startCardCheckout(applicationId: string) {
       .values({
         paymentId: payment.id,
         environment: env.GENIE_ENVIRONMENT,
-        amountMinor: payment.expectedAmountMinor,
+        amountMinor: cardCheckoutAmount(payment.expectedAmountMinor, payment.currency),
         currency: payment.currency,
         expiresAt: new Date(Date.now() + 15 * 60_000),
       })
