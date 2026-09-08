@@ -59,7 +59,9 @@ export async function GET(
       (record.file.mimeTypeDetected === "application/pdf" ||
         record.file.mimeTypeDetected?.startsWith("image/"));
     if (profile.accountKind === "applicant") {
-      const ownsApplication = record.application?.ownerProfileId === profile.id;
+      const ownsApplication =
+        record.application?.ownerProfileId === profile.id &&
+        !record.application.deletedAt;
       const ownsProfileImage =
         record.file.createdByProfileId === profile.id &&
         ["profile_original", "profile_512", "profile_96"].includes(

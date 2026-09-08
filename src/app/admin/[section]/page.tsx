@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { getDb } from "@/lib/db";
 import {
+  nonDeletedApplications,
+  submittedApplications,
+} from "@/server/dal/application-visibility";
+import {
   applicationFiles,
   applications,
   auditLogs,
@@ -117,6 +121,7 @@ export default async function AdminSection({
       .select({ payment: payments, application: applications })
       .from(payments)
       .innerJoin(applications, eq(payments.applicationId, applications.id))
+      .where(submittedApplications())
       .orderBy(desc(payments.updatedAt))
       .limit(pageSize)
       .offset(offset);
@@ -162,7 +167,11 @@ export default async function AdminSection({
             applications,
             eq(applicationFiles.applicationId, applications.id),
           )
-          .where(eq(applications.assignedReviewerId, currentProfile.id))
+          .where(
+            nonDeletedApplications(
+              eq(applications.assignedReviewerId, currentProfile.id),
+            ),
+          )
           .orderBy(desc(files.createdAt))
           .limit(pageSize)
           .offset(offset)
@@ -443,33 +452,33 @@ export default async function AdminSection({
         className="mt-4 flex flex-wrap items-center justify-between gap-3"
         aria-label="Pagination"
       >
-          <Button
-            variant="outline"
-            disabled={page === 1}
-            render={
-              page > 1 ? (
-                <a
-                  href={`/admin/${section}?page=${page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
-                />
-              ) : undefined
-            }
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">Page {page}</span>
-          <Button
-            variant="outline"
-            disabled={rows.length < pageSize}
-            render={
-              rows.length === pageSize ? (
-                <a
-                  href={`/admin/${section}?page=${page + 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
-                />
-              ) : undefined
-            }
-          >
-            Next
-          </Button>
+        <Button
+          variant="outline"
+          disabled={page === 1}
+          render={
+            page > 1 ? (
+              <a
+                href={`/admin/${section}?page=${page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
+              />
+            ) : undefined
+          }
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <Button
+          variant="outline"
+          disabled={rows.length < pageSize}
+          render={
+            rows.length === pageSize ? (
+              <a
+                href={`/admin/${section}?page=${page + 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
+              />
+            ) : undefined
+          }
+        >
+          Next
+        </Button>
       </nav>
     </>
   );

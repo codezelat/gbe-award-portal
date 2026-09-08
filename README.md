@@ -66,6 +66,8 @@ The public form is deliberately short and guided:
 
 Supporting documents and payment proof are independently limited to **5 MB per file**. The browser gives upload progress, cancellation and retry feedback; the server repeats validation before accepting a completion request.
 
+Normal dashboards, review queues, applicant views and nomination exports exclude soft-deleted nominations. Submitted totals and summaries also exclude unfinished upload shells. The explicit **Deleted** application view and its exports retain recovery access; audit and delivery history remain available. Deleting or restoring a nomination refreshes the linked admin and applicant workspaces.
+
 ## 🏗️ Architecture
 
 | Layer            | Technology                                             | Responsibility                                                                                            |

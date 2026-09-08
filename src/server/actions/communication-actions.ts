@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applicationMessages,
   applications,
@@ -95,7 +96,11 @@ export async function sendManualApplicantMessageAction(formData: FormData) {
   const [application] = await db
     .select()
     .from(applications)
-    .where(eq(applications.reference, input.applicationReference))
+    .where(
+      nonDeletedApplications(
+        eq(applications.reference, input.applicationReference),
+      ),
+    )
     .limit(1);
   if (
     !application ||

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applicationFiles,
   applicationChangeRequests,
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
       .from(applications)
       .innerJoin(files, eq(files.id, input.fileId))
       .where(
-        and(
+        nonDeletedApplications(
           eq(applications.id, input.applicationId),
           eq(applications.ownerProfileId, profile.id),
           eq(files.createdByProfileId, profile.id),

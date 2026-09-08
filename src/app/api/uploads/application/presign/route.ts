@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applicationChangeRequests,
   applications,
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       .select()
       .from(applications)
       .where(
-        and(
+        nonDeletedApplications(
           eq(applications.id, input.applicationId),
           eq(applications.ownerProfileId, profile.id),
         ),

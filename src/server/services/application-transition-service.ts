@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applications,
   applicationStatusHistory,
@@ -67,7 +68,7 @@ export async function changeApplicationStatusWithTx(
     })
     .from(applications)
     .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-    .where(eq(applications.id, input.applicationId))
+    .where(nonDeletedApplications(eq(applications.id, input.applicationId)))
     .limit(1);
   if (!current) throw new Error("Application not found.");
   if (

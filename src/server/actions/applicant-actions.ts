@@ -4,6 +4,7 @@ import { z } from "zod";
 import { and, eq, gte } from "drizzle-orm";
 import { requirePortalSession } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applicationMessages, auditLogs, profiles } from "@/lib/db/schema";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
@@ -88,7 +89,7 @@ export async function sendApplicantMessageAction(formData: FormData) {
     .select({ id: applications.id })
     .from(applications)
     .where(
-      and(
+      nonDeletedApplications(
         eq(applications.id, input.applicationId),
         eq(applications.ownerProfileId, profile.id),
       ),
@@ -161,7 +162,7 @@ export async function submitRequestedChangesAction(formData: FormData) {
     .select()
     .from(applications)
     .where(
-      and(
+      nonDeletedApplications(
         eq(applications.id, input.applicationId),
         eq(applications.ownerProfileId, profile.id),
         eq(applications.workflowStatus, "changes_requested"),

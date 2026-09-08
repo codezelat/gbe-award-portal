@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, awardCycles } from "@/lib/db/schema";
 import { applicantVisibleStatus } from "@/lib/domain/outcome-visibility";
 import { requirePortalSession } from "@/server/dal/auth";
@@ -18,7 +19,9 @@ export default async function MyApplications() {
       })
       .from(applications)
       .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-      .where(eq(applications.ownerProfileId, profile.id))
+      .where(
+        nonDeletedApplications(eq(applications.ownerProfileId, profile.id)),
+      )
       .orderBy(desc(applications.lastActivityAt)),
   ]);
   return (

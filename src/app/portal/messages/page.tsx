@@ -4,6 +4,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { Send } from "lucide-react";
 import { requirePortalSession } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applicationMessages, applications } from "@/lib/db/schema";
 import { sendApplicantMessageAction } from "@/server/actions/applicant-actions";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,9 @@ export default async function MessagesPage({
     getDb()
       .select()
       .from(applications)
-      .where(eq(applications.ownerProfileId, profile.id))
+      .where(
+        nonDeletedApplications(eq(applications.ownerProfileId, profile.id)),
+      )
       .orderBy(desc(applications.lastActivityAt)),
   ]);
   const selected = owned.find((item) => item.id === applicationId) ?? owned[0];

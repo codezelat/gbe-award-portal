@@ -4,6 +4,7 @@ import { z } from "zod";
 import { formatInTimeZone } from "date-fns-tz";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { submittedApplications } from "@/server/dal/application-visibility";
 import {
   applicationFiles,
   applications,
@@ -68,6 +69,9 @@ export async function GET(request: Request) {
     const format = url.searchParams.get("format") === "csv" ? "csv" : "xlsx";
     await requireExportFormat(format);
     const cycleId = z.uuid().safeParse(url.searchParams.get("cycle")).data;
+    const applicationScope = submittedApplications(
+      cycleId ? eq(applications.cycleId, cycleId) : undefined,
+    );
     const specialisedPermission = {
       applicant_contacts: "applicants.manage",
       payment_reconciliation: "payments.view",
@@ -141,7 +145,7 @@ export async function GET(request: Request) {
           awardCategories,
           eq(applications.categoryId, awardCategories.id),
         )
-        .where(cycleId ? eq(applications.cycleId, cycleId) : undefined)
+        .where(applicationScope)
         .groupBy(awardCategories.name, applications.workflowStatus)
         .orderBy(awardCategories.name, applications.workflowStatus);
       headings = ["Category", "Workflow status", "Applications"];
@@ -150,7 +154,7 @@ export async function GET(request: Request) {
       const data = await db
         .select({ status: applications.workflowStatus, total: count() })
         .from(applications)
-        .where(cycleId ? eq(applications.cycleId, cycleId) : undefined)
+        .where(applicationScope)
         .groupBy(applications.workflowStatus)
         .orderBy(applications.workflowStatus);
       headings = ["Workflow status", "Applications"];
@@ -170,7 +174,7 @@ export async function GET(request: Request) {
         })
         .from(payments)
         .innerJoin(applications, eq(payments.applicationId, applications.id))
-        .where(cycleId ? eq(applications.cycleId, cycleId) : undefined)
+        .where(applicationScope)
         .orderBy(desc(payments.updatedAt))
         .limit(10000);
       headings = [
@@ -212,7 +216,7 @@ export async function GET(request: Request) {
           applications,
           eq(applicationFiles.applicationId, applications.id),
         )
-        .where(cycleId ? eq(applications.cycleId, cycleId) : undefined)
+        .where(applicationScope)
         .orderBy(desc(files.createdAt))
         .limit(10000);
       headings = [
@@ -302,6 +306,7 @@ export async function GET(request: Request) {
         .from(applications)
         .where(
           and(
+            applicationScope,
             eq(applications.workflowStatus, status),
             cycleId ? eq(applications.cycleId, cycleId) : undefined,
           ),

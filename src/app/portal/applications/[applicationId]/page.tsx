@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download, LockKeyhole } from "lucide-react";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applicationChangeRequests,
   applications,
@@ -34,7 +35,7 @@ export default async function ApplicationDetail({
     .from(applications)
     .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
     .where(
-      and(
+      nonDeletedApplications(
         eq(applications.id, applicationId),
         eq(applications.ownerProfileId, profile.id),
       ),

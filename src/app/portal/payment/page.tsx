@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { Banknote, FileText } from "lucide-react";
 import { requirePortalSession } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, payments } from "@/lib/db/schema";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ export default async function PaymentPage() {
     .select({ application: applications, payment: payments })
     .from(applications)
     .innerJoin(payments, eq(payments.applicationId, applications.id))
-    .where(eq(applications.ownerProfileId, profile.id))
+    .where(nonDeletedApplications(eq(applications.ownerProfileId, profile.id)))
     .orderBy(desc(applications.lastActivityAt))
     .limit(1);
   if (!row)

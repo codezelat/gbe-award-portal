@@ -21,6 +21,7 @@ import {
 import { getAuth } from "@/lib/auth";
 import { paymentVerificationError } from "@/lib/domain/payment-verification";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { and, eq, sql } from "drizzle-orm";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
@@ -52,7 +53,7 @@ async function assertApplicationAccess(
   const [record] = await getDb()
     .select({ assignedReviewerId: applications.assignedReviewerId })
     .from(applications)
-    .where(eq(applications.id, applicationId))
+    .where(nonDeletedApplications(eq(applications.id, applicationId)))
     .limit(1);
   if (
     !record ||
@@ -157,7 +158,9 @@ export async function setApplicationDeletionAction(formData: FormData) {
     });
   });
   revalidatePath(`/admin/applications/${input.applicationId}`);
-  revalidatePath("/admin/applications");
+  // Deletion/restoration affects dashboard aggregates and linked workspaces too.
+  revalidatePath("/admin", "layout");
+  revalidatePath("/portal", "layout");
 }
 export async function purgeIncompleteApplicationAction(formData: FormData) {
   const { profile, membership } = await requireStaff();

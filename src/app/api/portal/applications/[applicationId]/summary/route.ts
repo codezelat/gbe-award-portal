@@ -1,9 +1,10 @@
 import path from "node:path";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { NextResponse } from "next/server";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applications,
   auditLogs,
@@ -48,7 +49,7 @@ export async function GET(
       .from(applications)
       .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
       .where(
-        and(
+        nonDeletedApplications(
           eq(applications.id, applicationId),
           eq(applications.ownerProfileId, profile.id),
         ),

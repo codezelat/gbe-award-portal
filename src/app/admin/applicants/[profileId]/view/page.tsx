@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Eye, LockKeyhole } from "lucide-react";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, payments, profiles, user } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { applicantVisibleStatus } from "@/lib/domain/outcome-visibility";
@@ -41,7 +42,7 @@ export default async function ApplicantExperience({
     .from(applications)
     .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
     .leftJoin(payments, eq(payments.applicationId, applications.id))
-    .where(eq(applications.ownerProfileId, profileId))
+    .where(nonDeletedApplications(eq(applications.ownerProfileId, profileId)))
     .orderBy(desc(applications.lastActivityAt));
   return (
     <>

@@ -9,6 +9,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  ne,
   or,
   sql,
   type SQL,
@@ -53,7 +54,11 @@ export async function GET(request: Request) {
   await enforceRateLimit(`export-create:${staff.profile.id}`, 20, 3600);
   const format = url.searchParams.get("format") === "csv" ? "csv" : "xlsx";
   await requireExportFormat(format);
-  const filters: SQL[] = [];
+  // Match the applications list, including its deliberately selected archive view.
+  const filters: SQL[] = [
+    isNotNull(applications.submittedAt),
+    ne(applications.workflowStatus, "uploading"),
+  ];
   const search = url.searchParams.get("search");
   const status = url.searchParams.get("status");
   const paymentStatus = url.searchParams.get("paymentStatus");

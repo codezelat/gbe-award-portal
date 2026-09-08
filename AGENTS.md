@@ -77,6 +77,7 @@ bun run db:bootstrap-admin
 - Internal access has two levels: `staff` for the complete nomination workflow and `super_admin` for people/system governance. Permission checks use `src/lib/domain/permissions.ts` and `src/config/permissions.ts`; do not rely on hidden navigation or client rendering as access control.
 - Award-cycle data, fee settings, legal text, categories, programme copy and opening status are business-controlled content. Do not silently alter them during technical work. Ask for explicit direction when a change goes beyond the requested scope.
 - References must remain opaque, non-sequential and unique. Do not replace their random six-digit suffix with a count or predictable ID.
+- Normal nomination queries must exclude soft-deleted records. Reuse `src/server/dal/application-visibility.ts`: `nonDeletedApplications()` for ownership/linked views and `submittedApplications()` for submitted dashboards and summaries. Preserve explicit Deleted exports and audit history as separate scopes. Deletion/restoration must invalidate both admin and portal layouts so counts and linked views refresh together.
 
 ### Files and exports
 

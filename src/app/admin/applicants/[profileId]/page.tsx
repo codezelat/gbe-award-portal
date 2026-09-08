@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, invitations, profiles, user } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -37,7 +38,9 @@ export default async function ApplicantDetail({
     db
       .select()
       .from(applications)
-      .where(eq(applications.ownerProfileId, profileId)),
+      .where(
+        nonDeletedApplications(eq(applications.ownerProfileId, profileId)),
+      ),
     db.select().from(invitations).where(eq(invitations.profileId, profileId)),
   ]);
   return (

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { and, eq, ne } from "drizzle-orm";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applications,
   auditLogs,
@@ -23,7 +24,7 @@ export async function createOrRefreshApplicantInvitation(
   const [application] = await db
     .select()
     .from(applications)
-    .where(eq(applications.id, applicationId))
+    .where(nonDeletedApplications(eq(applications.id, applicationId)))
     .limit(1);
   if (!application || application.workflowStatus !== "approved")
     throw new Error("Only an approved application can receive portal access.");

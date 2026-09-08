@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, payments } from "@/lib/db/schema";
 import { requirePortalSession } from "@/server/dal/auth";
 import { AuthenticatedUpload } from "@/components/uploads/authenticated-upload";
@@ -16,7 +17,7 @@ export default async function ReplacePayment({
     .from(applications)
     .innerJoin(payments, eq(payments.applicationId, applications.id))
     .where(
-      and(
+      nonDeletedApplications(
         eq(applications.id, applicationId),
         eq(applications.ownerProfileId, profile.id),
         eq(payments.status, "rejected"),

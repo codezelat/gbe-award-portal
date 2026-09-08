@@ -1,8 +1,9 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Download, FileText, LockKeyhole } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { requirePortalSession } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applicationChangeRequests,
   applicationFiles,
@@ -22,7 +23,7 @@ export default async function DocumentsPage() {
     )
     .innerJoin(files, eq(applicationFiles.fileId, files.id))
     .where(
-      and(
+      nonDeletedApplications(
         eq(applications.ownerProfileId, profile.id),
         eq(files.status, "ready"),
       ),
@@ -36,7 +37,7 @@ export default async function DocumentsPage() {
       eq(applicationChangeRequests.applicationId, applications.id),
     )
     .where(
-      and(
+      nonDeletedApplications(
         eq(applications.ownerProfileId, profile.id),
         eq(applicationChangeRequests.status, "open"),
       ),

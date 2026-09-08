@@ -1,6 +1,7 @@
 import { and, asc, eq, ilike, or } from "drizzle-orm";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, profiles, user } from "@/lib/db/schema";
 import {
   setApplicantStatusAction,
@@ -25,7 +26,10 @@ export default async function ApplicantsPage({
     .select({ profile: profiles, email: user.email, application: applications })
     .from(profiles)
     .innerJoin(user, eq(profiles.authUserId, user.id))
-    .leftJoin(applications, eq(applications.ownerProfileId, profiles.id))
+    .leftJoin(
+      applications,
+      nonDeletedApplications(eq(applications.ownerProfileId, profiles.id)),
+    )
     .where(
       and(
         eq(profiles.accountKind, "applicant"),

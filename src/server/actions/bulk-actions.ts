@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireStaff, hasPermission } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applicationMessages,
   applications,
@@ -52,7 +53,7 @@ export async function bulkAssignReviewerAction(formData: FormData) {
         assignedReviewerId: applications.assignedReviewerId,
       })
       .from(applications)
-      .where(inArray(applications.id, ids));
+      .where(nonDeletedApplications(inArray(applications.id, ids)));
     if (
       scoped.length !== new Set(ids).size ||
       (!hasPermission(membership, "applications.view_all") &&
@@ -68,7 +69,7 @@ export async function bulkAssignReviewerAction(formData: FormData) {
         lastActivityAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(inArray(applications.id, ids));
+      .where(nonDeletedApplications(inArray(applications.id, ids)));
     await tx.insert(auditLogs).values({
       actorProfileId: profile.id,
       actorType: "staff",
@@ -121,7 +122,7 @@ export async function bulkChangeSafeStatusAction(formData: FormData) {
         reference: applications.reference,
       })
       .from(applications)
-      .where(inArray(applications.id, ids));
+      .where(nonDeletedApplications(inArray(applications.id, ids)));
     if (rows.length !== new Set(ids).size)
       throw new Error("One or more selected applications no longer exist.");
     if (
@@ -193,7 +194,7 @@ export async function bulkSendTemplateAction(formData: FormData) {
         assignedReviewerId: applications.assignedReviewerId,
       })
       .from(applications)
-      .where(inArray(applications.id, ids));
+      .where(nonDeletedApplications(inArray(applications.id, ids)));
     if (rows.length !== new Set(ids).size)
       throw new Error("One or more selected applications no longer exist.");
     if (

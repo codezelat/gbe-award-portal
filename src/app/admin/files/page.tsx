@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { Download, Search } from "lucide-react";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applicationFiles, applications, files } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { FileDispositionButton } from "@/components/admin/file-disposition-button";
@@ -32,7 +33,7 @@ export default async function FilesPage({
   const pageSize = pageSizes.includes(requestedSize as 25 | 50 | 100)
     ? requestedSize
     : 25;
-  const filters: SQL[] = [];
+  const filters: SQL[] = [nonDeletedApplications()];
   if (!hasPermission(membership, "applications.view_all"))
     filters.push(eq(applications.assignedReviewerId, profile.id));
   if (query.status && files.status.enumValues.includes(query.status as never))
@@ -251,14 +252,17 @@ export default async function FilesPage({
                               <ProtectedFilePreview
                                 fileId={file.id}
                                 fileName={
-                                  file.safeDownloadFilename ?? "Protected object"
+                                  file.safeDownloadFilename ??
+                                  "Protected object"
                                 }
                               />
                             ) : (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                render={<a href={`/api/files/${file.id}/download`} />}
+                                render={
+                                  <a href={`/api/files/${file.id}/download`} />
+                                }
                               >
                                 <Download data-icon="inline-start" />
                                 Download

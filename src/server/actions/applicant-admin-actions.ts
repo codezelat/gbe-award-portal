@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireStaff, hasPermission } from "@/server/dal/auth";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import {
@@ -143,7 +144,10 @@ export async function resendApplicantInviteAction(formData: FormData) {
     .select({ profile: profiles, email: user.email, application: applications })
     .from(profiles)
     .innerJoin(user, eq(profiles.authUserId, user.id))
-    .innerJoin(applications, eq(applications.ownerProfileId, profiles.id))
+    .innerJoin(
+      applications,
+      nonDeletedApplications(eq(applications.ownerProfileId, profiles.id)),
+    )
     .where(eq(profiles.id, profileId))
     .limit(1);
   if (!record) throw new Error("Applicant or linked application not found.");
@@ -409,7 +413,7 @@ export async function reassignApplicationOwnerAction(formData: FormData) {
     const [before] = await tx
       .select({ ownerProfileId: applications.ownerProfileId })
       .from(applications)
-      .where(eq(applications.id, input.applicationId))
+      .where(nonDeletedApplications(eq(applications.id, input.applicationId)))
       .limit(1);
     if (!before) throw new Error("Application not found.");
     if (before.ownerProfileId === target.profile.id) return;

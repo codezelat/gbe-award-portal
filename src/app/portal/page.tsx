@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
   applications,
   applicationStatusHistory,
@@ -36,7 +37,9 @@ export default async function PortalDashboard() {
       })
       .from(applications)
       .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-      .where(eq(applications.ownerProfileId, profile.id))
+      .where(
+        nonDeletedApplications(eq(applications.ownerProfileId, profile.id)),
+      )
       .orderBy(desc(applications.lastActivityAt))
       .limit(1),
   ]);

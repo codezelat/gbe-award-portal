@@ -1,17 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import {
-  and,
-  count,
-  desc,
-  eq,
-  gt,
-  inArray,
-  isNull,
-  isNotNull,
-  ne,
-  type SQL,
-} from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { getDb } from "@/lib/db";
 import {
@@ -23,6 +12,7 @@ import {
   profiles,
 } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
+import { getDashboardApplications } from "@/server/dal/dashboard-applications";
 export default async function AdminDashboard() {
   const { profile, membership } = await requireStaff();
   const isSuperAdmin = membership.role === "super_admin";
@@ -43,110 +33,14 @@ export default async function AdminDashboard() {
         eq(applications.assignedReviewerId, profile.id),
         selectedCycleId ? eq(applications.cycleId, selectedCycleId) : undefined,
       );
-  const scoped = (condition: SQL) =>
-    scope ? and(scope, condition) : condition;
   const [
-    [total],
-    [review],
-    [approved],
-    [payments],
-    [actionRequired],
-    recent,
-    unassigned,
+    { counts, recent, unassigned },
     failedEmails,
     expiringInvites,
     failedJobs,
     activity,
   ] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(applications)
-      .where(
-        scoped(
-          inArray(applications.workflowStatus, [
-            "submitted",
-            "under_review",
-            "changes_requested",
-            "resubmitted",
-            "approved",
-            "entry_confirmed",
-            "shortlisted",
-            "winner",
-          ]),
-        ),
-      ),
-    db
-      .select({ value: count() })
-      .from(applications)
-      .where(
-        scoped(
-          inArray(applications.workflowStatus, [
-            "submitted",
-            "under_review",
-            "resubmitted",
-          ]),
-        ),
-      ),
-    db
-      .select({ value: count() })
-      .from(applications)
-      .where(scoped(eq(applications.workflowStatus, "approved"))),
-    db
-      .select({ value: count() })
-      .from(applications)
-      .where(
-        scoped(
-          and(
-            eq(applications.paymentStatus, "proof_submitted"),
-            ne(applications.workflowStatus, "uploading"),
-          )!,
-        ),
-      ),
-    db
-      .select({ value: count() })
-      .from(applications)
-      .where(scoped(eq(applications.workflowStatus, "changes_requested"))),
-    db
-      .select({
-        id: applications.id,
-        reference: applications.reference,
-        nomineeName: applications.nomineeName,
-        status: applications.workflowStatus,
-        submittedAt: applications.submittedAt,
-      })
-      .from(applications)
-      .where(
-        scoped(
-          and(
-            ne(applications.workflowStatus, "uploading"),
-            isNotNull(applications.submittedAt),
-            isNull(applications.deletedAt),
-          )!,
-        ),
-      )
-      .orderBy(desc(applications.submittedAt))
-      .limit(6),
-    db
-      .select({
-        id: applications.id,
-        reference: applications.reference,
-        nomineeName: applications.nomineeName,
-      })
-      .from(applications)
-      .where(
-        scoped(
-          and(
-            isNull(applications.assignedReviewerId),
-            inArray(applications.workflowStatus, [
-              "submitted",
-              "under_review",
-              "resubmitted",
-            ]),
-          )!,
-        ),
-      )
-      .orderBy(desc(applications.submittedAt))
-      .limit(6),
+    getDashboardApplications(scope),
     db
       .select({
         id: emailOutbox.id,
@@ -155,7 +49,10 @@ export default async function AdminDashboard() {
         createdAt: emailOutbox.createdAt,
       })
       .from(emailOutbox)
-      .where(eq(emailOutbox.status, "failed"))
+      .leftJoin(applications, eq(emailOutbox.applicationId, applications.id))
+      .where(
+        and(eq(emailOutbox.status, "failed"), isNull(applications.deletedAt)),
+      )
       .orderBy(desc(emailOutbox.createdAt))
       .limit(6),
     db
@@ -165,10 +62,12 @@ export default async function AdminDashboard() {
         expiresAt: invitations.expiresAt,
       })
       .from(invitations)
+      .leftJoin(applications, eq(invitations.applicationId, applications.id))
       .where(
         and(
           inArray(invitations.status, ["pending", "sent"]),
           gt(invitations.expiresAt, new Date()),
+          isNull(applications.deletedAt),
         ),
       )
       .orderBy(invitations.expiresAt)
@@ -198,23 +97,27 @@ export default async function AdminDashboard() {
   const metrics = [
     {
       label: "Total submitted",
-      value: total.value,
+      value: counts.total,
       help: "Active records in this cycle",
     },
     {
       label: "Awaiting review",
-      value: review.value,
+      value: counts.review,
       help: "Submitted, reviewing or resubmitted",
     },
-    { label: "Approved", value: approved.value, help: "Passed initial review" },
+    {
+      label: "Approved",
+      value: counts.approved,
+      help: "Passed initial review",
+    },
     {
       label: "Payment proofs",
-      value: payments.value,
+      value: counts.payments,
       help: "Awaiting finance verification",
     },
     {
       label: "Action required",
-      value: actionRequired.value,
+      value: counts.actionRequired,
       help: "Applicant updates are outstanding",
     },
   ];
