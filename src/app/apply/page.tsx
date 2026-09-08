@@ -117,7 +117,14 @@ export default async function ApplyPage() {
           </div>
           <NominationForm
             cardEnabled={genieAvailable()}
-            cardFeeMinor={cycle ? cardCheckoutAmount(cycle.nominationFeeMinor ?? 0, cycle.currency ?? "LKR") : undefined}
+            cardFeeMinor={
+              cycle
+                ? cardCheckoutAmount(
+                    cycle.nominationFeeMinor ?? 0,
+                    cycle.currency ?? "LKR",
+                  )
+                : undefined
+            }
             categories={categories}
             unavailable={unavailable}
             feeMinor={cycle?.nominationFeeMinor ?? undefined}

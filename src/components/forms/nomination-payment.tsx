@@ -232,7 +232,7 @@ export function NominationPayment({
               <Button
                 disabled={Boolean(busy)}
                 onClick={() => void act("checkout")}
-                className="min-h-12"
+                className="h-auto min-h-14 gap-2 whitespace-normal px-5 py-3 leading-6"
               >
                 {busy === "checkout" ? (
                   <LoaderCircle className="animate-spin" />
@@ -247,7 +247,7 @@ export function NominationPayment({
                 variant="outline"
                 disabled={Boolean(busy) || payment.method === "bank_transfer"}
                 onClick={() => void act("bank_transfer")}
-                className="min-h-12"
+                className="h-auto min-h-14 gap-2 whitespace-normal px-5 py-3 leading-6"
               >
                 {busy === "bank_transfer" ? (
                   <LoaderCircle className="animate-spin" />
@@ -258,14 +258,23 @@ export function NominationPayment({
               </Button>
             )}
           </div>
-          {cardEnabled && payment.cardAmountMinor !== bankAmountMinor && !waiting && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Card test: {currency} {(payment.cardAmountMinor / 100).toLocaleString("en-LK")}. Bank transfer: {currency} {(bankAmountMinor / 100).toLocaleString("en-LK")}.
-            </p>
-          )}
+          {cardEnabled &&
+            payment.cardAmountMinor !== bankAmountMinor &&
+            !waiting && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Card test: {currency}{" "}
+                {(payment.cardAmountMinor / 100).toLocaleString("en-LK")}. Bank
+                transfer: {currency}{" "}
+                {(bankAmountMinor / 100).toLocaleString("en-LK")}.
+              </p>
+            )}
           {payment.method === "bank_transfer" && bank && (
             <div className="mt-6 border-t pt-5">
-              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+                <Landmark aria-hidden className="size-5" />
+                Bank account details
+              </h2>
+              <dl className="grid gap-4 rounded-lg border bg-muted/40 p-4 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-xs text-muted-foreground">
                     Account name
@@ -283,7 +292,7 @@ export function NominationPayment({
                   <dt className="text-xs text-muted-foreground">
                     Account number
                   </dt>
-                  <dd className="font-mono">{bank.accountNumber}</dd>
+                  <dd className="break-all font-mono">{bank.accountNumber}</dd>
                 </div>
               </dl>
               <label
@@ -300,11 +309,11 @@ export function NominationPayment({
                 type="file"
                 accept="application/pdf,image/jpeg,image/png,image/webp"
                 disabled={Boolean(busy)}
-                className="mt-2 w-full min-w-0"
+                className="mt-2 h-auto min-h-12 w-full min-w-0 py-2 file:mr-3 file:h-8"
                 onChange={(event) => setFile(event.target.files?.[0])}
               />
               <Button
-                className="mt-4"
+                className="mt-4 h-auto min-h-14 w-full gap-2 whitespace-normal px-6 py-3 text-base font-semibold leading-6 sm:w-auto"
                 disabled={Boolean(busy) || !file}
                 onClick={() => void uploadProof()}
               >
@@ -324,7 +333,7 @@ export function NominationPayment({
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <Button
             variant="ghost"
-            size="sm"
+            className="h-auto min-h-11 whitespace-normal px-4 py-2"
             disabled={Boolean(busy)}
             onClick={() => void act("status")}
           >

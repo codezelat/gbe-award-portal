@@ -8,7 +8,10 @@ import { genieAvailable } from "@/server/services/genie-client";
 import { getDb } from "@/lib/db";
 import { paymentAttempts } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { cardCheckoutAmount, paymentDisplayAmount } from "@/lib/domain/card-checkout-amount";
+import {
+  cardCheckoutAmount,
+  paymentDisplayAmount,
+} from "@/lib/domain/card-checkout-amount";
 
 export const metadata: Metadata = {
   title: "Nomination payment",
@@ -52,8 +55,16 @@ export default async function PaymentPage({
               status: row.payment.status,
               method: row.payment.method,
               receipt: row.payment.receiptReference,
-              amountMinor: paymentDisplayAmount(row.payment, attempt?.active ? attempt.amountMinor : null),
-              cardAmountMinor: attempt?.active ? attempt.amountMinor : cardCheckoutAmount(row.payment.expectedAmountMinor ?? 0, row.payment.currency ?? "LKR"),
+              amountMinor: paymentDisplayAmount(
+                row.payment,
+                attempt?.active ? attempt.amountMinor : null,
+              ),
+              cardAmountMinor: attempt?.active
+                ? attempt.amountMinor
+                : cardCheckoutAmount(
+                    row.payment.expectedAmountMinor ?? 0,
+                    row.payment.currency ?? "LKR",
+                  ),
               attempt: attempt
                 ? { ...attempt, expiresAt: attempt.expiresAt.toISOString() }
                 : null,

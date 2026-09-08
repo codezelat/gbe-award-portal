@@ -240,7 +240,10 @@ export async function startCardCheckout(applicationId: string) {
       .values({
         paymentId: payment.id,
         environment: env.GENIE_ENVIRONMENT,
-        amountMinor: cardCheckoutAmount(payment.expectedAmountMinor, payment.currency),
+        amountMinor: cardCheckoutAmount(
+          payment.expectedAmountMinor,
+          payment.currency,
+        ),
         currency: payment.currency,
         expiresAt: new Date(Date.now() + 15 * 60_000),
       })

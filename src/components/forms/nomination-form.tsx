@@ -226,8 +226,14 @@ export function NominationForm({
       )
     : 0;
   const busy = ["preparing", "uploading", "finalising"].includes(stage);
-  const cardTest = paymentMethod === "card" && cardFeeMinor !== undefined && cardFeeMinor !== feeMinor;
-  const fee = formatFee(paymentMethod === "card" ? (cardFeeMinor ?? feeMinor) : feeMinor, currency);
+  const cardTest =
+    paymentMethod === "card" &&
+    cardFeeMinor !== undefined &&
+    cardFeeMinor !== feeMinor;
+  const fee = formatFee(
+    paymentMethod === "card" ? (cardFeeMinor ?? feeMinor) : feeMinor,
+    currency,
+  );
   const standardFee = formatFee(
     paymentInstructions?.standardFeeMinor,
     currency,
@@ -677,7 +683,9 @@ export function NominationForm({
           <FieldGroup>
             <div className="rounded-md border border-champagne/50 bg-gold-wash/55 p-4 text-sm text-graphite">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <p className="font-medium text-foreground">{cardTest ? "Card test payment" : "Application fee"}</p>
+                <p className="font-medium text-foreground">
+                  {cardTest ? "Card test payment" : "Application fee"}
+                </p>
                 <div className="flex items-baseline gap-2">
                   {standardFee && !cardTest ? (
                     <span className="text-sm text-muted-foreground line-through">
@@ -696,12 +704,19 @@ export function NominationForm({
                   Limited offer
                 </p>
               ) : null}
-              {cardTest ? <p className="mt-2 leading-6">Temporary card checkout test amount. Bank transfer remains at {formatFee(feeMinor, currency)}.</p> : <p className="mt-2 leading-6">
-                Covers nomination processing and document verification.
-                {paymentInstructions?.refundableIfNotAwarded
-                  ? " Fully refundable if the nominee is not awarded."
-                  : ""}
-              </p>}
+              {cardTest ? (
+                <p className="mt-2 leading-6">
+                  Temporary card checkout test amount. Bank transfer remains at{" "}
+                  {formatFee(feeMinor, currency)}.
+                </p>
+              ) : (
+                <p className="mt-2 leading-6">
+                  Covers nomination processing and document verification.
+                  {paymentInstructions?.refundableIfNotAwarded
+                    ? " Fully refundable if the nominee is not awarded."
+                    : ""}
+                </p>
+              )}
               <div className="mt-4 border-t border-champagne/40 pt-4">
                 <fieldset className="mb-4 grid gap-3 sm:grid-cols-2">
                   <legend className="sr-only">Payment method</legend>
@@ -882,7 +897,7 @@ export function NominationForm({
             <Button
               type="submit"
               disabled={busy || unavailable}
-              className="ceremonial-button h-12 flex-1 text-base font-semibold"
+              className="ceremonial-button h-auto min-h-14 flex-none gap-3 whitespace-normal px-6 py-3 text-base font-semibold leading-6 sm:flex-1"
             >
               {busy ? (
                 <LoaderCircle
@@ -974,9 +989,16 @@ function PaymentMethodDialog({
   return (
     <Dialog>
       <DialogTrigger
-        render={<Button type="button" variant="outline" size="sm" />}
+        render={
+          <Button
+            type="button"
+            className="h-auto min-h-14 w-full gap-3 whitespace-normal px-5 py-3 text-base font-semibold leading-6"
+          />
+        }
       >
-        View bank details
+        <Landmark aria-hidden className="size-5" />
+        View bank account details
+        <ArrowRight aria-hidden className="size-5" />
       </DialogTrigger>
       <DialogContent className="gap-5 p-5 sm:max-w-lg">
         <DialogHeader>

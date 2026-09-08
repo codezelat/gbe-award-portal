@@ -19,5 +19,7 @@ export function paymentDisplayAmount(
   if (payment.amountMinor !== null) return payment.amountMinor;
   const fee = payment.expectedAmountMinor ?? 0;
   if (payment.method !== "card" || !fee) return fee;
-  return activeAttemptAmount ?? cardCheckoutAmount(fee, payment.currency ?? "LKR");
+  return (
+    activeAttemptAmount ?? cardCheckoutAmount(fee, payment.currency ?? "LKR")
+  );
 }

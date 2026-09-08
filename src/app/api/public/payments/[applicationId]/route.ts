@@ -11,7 +11,10 @@ import {
 } from "@/server/services/card-payments";
 import { z } from "zod";
 import { paymentErrorMessage } from "@/lib/domain/genie";
-import { cardCheckoutAmount, paymentDisplayAmount } from "@/lib/domain/card-checkout-amount";
+import {
+  cardCheckoutAmount,
+  paymentDisplayAmount,
+} from "@/lib/domain/card-checkout-amount";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ applicationId: string }> };
@@ -104,8 +107,16 @@ export async function POST(request: Request, context: Context) {
           status: current.status,
           method: current.method,
           receipt: current.receiptReference,
-          amountMinor: paymentDisplayAmount(current, latest?.active ? latest.amountMinor : null),
-          cardAmountMinor: latest?.active ? latest.amountMinor : cardCheckoutAmount(current.expectedAmountMinor ?? 0, current.currency ?? "LKR"),
+          amountMinor: paymentDisplayAmount(
+            current,
+            latest?.active ? latest.amountMinor : null,
+          ),
+          cardAmountMinor: latest?.active
+            ? latest.amountMinor
+            : cardCheckoutAmount(
+                current.expectedAmountMinor ?? 0,
+                current.currency ?? "LKR",
+              ),
           attempt: latest ?? null,
         },
       },
