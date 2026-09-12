@@ -113,7 +113,7 @@ export default async function DraftPage({
           />
         ) : null}
       </header>
-      <dl className="grid min-w-0 gap-6 rounded-lg border bg-card p-5 sm:grid-cols-2 sm:p-7">
+      {Object.entries(data).some(([key, value]) => key !== "nomineeName" && Boolean(value)) ? <dl className="grid min-w-0 gap-6 rounded-lg border bg-card p-5 sm:grid-cols-2 sm:p-7">
         {[
           ["Email", data.email],
           ["Phone", data.phone],
@@ -151,7 +151,7 @@ export default async function DraftPage({
             </dd>
           </div>
         ) : null}
-      </dl>
+      </dl> : null}
       {linked.length ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-base font-semibold">Attachments</h2>

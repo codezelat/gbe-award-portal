@@ -93,11 +93,11 @@ export default async function InProgressPage({
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[34%]">Nominee</TableHead>
+                <TableHead className="md:w-[34%]">Nominee</TableHead>
                 <TableHead className="hidden w-[30%] md:table-cell">
                   Nomination
                 </TableHead>
-                <TableHead>Saved step</TableHead>
+                <TableHead className="w-28 md:w-auto">Saved step</TableHead>
                 <TableHead className="hidden w-40 lg:table-cell">
                   Updated
                 </TableHead>
@@ -110,12 +110,12 @@ export default async function InProgressPage({
               {result.rows.map((row) => (
                 <TableRow key={`${row.source}:${row.id}`}>
                   <TableCell className="align-top">
-                    <Link
-                      className="block truncate font-medium hover:underline"
-                      href={`/admin/in-progress/${row.id}?source=${row.source}`}
-                    >
-                      {row.nomineeName}
-                    </Link>
+                    <Tooltip>
+                      <TooltipTrigger render={<Link className="block truncate font-medium hover:underline" href={`/admin/in-progress/${row.id}?source=${row.source}`} />}>
+                        {row.nomineeName}
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[min(24rem,calc(100vw-2rem))] break-words">{row.nomineeName}</TooltipContent>
+                    </Tooltip>
                     {row.email ? (
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {row.email}
