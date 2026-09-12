@@ -29,8 +29,8 @@ export default async function InProgressPage({ searchParams }: {
       </header>
       <form className="surface mb-5 flex flex-wrap items-center gap-3 rounded-xl p-3 sm:p-4">
         <DebouncedApplicationSearch defaultValue={search} label="Search drafts" placeholder="Search name, email or nomination" />
-        <Button variant="outline" size="lg" type="submit">Search</Button>
-        {search ? <Button variant="ghost" size="lg" render={<Link href="/admin/in-progress" />}>Clear</Button> : null}
+        <Button variant="outline" className="h-11" type="submit">Search</Button>
+        {search ? <Button variant="ghost" className="h-11" render={<Link href="/admin/in-progress" />}>Clear</Button> : null}
       </form>
       {!result.rows.length ? (
         <Empty className="surface rounded-xl">

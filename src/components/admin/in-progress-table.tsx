@@ -52,9 +52,12 @@ export function InProgressTable({ rows }: { rows: InProgressRow[] }) {
             {rows.map((row) => (
               <TableRow key={`${row.source}:${row.id}`}>
                 <TableCell className="px-4 py-4">
-                  <Link href={`/admin/in-progress/${row.id}?source=${row.source}`} className="line-clamp-2 whitespace-normal font-semibold leading-6 [overflow-wrap:anywhere] hover:text-primary hover:underline focus-visible:outline-ring">
-                    {row.nomineeName}
-                  </Link>
+                  <Tooltip>
+                    <TooltipTrigger render={<Link href={`/admin/in-progress/${row.id}?source=${row.source}`} className="line-clamp-2 whitespace-normal font-semibold leading-6 [overflow-wrap:anywhere] hover:text-primary hover:underline focus-visible:outline-ring" />}>
+                      {row.nomineeName}
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[min(28rem,calc(100vw-2rem))] [overflow-wrap:anywhere]">{row.nomineeName}</TooltipContent>
+                  </Tooltip>
                   {row.email ? <p className="mt-1 truncate text-xs text-muted-foreground">{row.email}</p> : null}
                 </TableCell>
                 <TableCell className="px-4 py-4"><Nomination row={row} /></TableCell>
@@ -76,7 +79,7 @@ export function InProgressTable({ rows }: { rows: InProgressRow[] }) {
       <div className="divide-y xl:hidden">
         {rows.map((row) => (
           <article key={`${row.source}:${row.id}`} className="min-w-0 p-4">
-            <Link href={`/admin/in-progress/${row.id}?source=${row.source}`} className="block rounded-sm font-semibold leading-6 [overflow-wrap:anywhere] hover:text-primary focus-visible:outline-ring">
+            <Link href={`/admin/in-progress/${row.id}?source=${row.source}`} className="line-clamp-2 rounded-sm font-semibold leading-6 [overflow-wrap:anywhere] hover:text-primary focus-visible:outline-ring">
               {row.nomineeName}
             </Link>
             {row.email ? <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">{row.email}</p> : null}
