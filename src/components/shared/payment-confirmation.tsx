@@ -53,7 +53,9 @@ export function PaymentConfirmation({
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">
               {label}
             </dt>
-            <dd className="mt-1 font-medium [overflow-wrap:anywhere]">{value}</dd>
+            <dd className="mt-1 font-medium [overflow-wrap:anywhere]">
+              {value}
+            </dd>
           </div>
         ))}
       </dl>

@@ -208,7 +208,8 @@
     border-color: #e9c8c8;
   }
 
-  .workspace-shell {
+  .workspace-shell,
+  body:has(.workspace-shell) {
     --font-heading: var(--font-manrope);
     --font-display: var(--font-manrope);
     --background: #f5f7f8;
@@ -293,7 +294,9 @@
 }
 
 .workspace-shell .font-display,
-.workspace-shell .font-heading {
+.workspace-shell .font-heading,
+body:has(.workspace-shell) .font-display,
+body:has(.workspace-shell) .font-heading {
   font-family: var(--font-manrope), system-ui, sans-serif;
 }
 

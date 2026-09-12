@@ -1,10 +1,13 @@
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { applications, payments } from "@/lib/db/schema";
 import { requirePortalSession } from "@/server/dal/auth";
 import { AuthenticatedUpload } from "@/components/uploads/authenticated-upload";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Button } from "@/components/ui/button";
 export default async function ReplacePayment({
   params,
 }: {
@@ -20,11 +23,46 @@ export default async function ReplacePayment({
       nonDeletedApplications(
         eq(applications.id, applicationId),
         eq(applications.ownerProfileId, profile.id),
-        eq(payments.status, "rejected"),
       ),
     )
     .limit(1);
   if (!row) notFound();
+  if (row.payment.status !== "rejected" || row.payment.method === "card") {
+    return (
+      <>
+        <h1 className="page-heading">Payment</h1>
+        <p className="mt-2 font-mono text-sm text-muted-foreground">
+          {row.application.reference}
+        </p>
+        <section className="surface mt-6 flex max-w-2xl flex-col items-start gap-5 rounded-xl p-5 sm:p-7">
+          <StatusBadge status={row.payment.status} />
+          {row.payment.amountMinor !== null ? (
+            <p className="text-2xl font-semibold">
+              {row.payment.currency ?? "LKR"}{" "}
+              {(row.payment.amountMinor / 100).toLocaleString("en-LK")}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-3">
+            {row.payment.status === "awaiting_payment" && row.payment.method ? (
+              <Button
+                className="h-11"
+                render={<Link href={`/apply/payment/${applicationId}`} />}
+              >
+                Complete payment
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              className="h-11"
+              render={<Link href={`/portal/applications/${applicationId}`} />}
+            >
+              Back to nomination
+            </Button>
+          </div>
+        </section>
+      </>
+    );
+  }
   return (
     <>
       <h1 className="page-heading">Replace payment proof</h1>

@@ -1,7 +1,9 @@
 "use client";
 
+import { X } from "lucide-react";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -40,6 +42,7 @@ export function ApplicationEditDialog({
       <DialogContent
         className="inset-y-0 right-0 left-auto h-dvh w-full max-w-[calc(100%-1rem)] translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-xl rounded-r-none p-0 sm:max-w-2xl"
         aria-describedby="application-edit-description"
+        showCloseButton={false}
       >
         <DialogHeader className="sticky top-0 z-10 border-b bg-popover px-6 py-5 pr-14">
           <DialogTitle>Edit nomination details</DialogTitle>
@@ -47,6 +50,19 @@ export function ApplicationEditDialog({
             Save only the fields that need correction. Each save creates an
             audited new version.
           </DialogDescription>
+          <DialogClose
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 size-11"
+              />
+            }
+          >
+            <X aria-hidden />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
         <ApplicationCorrectionForm className="grid min-w-0 grid-cols-1 gap-5 p-4 [overflow-wrap:anywhere] [&>*]:min-w-0 sm:p-6 md:grid-cols-2">
           <input type="hidden" name="applicationId" value={application.id} />
@@ -83,7 +99,7 @@ export function ApplicationEditDialog({
               required
               minLength={10}
               maxLength={4000}
-              className="min-h-36 bg-white"
+              className="min-h-36 max-h-64 overflow-y-auto bg-white"
             />
           </label>
           <label className="flex flex-col gap-2 text-sm font-medium">
