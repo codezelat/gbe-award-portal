@@ -1,4 +1,4 @@
-import { TablePageSkeleton } from "@/components/shared/loading-skeletons";
+import { InProgressSkeleton } from "@/components/admin/in-progress-skeletons";
 export default function Loading() {
-  return <TablePageSkeleton label="Loading in-progress nominations" />;
+  return <InProgressSkeleton />;
 }

@@ -121,7 +121,7 @@ export function ApplicationsTable({
               >
                 {row.original.awardNomination}
               </TooltipTrigger>
-              <TooltipContent className="max-w-md items-start whitespace-pre-wrap px-4 py-3 text-left leading-5">
+              <TooltipContent className="max-h-[min(20rem,60dvh)] max-w-[min(28rem,calc(100vw-2rem))] items-start overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] px-4 py-3 text-left leading-5">
                 <span className="font-medium text-background">
                   {row.original.categoryNameSnapshot}
                 </span>
@@ -210,7 +210,7 @@ export function ApplicationsTable({
                       router.push(`/admin/applications/${row.original.id}`);
                   }}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter")
+                    if (event.key === "Enter" && event.target === event.currentTarget)
                       router.push(`/admin/applications/${row.original.id}`);
                   }}
                   data-state={row.getIsSelected() ? "selected" : undefined}
@@ -262,14 +262,14 @@ export function ApplicationsTable({
                   </Link>
                   <Link
                     href={`/admin/applications/${row.original.id}`}
-                    className="mt-1 block font-semibold leading-snug hover:text-primary hover:underline"
+                    className="mt-1 block font-semibold leading-snug [overflow-wrap:anywhere] hover:text-primary hover:underline"
                   >
                     {row.original.nomineeName}
                   </Link>
-                  <p className="mt-1 text-xs font-medium text-muted-foreground">
+                  <p className="mt-1 text-xs font-medium text-muted-foreground [overflow-wrap:anywhere]">
                     {row.original.categoryNameSnapshot}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                     {row.original.awardNomination}
                   </p>
                 </div>
@@ -277,7 +277,7 @@ export function ApplicationsTable({
               <div className="mt-3 flex flex-wrap items-center gap-2 pl-7">
                 <StatusBadge status={row.original.workflowStatus} />
                 <StatusBadge status={row.original.paymentStatus} />
-                <span className="text-xs text-muted-foreground">
+                <span className="min-w-0 text-xs text-muted-foreground [overflow-wrap:anywhere]">
                   {row.original.reviewerName}
                 </span>
               </div>
@@ -290,7 +290,7 @@ export function ApplicationsTable({
         )}
       </div>
       {selected.length ? (
-        <div className="glass-shell sticky bottom-4 z-20 mx-3 mb-3 rounded-lg p-3 shadow-xl">
+        <div className="glass-shell sticky bottom-4 z-20 mx-3 mb-3 max-h-[65dvh] overflow-y-auto rounded-lg p-3 shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <strong className="text-sm">{selected.length} selected</strong>
             <div className="flex flex-wrap items-center gap-2">
@@ -322,7 +322,7 @@ export function ApplicationsTable({
               </span>
             </summary>
             <div className="mt-3 grid gap-3 xl:grid-cols-3">
-              <form action={bulkAssignReviewerAction} className="flex gap-2">
+              <form action={bulkAssignReviewerAction} className="flex min-w-0 flex-wrap gap-2">
                 {selected.map((id) => (
                   <input
                     key={id}
@@ -334,7 +334,7 @@ export function ApplicationsTable({
                 <select
                   name="reviewerId"
                   aria-label="Assign selected applications to a staff member"
-                  className="h-9 rounded-md border bg-white px-3 text-sm"
+                  className="h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm"
                 >
                   <option value="">Unassigned</option>
                   {reviewers.map((reviewer) => (
@@ -348,7 +348,7 @@ export function ApplicationsTable({
                   Assign
                 </Button>
               </form>
-              <form action={bulkChangeSafeStatusAction} className="flex gap-2">
+              <form action={bulkChangeSafeStatusAction} className="flex min-w-0 flex-wrap gap-2">
                 {selected.map((id) => (
                   <input
                     key={id}
@@ -360,7 +360,7 @@ export function ApplicationsTable({
                 <select
                   name="to"
                   aria-label="Safe bulk status"
-                  className="h-9 rounded-md border bg-white px-3 text-sm"
+                  className="h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm"
                 >
                   <option value="under_review">Move to under review</option>
                   <option value="archived">Archive eligible</option>
@@ -369,13 +369,13 @@ export function ApplicationsTable({
                   name="reason"
                   aria-label="Bulk status reason"
                   placeholder="Archive reason if required"
-                  className="h-9 w-48 bg-white"
+                  className="h-11 w-full min-w-0 bg-white"
                 />
                 <Button size="sm" variant="outline">
                   Apply status
                 </Button>
               </form>
-              <form action={bulkSendTemplateAction} className="flex gap-2">
+              <form action={bulkSendTemplateAction} className="flex min-w-0 flex-wrap gap-2">
                 {selected.map((id) => (
                   <input
                     key={id}
@@ -387,7 +387,7 @@ export function ApplicationsTable({
                 <select
                   name="template"
                   aria-label="Approved communication template"
-                  className="h-9 rounded-md border bg-white px-3 text-sm"
+                  className="h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm"
                 >
                   <option value="review_update">Review update</option>
                   <option value="deadline_reminder">Deadline reminder</option>

@@ -1,4 +1,4 @@
-import { DetailPageSkeleton } from "@/components/shared/loading-skeletons";
+import { InProgressDetailSkeleton } from "@/components/admin/in-progress-skeletons";
 export default function Loading() {
-  return <DetailPageSkeleton label="Loading saved nomination" />;
+  return <InProgressDetailSkeleton />;
 }
