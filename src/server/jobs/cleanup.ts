@@ -1,6 +1,6 @@
 import "server-only";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { and, eq, gt, inArray, lt, lte } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, lte, notExists } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
   applications,
@@ -13,11 +13,12 @@ import {
   rateLimitBuckets,
   systemSettings,
   uploadSessions,
+  nominationDrafts,
+  nominationDraftFiles,
   verification,
 } from "@/lib/db/schema";
 import { getR2, r2ObjectKey } from "@/lib/r2/client";
 import { env } from "@/lib/env";
-import { purgeIncompleteNominationShell } from "@/server/services/incomplete-nomination-cleanup";
 export async function cleanupStaleUploads() {
   const db = getDb();
   const expired = await db
@@ -30,53 +31,57 @@ export async function cleanupStaleUploads() {
       ),
     )
     .limit(100);
-  let purgedIncompleteNominations = 0;
-  let retainedIncompleteNominations = 0;
-  const processedApplicationIds = new Set<string>();
   for (const session of expired) {
-    const manifest = session.expectedManifest as Array<{
-      id: string;
-      kind: string;
-    }>;
-    const [application] = await db
-      .select({ application: applications, cycle: awardCycles })
-      .from(applications)
-      .innerJoin(awardCycles, eq(applications.cycleId, awardCycles.id))
-      .where(eq(applications.id, session.applicationId))
-      .limit(1);
-    if (application)
-      for (const item of manifest) {
-        const key = r2ObjectKey(
-          `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${application.cycle.year}/${application.application.id}/${item.id}`,
-        );
-        await getR2().send(
-          new DeleteObjectCommand({
-            Bucket: env.R2_PRIVATE_BUCKET,
-            Key: key,
-          }),
-        );
-      }
-    await db
-      .update(uploadSessions)
-      .set({ status: "expired", updatedAt: new Date() })
-      .where(eq(uploadSessions.id, session.id));
-    if (!application || processedApplicationIds.has(session.applicationId))
-      continue;
-    processedApplicationIds.add(session.applicationId);
-    try {
-      await purgeIncompleteNominationShell(
-        session.applicationId,
-        {
-          type: "system",
-          reason: "Expired upload session cleared automatically.",
-        },
-        { deleteStagedObjects: false },
-      );
-      purgedIncompleteNominations += 1;
-    } catch {
-      // A non-empty or changed record is retained for the normal staff workflow.
-      retainedIncompleteNominations += 1;
-    }
+    await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(uploadSessions)
+        .where(
+          and(
+            eq(uploadSessions.id, session.id),
+            eq(uploadSessions.status, "uploading"),
+            lt(uploadSessions.expiresAt, new Date()),
+          ),
+        )
+        .for("update");
+      if (!current) return;
+      const [draft] = await tx
+        .select({ id: nominationDrafts.id })
+        .from(nominationDrafts)
+        .where(eq(nominationDrafts.applicationId, session.applicationId));
+      const manifest = session.expectedManifest as Array<{
+        id: string;
+        kind: string;
+      }>;
+      const [application] = await tx
+        .select({ application: applications, cycle: awardCycles })
+        .from(applications)
+        .innerJoin(awardCycles, eq(applications.cycleId, awardCycles.id))
+        .where(eq(applications.id, session.applicationId))
+        .limit(1);
+      if (
+        application &&
+        !draft &&
+        !application.application.submittedAt &&
+        application.application.workflowStatus === "uploading"
+      )
+        for (const item of manifest) {
+          const key = r2ObjectKey(
+            `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${application.cycle.year}/${application.application.id}/${item.id}`,
+          );
+          await getR2().send(
+            new DeleteObjectCommand({
+              Bucket: env.R2_PRIVATE_BUCKET,
+              Key: key,
+            }),
+          );
+        }
+      await tx
+        .update(uploadSessions)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(eq(uploadSessions.id, session.id));
+      // Keep unfinished records visible in In-progress until staff explicitly remove them.
+    });
   }
   const pendingFiles = await db
     .select()
@@ -84,6 +89,12 @@ export async function cleanupStaleUploads() {
     .where(
       and(
         eq(files.status, "pending"),
+        notExists(
+          db
+            .select({ id: nominationDraftFiles.id })
+            .from(nominationDraftFiles)
+            .where(eq(nominationDraftFiles.fileId, files.id)),
+        ),
         lt(files.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)),
       ),
     )
@@ -106,8 +117,8 @@ export async function cleanupStaleUploads() {
   return {
     expiredSessions: expired.length,
     deletedPendingFiles: pendingFiles.length,
-    purgedIncompleteNominations,
-    retainedIncompleteNominations,
+    purgedIncompleteNominations: 0,
+    retainedIncompleteNominations: expired.length,
   };
 }
 export async function cleanupExpiredExports() {

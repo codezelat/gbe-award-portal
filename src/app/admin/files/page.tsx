@@ -1,11 +1,27 @@
 import Link from "next/link";
-import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  isNull,
+  notExists,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { Download, Search } from "lucide-react";
 import { getDb } from "@/lib/db";
 import { nonDeletedApplications } from "@/server/dal/application-visibility";
-import { applicationFiles, applications, files } from "@/lib/db/schema";
+import {
+  applicationFiles,
+  applications,
+  files,
+  nominationDraftFiles,
+  nominationDrafts,
+} from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { FileDispositionButton } from "@/components/admin/file-disposition-button";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
@@ -34,6 +50,23 @@ export default async function FilesPage({
     ? requestedSize
     : 25;
   const filters: SQL[] = [nonDeletedApplications()];
+  filters.push(
+    notExists(
+      getDb()
+        .select({ id: nominationDraftFiles.id })
+        .from(nominationDraftFiles)
+        .innerJoin(
+          nominationDrafts,
+          eq(nominationDraftFiles.draftId, nominationDrafts.id),
+        )
+        .where(
+          and(
+            eq(nominationDraftFiles.fileId, files.id),
+            isNull(nominationDrafts.submittedAt),
+          ),
+        ),
+    ),
+  );
   if (!hasPermission(membership, "applications.view_all"))
     filters.push(eq(applications.assignedReviewerId, profile.id));
   if (query.status && files.status.enumValues.includes(query.status as never))

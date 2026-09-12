@@ -10,6 +10,13 @@ async function fillNomination(page: Page, continueToPayment = true) {
   await page
     .getByLabel("Company Name / Full Name", { exact: false })
     .fill(`Playwright Nominee ${Date.now()}`);
+  await page.waitForFunction(() =>
+    Boolean(
+      document.querySelector<HTMLInputElement>(
+        'input[name="cf-turnstile-response"]',
+      )?.value,
+    ),
+  );
   await page.getByRole("button", { name: "Continue" }).click();
   await page
     .getByLabel("Email Address", { exact: false })
@@ -88,6 +95,10 @@ test("retries only a failed upload without duplicating the application", async (
     buffer: paymentPng,
   });
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByText(/Your details are saved; press Continue to retry/i),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
     .getByRole("checkbox", {
       name: /I confirm that the details provided are accurate/i,
@@ -101,8 +112,6 @@ test("retries only a failed upload without duplicating the application", async (
     ),
   );
   await page.getByRole("button", { name: "Submit nomination" }).click();
-  await expect(page.getByText(/Successful files are preserved/i)).toBeVisible();
-  await page.getByRole("button", { name: "Retry failed files" }).click();
   await expect(
     page.getByRole("heading", { name: "Nomination received" }),
   ).toBeVisible({ timeout: 30_000 });

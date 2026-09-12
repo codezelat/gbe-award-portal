@@ -19,6 +19,7 @@ import {
   applicationFiles,
   applications,
   files,
+  nominationDrafts,
   payments,
 } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
@@ -64,6 +65,8 @@ export default async function PaymentsPage({
       ? eq(applications.workflowStatus, "uploading")
       : ne(applications.workflowStatus, "uploading"),
   ];
+  const noSavedDraft = sql`not exists (select 1 from ${nominationDrafts} where ${nominationDrafts.applicationId} = ${applications.id})`;
+  if (isIncompleteView) filters.push(noSavedDraft);
   if (
     query.status &&
     payments.status.enumValues.includes(query.status as never)
@@ -129,6 +132,7 @@ export default async function PaymentsPage({
             and(
               isNull(applications.deletedAt),
               eq(applications.workflowStatus, "uploading"),
+              noSavedDraft,
             ),
           )
       : Promise.resolve([{ value: 0 }]),

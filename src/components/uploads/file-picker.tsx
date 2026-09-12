@@ -24,6 +24,8 @@ export type UploadStatus = "ready" | "uploading" | "uploaded" | "failed";
 export type SelectedUpload = {
   id: string;
   file: File;
+  /** A verified server-side file restored after a page reload, never re-uploaded. */
+  savedSize?: number;
   kind: "supporting_document" | "payment_proof";
   status: UploadStatus;
   progress: number;
@@ -136,7 +138,12 @@ export function FilePicker({
                   {upload.file.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {(upload.file.size / 1024 / 1024).toFixed(2)} MB ·{" "}
+                  {(
+                    (upload.savedSize ?? upload.file.size) /
+                    1024 /
+                    1024
+                  ).toFixed(2)}{" "}
+                  MB ·{" "}
                   {upload.status === "ready"
                     ? "Ready to upload"
                     : upload.status === "uploading"

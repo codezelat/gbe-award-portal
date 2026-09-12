@@ -15,6 +15,7 @@ import {
   files,
   payments,
   uploadSessions,
+  nominationDrafts,
 } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
 import { env } from "@/lib/env";
@@ -29,6 +30,7 @@ import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-deli
 import { z } from "zod";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
 import { setPaymentSession } from "@/server/security/payment-session";
+import { draftFileRows } from "@/server/services/nomination-drafts";
 
 export const runtime = "nodejs";
 const inputSchema = z.object({
@@ -81,6 +83,8 @@ export async function POST(request: Request) {
     const row = rows[0];
     if (!row || row.session.publicTokenHash !== hash(token))
       throw new Error("The upload session is invalid or expired.");
+    if (row.application.deletedAt)
+      throw new Error("This nomination is no longer available.");
     if (row.session.status === "completed" && row.application.reference) {
       if (row.payment.method === "card" && row.session.expiresAt > new Date())
         await setPaymentSession(applicationId, token);
@@ -99,12 +103,23 @@ export async function POST(request: Request) {
       throw new Error(
         "The upload session expired. Your entered details remain on this page; please submit again.",
       );
+    if (row.session.status !== "uploading")
+      throw new Error(
+        "The form changed. Please submit the latest saved details.",
+      );
     if (row.cycle.status !== "open" || new Date() > row.cycle.closesAt)
       throw new Error("Nominations are no longer open for completion.");
     const manifest = z
       .array(fileManifestItemSchema)
       .parse(row.session.expectedManifest);
     const r2 = getR2();
+    const [draft] = await db
+      .select()
+      .from(nominationDrafts)
+      .where(eq(nominationDrafts.applicationId, applicationId));
+    if (draft?.deletedAt)
+      throw new Error("This nomination is no longer available.");
+    const savedFiles = draft ? await draftFileRows(draft.id) : [];
     const readyFiles: Array<{
       id: string;
       kind: "supporting_document" | "payment_proof";
@@ -114,11 +129,17 @@ export async function POST(request: Request) {
       claimed: string;
       detected: string;
       etag?: string;
+      storedFileId?: string;
     }> = [];
     for (const item of manifest) {
-      const key = r2ObjectKey(
-        `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${row.cycle.year}/${row.application.id}/${item.id}`,
-      );
+      const saved = savedFiles.find(({ link }) => link.id === item.id);
+      if (draft && (!saved || saved.file.status !== "ready"))
+        throw new Error("A saved file is no longer available.");
+      const key =
+        saved?.file.objectKey ??
+        r2ObjectKey(
+          `${item.kind === "payment_proof" ? "payment-proofs" : "applications"}/${row.cycle.year}/${row.application.id}/${item.id}`,
+        );
       const head = await r2.send(
         new HeadObjectCommand({ Bucket: env.R2_PRIVATE_BUCKET, Key: key }),
       );
@@ -140,6 +161,7 @@ export async function POST(request: Request) {
         throw new Error(`${item.name} does not match an accepted file type.`);
       readyFiles.push({
         id: item.id,
+        storedFileId: saved?.file.id,
         kind: item.kind,
         key,
         name: item.name,
@@ -150,12 +172,22 @@ export async function POST(request: Request) {
       });
     }
     const reference = await db.transaction(async (tx) => {
+      if (draft) {
+        const [current] = await tx
+          .select()
+          .from(nominationDrafts)
+          .where(eq(nominationDrafts.id, draft.id))
+          .for("update");
+        if (!current || current.deletedAt)
+          throw new Error("This nomination is no longer available.");
+      }
       const claimed = await tx
         .update(uploadSessions)
         .set({ updatedAt: new Date() })
         .where(
           and(
             eq(uploadSessions.id, row.session.id),
+            eq(uploadSessions.idempotencyKey, input.idempotencyKey),
             eq(uploadSessions.status, "uploading"),
           ),
         )
@@ -205,6 +237,7 @@ export async function POST(request: Request) {
                   eq(applications.id, row.application.id),
                   eq(applications.workflowStatus, "uploading"),
                   isNull(applications.reference),
+                  isNull(applications.deletedAt),
                 ),
               )
               .returning({ id: applications.id }),
@@ -225,23 +258,28 @@ export async function POST(request: Request) {
         .set({ paymentReference, updatedAt: new Date() })
         .where(eq(payments.applicationId, row.application.id));
       for (const item of readyFiles) {
-        const [stored] = await tx
-          .insert(files)
-          .values({
-            bucket: "private",
-            objectKey: item.key,
-            purpose: item.kind,
-            status: "ready",
-            originalFilename: item.name,
-            safeDownloadFilename: item.name.replace(/[^a-zA-Z0-9._ -]/g, "_"),
-            mimeTypeClaimed: item.claimed,
-            mimeTypeDetected: item.detected,
-            sizeBytes: item.size,
-            etag: item.etag,
-            createdViaPublicSubmission: true,
-            validatedAt: new Date(),
-          })
-          .returning({ id: files.id });
+        const [stored] = item.storedFileId
+          ? [{ id: item.storedFileId }]
+          : await tx
+              .insert(files)
+              .values({
+                bucket: "private",
+                objectKey: item.key,
+                purpose: item.kind,
+                status: "ready",
+                originalFilename: item.name,
+                safeDownloadFilename: item.name.replace(
+                  /[^a-zA-Z0-9._ -]/g,
+                  "_",
+                ),
+                mimeTypeClaimed: item.claimed,
+                mimeTypeDetected: item.detected,
+                sizeBytes: item.size,
+                etag: item.etag,
+                createdViaPublicSubmission: true,
+                validatedAt: new Date(),
+              })
+              .returning({ id: files.id });
         const [link] = await tx
           .insert(applicationFiles)
           .values({
@@ -286,11 +324,17 @@ export async function POST(request: Request) {
           and(
             eq(applications.id, row.application.id),
             eq(applications.workflowStatus, "uploading"),
+            isNull(applications.deletedAt),
           ),
         )
         .returning({ id: applications.id });
       if (!updatedApplication.length)
         throw new Error("This nomination was already finalised.");
+      if (draft)
+        await tx
+          .update(nominationDrafts)
+          .set({ submittedAt, updatedAt: submittedAt })
+          .where(eq(nominationDrafts.id, draft.id));
       await tx.insert(applicationStatusHistory).values({
         applicationId: row.application.id,
         fromStatus: "uploading",
@@ -368,14 +412,14 @@ export async function POST(request: Request) {
         level: "error",
         action: "public application complete",
         requestId,
-        error: error instanceof Error ? error.message : "unknown",
+        error: error instanceof Error ? error.name : "unknown",
       }),
     );
     return NextResponse.json(
       {
         ok: false,
         message:
-          error instanceof Error
+          error instanceof Error && !("cause" in error)
             ? error.message
             : "We could not confirm your nomination. Please try again.",
         errorId: requestId,

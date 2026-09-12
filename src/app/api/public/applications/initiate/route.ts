@@ -23,6 +23,7 @@ import { verifyTurnstile } from "@/server/security/turnstile";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
 import { requireGenie } from "@/server/services/genie-client";
+import { initiateDraftSubmission } from "@/server/services/nomination-drafts";
 
 export const runtime = "nodejs";
 const hash = (value: string) =>
@@ -76,6 +77,10 @@ export async function POST(request: Request) {
       throw new Error("Please review the nomination before submitting.");
     const ip = requestHeaders.get("x-forwarded-for")?.split(",")[0] ?? "local";
     await enforceRateLimit(`public-initiate:${ip}:${hash(input.email)}`);
+    if (input.draftCredential) {
+      const data = await initiateDraftSubmission(input, ip);
+      return NextResponse.json({ ok: true, data });
+    }
     const db = getDb();
     const existing = await db
       .select({
@@ -239,14 +244,14 @@ export async function POST(request: Request) {
         level: "error",
         action: "public application initiate",
         requestId,
-        error: error instanceof Error ? error.message : "unknown",
+        error: error instanceof Error ? error.name : "unknown",
       }),
     );
     return NextResponse.json(
       {
         ok: false,
         message:
-          error instanceof Error
+          error instanceof Error && !("cause" in error)
             ? error.message
             : "We could not prepare the secure upload. Please try again.",
         errorId: requestId,

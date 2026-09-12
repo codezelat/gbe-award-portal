@@ -116,6 +116,7 @@ export default async function ApplyPage() {
             </div>
           </div>
           <NominationForm
+            cycleId={cycle?.id}
             cardEnabled={genieAvailable()}
             cardFeeMinor={
               cycle

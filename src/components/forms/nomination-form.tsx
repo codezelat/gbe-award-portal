@@ -66,6 +66,12 @@ import {
   type SelectedUpload,
 } from "@/components/uploads/file-picker";
 import { Turnstile } from "./turnstile";
+import {
+  draftCredentialSchema,
+  draftDataSchema,
+  draftManifestSchema,
+  type DraftCredential,
+} from "@/lib/validation/nomination-draft";
 
 type Category = { id: string; name: string };
 type PaymentInstructions = {
@@ -90,6 +96,8 @@ type UploadTarget = {
 type InitiatedData = {
   sessionToken: string;
   uploads: UploadTarget[];
+  preparedFileIds?: string[];
+  idempotencyKey?: string;
 };
 type InitiateResponse =
   | { ok: true; data: InitiatedData }
@@ -129,6 +137,12 @@ function uploadFile(
   signal: AbortSignal,
   onProgress: (value: number) => void,
 ) {
+  if (upload.savedSize !== undefined)
+    return Promise.reject(
+      new Error(
+        "This saved file is no longer available. Remove it and select it again.",
+      ),
+    );
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const abort = () => xhr.abort();
@@ -155,6 +169,7 @@ function uploadFile(
 }
 
 export function NominationForm({
+  cycleId,
   categories,
   unavailable,
   feeMinor,
@@ -163,6 +178,7 @@ export function NominationForm({
   cardEnabled = false,
   cardFeeMinor,
 }: {
+  cycleId?: string;
   categories: Category[];
   unavailable?: boolean;
   feeMinor?: number;
@@ -186,6 +202,13 @@ export function NominationForm({
   );
   const [turnstileReset, setTurnstileReset] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+  const [savingStep, setSavingStep] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const draftCredential = useRef<DraftCredential | null>(null);
+  const draftVersion = useRef(0);
+  const stepLock = useRef(false);
+  const submitLock = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const submissionCompleteRef = useRef(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
@@ -226,7 +249,11 @@ export function NominationForm({
         ) / allFiles.length,
       )
     : 0;
-  const busy = ["preparing", "uploading", "finalising"].includes(stage);
+  const busy =
+    savingStep ||
+    restoring ||
+    restoreFailed ||
+    ["preparing", "uploading", "finalising"].includes(stage);
   const cardTest =
     paymentMethod === "card" &&
     cardFeeMinor !== undefined &&
@@ -246,13 +273,193 @@ export function NominationForm({
   }, [currentStep]);
 
   useEffect(() => {
-    if (!busy) return;
+    if (!busy || restoreFailed) return;
     const warn = (event: BeforeUnloadEvent) => {
       if (!submissionCompleteRef.current) event.preventDefault();
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [busy]);
+  }, [busy, restoreFailed]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function restore() {
+      try {
+        const stored = sessionStorage.getItem(`gbe-draft:${cycleId}`);
+        if (!stored) return;
+        const parsed = draftCredentialSchema.safeParse(JSON.parse(stored));
+        if (!parsed.success) {
+          sessionStorage.removeItem(`gbe-draft:${cycleId}`);
+          return;
+        }
+        const credential = parsed.data;
+        const response = await fetch("/api/public/drafts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "resume", credential }),
+        });
+        const result = await response.json();
+        if (response.status === 404) {
+          sessionStorage.removeItem(`gbe-draft:${cycleId}`);
+          return;
+        }
+        if (!result.ok) throw new Error("Could not load saved form.");
+        if (result.data.submitted || result.data.cycleId !== cycleId) {
+          sessionStorage.removeItem(`gbe-draft:${cycleId}`);
+          return;
+        }
+        if (cancelled) return;
+        const values = draftDataSchema.parse(result.data.payload);
+        const manifest = draftManifestSchema.parse(result.data.files);
+        draftCredential.current = credential;
+        draftVersion.current = result.data.version;
+        for (const [key, value] of Object.entries(values)) {
+          if (key === "paymentMethod") continue;
+          form.setValue(key as keyof PublicApplicationInput, value);
+        }
+        setPaymentMethod(values.paymentMethod ?? "bank_transfer");
+        const uploads: SelectedUpload[] = manifest.map((item) => ({
+          id: item.id,
+          kind: item.kind,
+          file: new File([], item.name, { type: item.type }),
+          savedSize: item.size,
+          status: "uploaded",
+          progress: 100,
+        }));
+        setSupporting(
+          uploads.filter((file) => file.kind === "supporting_document"),
+        );
+        setPayment(uploads.filter((file) => file.kind === "payment_proof"));
+        setCurrentStep(Math.min(result.data.step + 1, 3));
+        if (result.data.pendingFiles > 0) {
+          setCurrentStep(Math.min(result.data.step, 2));
+          form.setError("root", {
+            message:
+              "Your details are restored. Choose any unfinished uploads again before continuing.",
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setRestoreFailed(true);
+          form.setError("root", {
+            message:
+              "Your saved form could not be loaded. Refresh to try again.",
+          });
+        }
+      } finally {
+        if (!cancelled) setRestoring(false);
+      }
+    }
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+  }, [cycleId, form]);
+
+  function manifest() {
+    return allFiles.map(({ id, file, kind, savedSize }) => ({
+      id,
+      name: file.name,
+      size: savedSize ?? file.size,
+      type: file.type,
+      kind,
+    }));
+  }
+  async function saveStep(step: number) {
+    if (!cycleId) throw new Error("Nominations are not currently open.");
+    if (!draftCredential.current) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      draftCredential.current = {
+        id: crypto.randomUUID(),
+        secret: Array.from(bytes, (byte) =>
+          byte.toString(16).padStart(2, "0"),
+        ).join(""),
+      };
+      try {
+        sessionStorage.setItem(
+          `gbe-draft:${cycleId}`,
+          JSON.stringify(draftCredential.current),
+        );
+      } catch {
+        /* In-memory retries still work if browser storage is disabled. */
+      }
+    }
+    const values = form.getValues();
+    const data = Object.fromEntries(
+      Object.entries({
+        nomineeName: values.nomineeName,
+        designation: values.designation,
+        businessWebsite: values.businessWebsite,
+        email: values.email,
+        phone: values.phone,
+        categoryId: values.categoryId,
+        awardNomination: values.awardNomination,
+        ...(step >= 2 ? { paymentMethod } : {}),
+      }).filter(([, value]) => value !== ""),
+    );
+    const response = await fetch("/api/public/drafts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "save",
+        credential: draftCredential.current,
+        cycleId,
+        version: draftVersion.current,
+        step,
+        data,
+        files: manifest(),
+        turnstileToken: values.turnstileToken,
+        startedAt,
+        honeypot: values.honeypot,
+      }),
+    });
+    const result = await response.json();
+    if (!result.ok)
+      throw new Error(
+        result.message ?? "Could not save this step. Please retry.",
+      );
+    draftVersion.current = result.data.version;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const outcomes = await Promise.allSettled(
+      (result.data.uploads as UploadTarget[]).map(async (target) => {
+        const file = allFiles.find((file) => file.id === target.id);
+        if (!file) throw new Error("Select the missing file again.");
+        updateFile(file.id, { status: "uploading", progress: 0 });
+        try {
+          await uploadFile(file, target, controller.signal, (progress) =>
+            updateFile(file.id, { progress }),
+          );
+          updateFile(file.id, { status: "uploaded", progress: 100 });
+        } catch (error) {
+          updateFile(file.id, {
+            status: "failed",
+            error: "Upload failed. Retry this step.",
+          });
+          throw error;
+        }
+      }),
+    );
+    abortRef.current = null;
+    if (outcomes.some((result) => result.status === "rejected"))
+      throw new Error(
+        "Some files could not be saved. Your details are saved; press Continue to retry.",
+      );
+    const confirmation = await fetch("/api/public/drafts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "confirm",
+        credential: draftCredential.current,
+        version: draftVersion.current,
+      }),
+    });
+    const confirmed = await confirmation.json();
+    if (!confirmed.ok)
+      throw new Error(
+        confirmed.message ?? "Could not verify the saved files. Please retry.",
+      );
+  }
 
   function updateFile(id: string, patch: Partial<SelectedUpload>) {
     const update = (files: SelectedUpload[]) =>
@@ -298,10 +505,13 @@ export function NominationForm({
   }
 
   async function runSubmission(values: PublicApplicationInput) {
+    if (submitLock.current || stepLock.current || restoring) return;
+    submitLock.current = true;
     submissionCompleteRef.current = false;
     if (paymentMethod === "bank_transfer" && payment.length !== 1) {
       setFileError("Choose one payment slip or screenshot.");
       errorSummaryRef.current?.focus();
+      submitLock.current = false;
       return;
     }
     setFileError(undefined);
@@ -310,19 +520,15 @@ export function NominationForm({
     try {
       if (!activeSession) {
         setStage("preparing");
+        await saveStep(3);
         const response = await fetch("/api/public/applications/initiate", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             ...values,
             paymentMethod,
-            files: allFiles.map(({ id, file, kind }) => ({
-              id,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              kind,
-            })),
+            draftCredential: draftCredential.current,
+            files: manifest(),
           }),
         });
         const initiated = (await response.json()) as InitiateResponse;
@@ -332,7 +538,9 @@ export function NominationForm({
       }
 
       const pendingFiles = allFiles.filter(
-        (file) => file.status !== "uploaded",
+        (file) =>
+          file.status !== "uploaded" &&
+          !activeSession!.preparedFileIds?.includes(file.id),
       );
       if (pendingFiles.length) {
         setStage("uploading");
@@ -385,7 +593,7 @@ export function NominationForm({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           sessionToken: activeSession.sessionToken,
-          idempotencyKey: values.idempotencyKey,
+          idempotencyKey: activeSession.idempotencyKey ?? values.idempotencyKey,
         }),
       });
       const result = (await complete.json()) as {
@@ -398,6 +606,11 @@ export function NominationForm({
       // The nomination is durable. Allow the intentional payment redirect
       // immediately, before React removes the upload-protection listener.
       submissionCompleteRef.current = true;
+      try {
+        sessionStorage.removeItem(`gbe-draft:${cycleId}`);
+      } catch {
+        /* Optional browser storage. */
+      }
       if (result.data.paymentUrl) {
         window.location.assign(result.data.paymentUrl);
         return;
@@ -423,6 +636,8 @@ export function NominationForm({
             : "We could not submit your nomination. Your entered information is safe. Please try again.",
       });
       errorSummaryRef.current?.focus();
+    } finally {
+      submitLock.current = false;
     }
   }
 
@@ -444,29 +659,66 @@ export function NominationForm({
   }
 
   async function moveToNextStep() {
-    const fieldsByStep: Array<Array<keyof PublicApplicationInput>> = [
-      ["nomineeName", "designation", "businessWebsite"],
-      ["email", "phone", "categoryId", "awardNomination"],
-      [],
-      ["declarationAccepted", "turnstileToken"],
-    ];
-    const valid = await form.trigger(fieldsByStep[currentStep], {
-      shouldFocus: true,
-    });
-    if (!valid) return;
-    if (
-      currentStep === 2 &&
-      paymentMethod === "bank_transfer" &&
-      payment.length !== 1
-    ) {
-      setFileError("Choose one payment slip or screenshot.");
-      errorSummaryRef.current?.focus();
-      return;
+    if (stepLock.current || busy || unavailable) return;
+    stepLock.current = true;
+    try {
+      const fieldsByStep: Array<Array<keyof PublicApplicationInput>> = [
+        ["nomineeName", "designation", "businessWebsite"],
+        ["email", "phone", "categoryId", "awardNomination"],
+        [],
+        ["declarationAccepted", "turnstileToken"],
+      ];
+      const valid = await form.trigger(fieldsByStep[currentStep], {
+        shouldFocus: true,
+      });
+      if (!valid) return;
+      if (
+        currentStep === 0 &&
+        draftVersion.current === 0 &&
+        !form.getValues("turnstileToken")
+      ) {
+        form.setError("root", {
+          message: "Please complete the security verification.",
+        });
+        return;
+      }
+      if (
+        currentStep === 2 &&
+        paymentMethod === "bank_transfer" &&
+        payment.length !== 1
+      ) {
+        setFileError("Choose one payment slip or screenshot.");
+        errorSummaryRef.current?.focus();
+        return;
+      }
+      setFileError(undefined);
+      setSavingStep(true);
+      form.clearErrors("root");
+      await saveStep(currentStep);
+      if (session) beginFreshUploadSession();
+      form.setValue("turnstileToken", "");
+      setTurnstileReset((value) => value + 1);
+      setCurrentStep((step) => Math.min(step + 1, FORM_STEPS.length - 1));
+    } catch (error) {
+      form.setError("root", {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not save this step. Please retry.",
+      });
+      if (draftVersion.current === 0) {
+        form.setValue("turnstileToken", "");
+        setTurnstileReset((value) => value + 1);
+      }
+    } finally {
+      stepLock.current = false;
+      setSavingStep(false);
     }
-    setFileError(undefined);
-    setCurrentStep((step) => Math.min(step + 1, FORM_STEPS.length - 1));
   }
-  const retry = () => void form.handleSubmit(runSubmission, handleInvalid)();
+  const retry = () =>
+    currentStep < 3
+      ? void moveToNextStep()
+      : void form.handleSubmit(runSubmission, handleInvalid)();
   const errors = form.formState.errors;
   const hasVisibleError = Boolean(
     errors.root ||
@@ -557,6 +809,15 @@ export function NominationForm({
           <AlertTitle>Review the nomination</AlertTitle>
           <AlertDescription>
             {errors.root?.message ? <p>{errors.root.message}</p> : null}
+            {restoreFailed ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.location.reload()}
+              >
+                Reload saved form
+              </Button>
+            ) : null}
             {visibleErrors.length || fileError ? (
               <ul className="mt-2 list-disc pl-5">
                 {visibleErrors.map((message) => (
@@ -949,13 +1210,33 @@ export function NominationForm({
           </p>
         </FormSection>
       ) : null}
-      {!busy && currentStep < FORM_STEPS.length - 1 ? (
+      {currentStep === 0 && draftVersion.current === 0 ? (
+        <div className="px-5 pb-4 md:px-8">
+          <Turnstile
+            onToken={(token) => form.setValue("turnstileToken", token)}
+            resetSignal={turnstileReset}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Progress saves as you continue.{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Privacy notice
+            </a>
+          </p>
+        </div>
+      ) : null}
+      {currentStep < FORM_STEPS.length - 1 ? (
         <div className="flex flex-col-reverse gap-3 border-t border-mist bg-white/45 px-5 py-5 sm:flex-row sm:justify-between md:px-8">
           {currentStep > 0 ? (
             <Button
               type="button"
               variant="ghost"
               className="h-11"
+              disabled={busy}
               onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
             >
               <ArrowLeft data-icon="inline-start" />
@@ -967,10 +1248,13 @@ export function NominationForm({
           <Button
             type="button"
             className="h-11"
-            disabled={unavailable}
+            disabled={unavailable || busy}
             onClick={() => void moveToNextStep()}
           >
-            Continue
+            {savingStep || restoring ? (
+              <LoaderCircle aria-hidden className="animate-spin" />
+            ) : null}
+            {savingStep ? "Saving" : restoring ? "Loading" : "Continue"}
             <ArrowRight data-icon="inline-end" />
           </Button>
         </div>

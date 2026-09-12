@@ -86,6 +86,7 @@ bun run db:bootstrap-admin
 - Respect existing size, quantity, ownership, purpose and disposition checks. Do not trust browser MIME types or filenames.
 - Use a dedicated R2 prefix for tests/previews. Do not reuse production objects or buckets for test data.
 - Only a super admin may remove an incomplete nomination shell, and only when it has no final reference or retained evidence. The removal must clear staged private objects and mutable operational rows, soft-delete the shell, and preserve append-only audit records; it must refuse submitted or evidenced nominations.
+- `/admin/in-progress` is available to staff with `applications.view_all`. Both staff and super admins with `applications.edit` may delete new nomination drafts; legacy upload-shell removal remains super-admin-only. Draft deletion must lock against submission, reject settled/submitted evidence, invalidate upload sessions, clear the draft payload and retain an audit tombstone. Removed draft files enter the existing retention queue.
 
 ### Authentication, email and jobs
 
@@ -97,7 +98,8 @@ bun run db:bootstrap-admin
 - Genie card payments use the server-only client and `card-payments` service. Never trust a return URL or webhook state as proof of payment: verify the signature and fetch the transaction, matching App ID, local reference, amount and currency. Only `CONFIRMED` settles payment. Preserve the one-active-attempt lock, idempotent receipt allocation and ambiguous-timeout protection.
 - Migration 0010 is additive; never backfill old payment amounts or methods. Enable Genie only after the migration and runtime permissions are verified. Keep card data on Genie's hosted page. UAT uses the isolated `scripts/dev-genie.mjs` helper, test credentials and `e2e/genie` storage prefix, never production nominations.
 - The owner-confirmed LKR 10 card test is complete. `CARD_TEST_AMOUNT_MINOR` in `src/lib/domain/card-checkout-amount.ts` is `null`, so new checkouts use the saved nomination fee. Never re-enable test pricing without the owner's explicit request, reprice active attempts or rewrite settled test amounts.
-- Vercel Hobby uses exactly one scheduled entry: `/api/cron/daily` in `vercel.json`. Add work to the daily dispatcher or event-driven processing; do not add duplicate cron schedules. The daily upload cleanup may remove only expired, empty nomination shells; it must retain audit history and never delete a submitted nomination.
+- Public form steps save through `/api/public/drafts`, using an opaque per-draft credential, first-save Turnstile, same-origin checks, request-size limits and rate limits. Save only on step navigation, not every keystroke. Drafts have no official reference, payment receipt, account or email notification. Migration 0011 is required before deployment. Final submission reuses verified draft files and marks the draft submitted in the same transaction as the official nomination.
+- Vercel Hobby uses exactly one scheduled entry: `/api/cron/daily` in `vercel.json`. Add work to the daily dispatcher or event-driven processing; do not add duplicate cron schedules. Unsubmitted drafts and legacy upload shells remain in In-progress until explicit deletion. Upload-session expiry must not delete their records or verified draft attachments, and must never remove a submitted nomination's files.
 
 ## 5. Security and environment rules
 

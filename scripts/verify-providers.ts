@@ -14,6 +14,22 @@ import { getR2, r2ObjectKey } from "../src/lib/r2/client";
 for (const provider of ["database", "r2", "auth", "email"] as const)
   requireProvider(provider);
 await getDb().execute(sql`select 1 as ok`);
+const drafts = await getDb().execute(sql`select
+  to_regclass('public.nomination_drafts') as drafts,
+  to_regclass('public.nomination_draft_files') as files`);
+if (!drafts.rows[0]?.drafts || !drafts.rows[0]?.files)
+  throw new Error(
+    "Apply migration 0011 before deploying in-progress nomination saves.",
+  );
+const draftPermissions = await getDb().execute(sql`select bool_and(
+  has_table_privilege(current_user, name, 'SELECT') and
+  has_table_privilege(current_user, name, 'INSERT') and
+  has_table_privilege(current_user, name, 'UPDATE')
+) as allowed from (values ('public.nomination_drafts'), ('public.nomination_draft_files')) as tables(name)`);
+if (draftPermissions.rows[0]?.allowed !== true)
+  throw new Error(
+    "Grant the runtime role SELECT, INSERT and UPDATE on nomination_drafts and nomination_draft_files.",
+  );
 if (env.GENIE_ENABLED === "true") {
   const result = await getDb().execute(sql`select
     has_table_privilege(current_user, 'public.payment_attempts', 'SELECT')

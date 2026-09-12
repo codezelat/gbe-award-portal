@@ -434,6 +434,50 @@ export const uploadSessions = pgTable("upload_sessions", {
   requestFingerprintHash: text("request_fingerprint_hash"),
   ...timestamps,
 });
+// Public step saves are deliberately separate from official nominations.
+export const nominationDrafts = pgTable(
+  "nomination_drafts",
+  {
+    id: uuid("id").primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => awardCycles.id),
+    applicationId: uuid("application_id")
+      .unique()
+      .references(() => applications.id),
+    payload: jsonb("payload").notNull(),
+    savedStep: integer("saved_step").notNull().default(0),
+    version: integer("version").notNull().default(0),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("nomination_drafts_pending_idx")
+      .on(t.cycleId, t.updatedAt, t.id)
+      .where(sql`${t.deletedAt} is null and ${t.submittedAt} is null`),
+    check("nomination_drafts_step_valid", sql`${t.savedStep} between 0 and 3`),
+  ],
+);
+export const nominationDraftFiles = pgTable(
+  "nomination_draft_files",
+  {
+    id: uuid("id").primaryKey(),
+    draftId: uuid("draft_id")
+      .notNull()
+      .references(() => nominationDrafts.id),
+    fileId: uuid("file_id")
+      .notNull()
+      .unique()
+      .references(() => files.id),
+    kind: text("kind", {
+      enum: ["supporting_document", "payment_proof"],
+    }).notNull(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => [index("nomination_draft_files_draft_idx").on(t.draftId)],
+);
 export const applicationFiles = pgTable("application_files", {
   id: uuid("id").primaryKey().defaultRandom(),
   applicationId: uuid("application_id")

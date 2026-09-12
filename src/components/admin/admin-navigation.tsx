@@ -26,6 +26,7 @@ export function AdminNavigation({
   ]);
   const nominationHrefs = new Set([
     "/admin",
+    "/admin/in-progress",
     "/admin/applications",
     "/admin/applicants",
     "/admin/payments",

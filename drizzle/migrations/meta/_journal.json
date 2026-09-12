@@ -78,6 +78,13 @@
       "when": 1788901152068,
       "tag": "0010_known_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789177380287,
+      "tag": "0011_stiff_vermin",
+      "breakpoints": true
     }
   ]
 }

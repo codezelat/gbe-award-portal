@@ -108,6 +108,9 @@ export const fileManifestItemSchema = z.object({
 });
 export const initiateApplicationSchema = publicApplicationSchema
   .extend({
+    draftCredential: z
+      .object({ id: z.uuid(), secret: z.string().regex(/^[a-f0-9]{64}$/) })
+      .optional(),
     paymentMethod: z.enum(["bank_transfer", "card"]).default("bank_transfer"),
     files: z
       .array(fileManifestItemSchema)

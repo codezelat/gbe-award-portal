@@ -35,6 +35,7 @@ async function AdminWorkspace({ children }: { children: React.ReactNode }) {
     ? cookieCycle!
     : cycles[0]?.id;
   const rules: Record<string, string> = {
+    "/admin/in-progress": "applications.view_all",
     "/admin/applications": "applications.view",
     "/admin/applicants": "applicants.manage",
     "/admin/payments": "payments.view",

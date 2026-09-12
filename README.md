@@ -68,6 +68,23 @@ Supporting documents and payment proof are independently limited to **5 MB per f
 
 Normal dashboards, review queues, applicant views and nomination exports exclude soft-deleted nominations. Submitted totals and summaries also exclude unfinished upload shells. The explicit **Deleted** application view and its exports retain recovery access; audit and delivery history remain available. Deleting or restoring a nomination refreshes the linked admin and applicant workspaces.
 
+### In-progress nominations
+
+**In-progress**, immediately above **Applications**, shows saved but unsubmitted forms to staff and super admins. Continue saves the completed step and uploads its selected attachments directly to private R2 storage. No email, account, official reference or receipt is created by saving a draft. Search by name, email, category or nomination; open a record for its full saved details and protected attachment previews.
+
+The same browser tab can restore saved details and verified attachments after a reload. Only an opaque draft credential is kept in session storage, not personal data. Closing the tab ends browser-side recovery; the saved record remains available to staff. Failed saves keep the current inputs visible for retry, and version checks prevent a stale tab from overwriting newer changes. Final submission atomically removes the draft from In-progress and creates the official submitted nomination, reusing the verified files without a second upload.
+
+Drafts remain until submitted or explicitly deleted. Staff and super admins can delete new drafts with an in-site confirmation; legacy unfinished upload shells still require a super admin. Submitted nominations, payment attempts and retained submission evidence cannot be deleted through this action. Deleted draft payloads are cleared, an audit tombstone is retained, and removed private attachments are queued for the existing retention cleanup.
+
+#### Deploying draft saves
+
+1. Create a Neon restore point or branch before schema work. Do not deploy the new code first.
+2. Set `DATABASE_URL_DIRECT` only in the migration shell, then run `bun run db:migrate` to apply additive migration `0011_stiff_vermin.sql`. It adds `nomination_drafts` and `nomination_draft_files`; it does not backfill or rewrite nominations or payments.
+3. Grant the existing runtime role `SELECT`, `INSERT` and `UPDATE` on both new tables. Existing file, upload-session, payment and audit permissions remain necessary. `bun run providers:verify` checks the new table permissions.
+4. Deploy the application. No new environment variables, provider accounts, Redis or cron schedules are needed. Never add `DATABASE_URL_DIRECT` to the Vercel runtime.
+
+Rollback: restore the previous code deployment while retaining the additive tables and saved data. Do not drop the tables or reverse existing nomination/payment data to roll back the UI.
+
 ## 🏗️ Architecture
 
 | Layer            | Technology                                             | Responsibility                                                                                            |
@@ -249,7 +266,7 @@ Application responses queue email in PostgreSQL. A Next.js `after()` callback at
 | Endpoint                    | Purpose                                                                                                  | Protection                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `POST /api/webhooks/resend` | Records verified Resend delivery events                                                                  | `RESEND_WEBHOOK_SECRET` signature verification               |
-| `GET /api/cron/daily`       | Runs email retries, stale-upload and abandoned-intake cleanup, expired-export cleanup, retention and stale rate-limit cleanup | Bearer authorization using the configured `CRON_SECRET`      |
+| `GET /api/cron/daily`       | Runs email retries, stale-upload expiry, expired-export cleanup, retention and stale rate-limit cleanup; unfinished nominations remain available | Bearer authorization using the configured `CRON_SECRET`      |
 | `GET /api/health`           | Reports database reachability                                                                            | No secrets returned; do not treat it as a public status page |
 
 Vercel Hobby supports one cron entry. [vercel.json](vercel.json) schedules the daily route at `23 2 * * *`; do not add overlapping Vercel cron entries for individual cleanup jobs.

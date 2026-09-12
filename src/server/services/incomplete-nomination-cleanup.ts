@@ -16,6 +16,7 @@ import {
   awardCycles,
   emailOutbox,
   invitations,
+  nominationDrafts,
   payments,
   paymentAttempts,
   uploadSessions,
@@ -45,6 +46,13 @@ export async function purgeIncompleteNominationShell(
 ) {
   const db = getDb();
   await db.transaction(async (tx) => {
+    const [draft] = await tx
+      .select({ id: nominationDrafts.id })
+      .from(nominationDrafts)
+      .where(eq(nominationDrafts.applicationId, applicationId))
+      .limit(1);
+    if (draft)
+      throw new Error("Remove this saved form from In-progress instead.");
     const [record] = await tx
       .select({
         application: applications,

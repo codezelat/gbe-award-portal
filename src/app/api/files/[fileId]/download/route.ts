@@ -9,12 +9,14 @@ import {
   files,
   profiles,
   staffMemberships,
+  nominationDraftFiles,
+  nominationDrafts,
 } from "@/lib/db/schema";
 import { getDb } from "@/lib/db";
 import { getR2 } from "@/lib/r2/client";
 import { env } from "@/lib/env";
 import { getAuth } from "@/lib/auth";
-import { hasPermission } from "@/server/dal/auth";
+import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 export const runtime = "nodejs";
 export async function GET(
@@ -52,6 +54,35 @@ export async function GET(
       .limit(1);
     if (!record)
       return NextResponse.json({ message: "File not found." }, { status: 404 });
+    const [draftLink] = await db
+      .select({
+        draft: nominationDrafts,
+        removedAt: nominationDraftFiles.removedAt,
+      })
+      .from(nominationDraftFiles)
+      .innerJoin(
+        nominationDrafts,
+        eq(nominationDraftFiles.draftId, nominationDrafts.id),
+      )
+      .where(eq(nominationDraftFiles.fileId, fileId))
+      .limit(1);
+    if (draftLink && !record.application) {
+      if (
+        profile.accountKind !== "staff" ||
+        draftLink.draft.deletedAt ||
+        draftLink.removedAt
+      )
+        return NextResponse.json(
+          { message: "Access denied." },
+          { status: 403 },
+        );
+      const staff = await requireStaff();
+      if (!hasPermission(staff.membership, "applications.view_all"))
+        return NextResponse.json(
+          { message: "Access denied." },
+          { status: 403 },
+        );
+    }
     const requestedPreview =
       new URL(request.url).searchParams.get("view") === "1";
     const previewAllowed =

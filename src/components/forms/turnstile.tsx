@@ -1,6 +1,6 @@
 "use client";
 import Script from "next/script";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { turnstileActions } from "@/config/turnstile";
 
 declare global {
@@ -24,10 +24,11 @@ export function Turnstile({
   const container = useRef<HTMLDivElement>(null);
   const widget = useRef<string | undefined>(undefined);
   const onTokenRef = useRef(onToken);
+  const previousReset = useRef(resetSignal);
   useEffect(() => {
     onTokenRef.current = onToken;
   }, [onToken]);
-  const render = () => {
+  const render = useCallback(() => {
     if (!container.current || !window.turnstile || widget.current) return;
     widget.current = window.turnstile.render(container.current, {
       sitekey:
@@ -35,19 +36,23 @@ export function Turnstile({
         "1x00000000000000000000AA",
       action,
       theme: "light",
-      callback: onToken,
-      "expired-callback": () => onToken(""),
-      "error-callback": () => onToken(""),
+      callback: (token: string) => onTokenRef.current(token),
+      "expired-callback": () => onTokenRef.current(""),
+      "error-callback": () => onTokenRef.current(""),
     });
-  };
-  useEffect(
-    () => () => {
-      if (widget.current) window.turnstile?.remove(widget.current);
-    },
-    [],
-  );
+  }, [action]);
   useEffect(() => {
-    if (resetSignal > 0 && widget.current) {
+    render();
+    return () => {
+      const id = widget.current;
+      widget.current = undefined;
+      if (id) window.turnstile?.remove(id);
+    };
+  }, [render]);
+  useEffect(() => {
+    if (previousReset.current === resetSignal) return;
+    previousReset.current = resetSignal;
+    if (widget.current) {
       window.turnstile?.reset(widget.current);
       onTokenRef.current("");
     }
@@ -57,7 +62,7 @@ export function Turnstile({
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"
-        onLoad={render}
+        onReady={render}
       />
       <div
         className="min-h-[70px]"

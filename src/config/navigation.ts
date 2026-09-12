@@ -5,6 +5,7 @@ import {
   BookOpen,
   CircleHelp,
   FileArchive,
+  FileClock,
   FolderOpen,
   Gauge,
   Mail,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 export const adminNavigation = [
   { href: "/admin", label: "Dashboard", icon: Gauge },
+  { href: "/admin/in-progress", label: "In-progress", icon: FileClock },
   { href: "/admin/applications", label: "Applications", icon: FileArchive },
   { href: "/admin/applicants", label: "Applicants", icon: UsersRound },
   { href: "/admin/payments", label: "Payments", icon: Banknote },
