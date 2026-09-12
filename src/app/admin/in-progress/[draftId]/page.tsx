@@ -89,7 +89,7 @@ export default async function DraftPage({
       </Button>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="page-heading break-words">{data.nomineeName}</h1>
+          <h1 className="page-heading [overflow-wrap:anywhere]">{data.nomineeName}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Badge variant="outline">
               {draftStepLabels[draft?.savedStep ?? 3]} saved
@@ -113,7 +113,7 @@ export default async function DraftPage({
           />
         ) : null}
       </header>
-      {Object.entries(data).some(([key, value]) => key !== "nomineeName" && Boolean(value)) ? <dl className="grid min-w-0 gap-6 rounded-lg border bg-card p-5 sm:grid-cols-2 sm:p-7">
+      {Object.entries(data).some(([key, value]) => key !== "nomineeName" && Boolean(value)) ? <dl className="surface grid min-w-0 gap-6 rounded-xl p-4 sm:grid-cols-2 sm:p-6">
         {[
           ["Email", data.email],
           ["Phone", data.phone],
@@ -125,7 +125,9 @@ export default async function DraftPage({
           .map(([label, value]) => (
             <div key={label} className="min-w-0">
               <dt className="text-xs text-muted-foreground">{label}</dt>
-              <dd className="mt-1 break-words text-sm">{value}</dd>
+              <dd className="mt-1 text-sm [overflow-wrap:anywhere]">
+                {label === "Email" ? <a className="hover:underline" href={`mailto:${value}`}>{value}</a> : label === "Phone" ? <a className="hover:underline" href={`tel:${value}`}>{value}</a> : value}
+              </dd>
             </div>
           ))}
         {website ? (
@@ -146,7 +148,7 @@ export default async function DraftPage({
         {data.awardNomination ? (
           <div className="min-w-0 sm:col-span-2">
             <dt className="text-xs text-muted-foreground">Award nomination</dt>
-            <dd className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">
+            <dd className="mt-2 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]">
               {data.awardNomination}
             </dd>
           </div>
@@ -158,9 +160,9 @@ export default async function DraftPage({
           {linked.map(({ file, link }) => (
             <div
               key={link.id}
-              className="flex min-w-0 items-center justify-between gap-3 rounded-lg border bg-card p-4"
+              className="surface flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl p-4"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1 basis-44">
                 <p className="truncate text-sm">{file.safeDownloadFilename}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {link.kind === "payment_proof"

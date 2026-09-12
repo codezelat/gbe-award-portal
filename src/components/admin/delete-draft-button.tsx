@@ -60,7 +60,7 @@ export function DeleteDraftButton({
     >
       <AlertDialogTrigger
         render={
-          <Button variant="ghost" size="icon" aria-label={`Delete ${name}`} />
+          <Button variant="ghost" size="icon" className="size-11 shrink-0" aria-label={`Delete ${name}`} />
         }
       >
         <Trash2 />
@@ -68,7 +68,7 @@ export function DeleteDraftButton({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription className="[overflow-wrap:anywhere]">
             {name} and its saved attachments will be removed. Submitted
             nominations are not affected.
           </AlertDialogDescription>
@@ -78,6 +78,7 @@ export function DeleteDraftButton({
           <Button
             variant="destructive"
             disabled={pending}
+            aria-busy={pending}
             onClick={() => void remove()}
           >
             {pending ? (
