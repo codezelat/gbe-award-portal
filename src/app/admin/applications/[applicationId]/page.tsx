@@ -250,8 +250,8 @@ export default async function AdminApplicationDetail({
           </div>
         </div>
       </header>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-6">
           <section className="surface rounded-xl p-5 sm:p-7">
             <div className="border-b pb-6">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -300,7 +300,7 @@ export default async function AdminApplicationDetail({
               </div>
             </summary>
             <div className="data-table-scroll overflow-x-auto border-t px-6 pb-6 pt-5">
-              <table className="w-full min-w-[620px] text-left text-sm">
+              <table className="w-full min-w-[620px] table-fixed text-left text-sm">
                 <thead className="text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="border-b px-3 py-2">Field</th>
@@ -699,7 +699,7 @@ export default async function AdminApplicationDetail({
             </div>
           </details>
         </div>
-        <aside className="flex flex-col gap-6">
+        <aside className="flex min-w-0 flex-col gap-6">
           {membership.role === "super_admin" ? (
             <details className="surface group rounded-lg border-destructive/30">
               <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

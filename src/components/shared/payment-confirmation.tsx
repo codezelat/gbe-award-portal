@@ -7,7 +7,6 @@ export function PaymentConfirmation({
   applicationReference,
   nomineeName,
   paymentReference,
-  receiptReference,
   amount,
   paymentDate,
   verifiedDate,
@@ -15,7 +14,6 @@ export function PaymentConfirmation({
   applicationReference: string;
   nomineeName: string;
   paymentReference: string;
-  receiptReference: string;
   amount: string;
   paymentDate: string;
   verifiedDate: string;
@@ -43,7 +41,6 @@ export function PaymentConfirmation({
       </div>
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
         {[
-          ["Receipt reference", receiptReference],
           ["Payment reference", paymentReference],
           ["Application reference", applicationReference],
           ["Nominee", nomineeName],
@@ -52,11 +49,11 @@ export function PaymentConfirmation({
           ["Verification date", verifiedDate],
           ["Issuer", "Global Business Excellence Awards"],
         ].map(([label, value]) => (
-          <div key={label} className="border-b pb-3">
+          <div key={label} className="min-w-0 border-b pb-3">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">
               {label}
             </dt>
-            <dd className="mt-1 font-medium">{value}</dd>
+            <dd className="mt-1 font-medium [overflow-wrap:anywhere]">{value}</dd>
           </div>
         ))}
       </dl>

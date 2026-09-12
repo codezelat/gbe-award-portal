@@ -48,7 +48,7 @@ export function ApplicationEditDialog({
             audited new version.
           </DialogDescription>
         </DialogHeader>
-        <ApplicationCorrectionForm className="grid gap-5 p-6 md:grid-cols-2">
+        <ApplicationCorrectionForm className="grid min-w-0 grid-cols-1 gap-5 p-4 [overflow-wrap:anywhere] [&>*]:min-w-0 sm:p-6 md:grid-cols-2">
           <input type="hidden" name="applicationId" value={application.id} />
           <input
             type="hidden"
@@ -121,7 +121,7 @@ export function ApplicationEditDialog({
             <select
               name="categoryId"
               defaultValue={application.categoryId}
-              className="h-11 rounded-md border bg-white px-3"
+              className="h-11 w-full min-w-0 rounded-md border bg-white px-3"
             >
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>

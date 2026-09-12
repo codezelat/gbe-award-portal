@@ -214,9 +214,6 @@ export function NominationPayment({
                   ? "The team will review your bank transfer."
                   : "Your payment record is up to date."}
             </p>
-            {payment.receipt && (
-              <p className="mt-2 font-mono text-xs">{payment.receipt}</p>
-            )}
           </div>
         </div>
       ) : (

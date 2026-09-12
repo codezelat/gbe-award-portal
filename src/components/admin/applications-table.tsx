@@ -81,19 +81,28 @@ export function ApplicationsTable({
         id: "nomination",
         header: "Nominee",
         cell: ({ row }) => (
-          <div className="min-w-52 py-1">
+          <div className="min-w-0 py-1">
             <Link
               href={`/admin/applications/${row.original.id}`}
               className="font-mono text-xs font-semibold text-antique-gold hover:underline"
             >
               {row.original.reference ?? "Pending reference"}
             </Link>
-            <Link
-              href={`/admin/applications/${row.original.id}`}
-              className="mt-1 block w-fit max-w-full truncate font-semibold hover:text-primary hover:underline"
-            >
-              {row.original.nomineeName}
-            </Link>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    href={`/admin/applications/${row.original.id}`}
+                    className="mt-1 block truncate font-semibold hover:text-primary hover:underline"
+                  />
+                }
+              >
+                {row.original.nomineeName}
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[min(28rem,calc(100vw-2rem))] [overflow-wrap:anywhere]">
+                {row.original.nomineeName}
+              </TooltipContent>
+            </Tooltip>
             {row.original.designation ? (
               <p className="max-w-64 truncate text-xs text-muted-foreground">
                 {row.original.designation}
@@ -106,7 +115,7 @@ export function ApplicationsTable({
         id: "nomination-summary",
         header: "Award nomination",
         cell: ({ row }) => (
-          <div className="min-w-72 max-w-md py-1">
+          <div className="min-w-0 py-1">
             <p className="truncate text-sm font-medium">
               {row.original.categoryNameSnapshot}
             </p>
@@ -135,7 +144,7 @@ export function ApplicationsTable({
         id: "state",
         header: "Status",
         cell: ({ row }) => (
-          <div className="flex min-w-32 flex-col items-start gap-1.5 py-1">
+          <div className="flex min-w-0 flex-col items-start gap-1.5 py-1">
             <StatusBadge status={row.original.workflowStatus} />
             <StatusBadge status={row.original.paymentStatus} />
           </div>
@@ -145,7 +154,7 @@ export function ApplicationsTable({
         id: "submitted",
         header: "Submitted",
         cell: ({ row }) => (
-          <div className="min-w-36 py-1 text-xs">
+          <div className="min-w-0 py-1 text-xs">
             <p className="text-foreground">{row.original.submittedLabel}</p>
             <p className="mt-1 truncate text-muted-foreground">
               {row.original.reviewerName === "Unassigned"
@@ -177,12 +186,25 @@ export function ApplicationsTable({
   return (
     <>
       <div className="hidden xl:block">
-        <Table className="min-w-[780px]">
+        <Table className="table-fixed">
           <TableHeader className="sticky top-0 z-10 bg-white">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
                 {group.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead
+                    key={header.id}
+                    className={
+                      header.id === "select"
+                        ? "w-10"
+                        : header.id === "nomination"
+                          ? "w-[28%]"
+                          : header.id === "state"
+                            ? "w-40"
+                            : header.id === "submitted"
+                              ? "w-40"
+                              : undefined
+                    }
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -210,7 +232,10 @@ export function ApplicationsTable({
                       router.push(`/admin/applications/${row.original.id}`);
                   }}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" && event.target === event.currentTarget)
+                    if (
+                      event.key === "Enter" &&
+                      event.target === event.currentTarget
+                    )
                       router.push(`/admin/applications/${row.original.id}`);
                   }}
                   data-state={row.getIsSelected() ? "selected" : undefined}
@@ -262,7 +287,7 @@ export function ApplicationsTable({
                   </Link>
                   <Link
                     href={`/admin/applications/${row.original.id}`}
-                    className="mt-1 block font-semibold leading-snug [overflow-wrap:anywhere] hover:text-primary hover:underline"
+                    className="mt-1 line-clamp-2 font-semibold leading-snug [overflow-wrap:anywhere] hover:text-primary hover:underline"
                   >
                     {row.original.nomineeName}
                   </Link>
@@ -322,7 +347,10 @@ export function ApplicationsTable({
               </span>
             </summary>
             <div className="mt-3 grid gap-3 xl:grid-cols-3">
-              <form action={bulkAssignReviewerAction} className="flex min-w-0 flex-wrap gap-2">
+              <form
+                action={bulkAssignReviewerAction}
+                className="flex min-w-0 flex-wrap gap-2"
+              >
                 {selected.map((id) => (
                   <input
                     key={id}
@@ -348,7 +376,10 @@ export function ApplicationsTable({
                   Assign
                 </Button>
               </form>
-              <form action={bulkChangeSafeStatusAction} className="flex min-w-0 flex-wrap gap-2">
+              <form
+                action={bulkChangeSafeStatusAction}
+                className="flex min-w-0 flex-wrap gap-2"
+              >
                 {selected.map((id) => (
                   <input
                     key={id}
@@ -375,7 +406,10 @@ export function ApplicationsTable({
                   Apply status
                 </Button>
               </form>
-              <form action={bulkSendTemplateAction} className="flex min-w-0 flex-wrap gap-2">
+              <form
+                action={bulkSendTemplateAction}
+                className="flex min-w-0 flex-wrap gap-2"
+              >
                 {selected.map((id) => (
                   <input
                     key={id}

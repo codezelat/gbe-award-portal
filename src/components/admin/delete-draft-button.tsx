@@ -60,7 +60,12 @@ export function DeleteDraftButton({
     >
       <AlertDialogTrigger
         render={
-          <Button variant="ghost" size="icon" className="size-11 shrink-0" aria-label={`Delete ${name}`} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11 shrink-0"
+            aria-label={`Delete ${name}`}
+          />
         }
       >
         <Trash2 />

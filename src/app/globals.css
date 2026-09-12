@@ -281,6 +281,15 @@
     line-height: 1.35;
     letter-spacing: -0.015em;
   }
+
+  /* Saved names, URLs and messages must not determine a workspace column's width. */
+  .workspace-shell main {
+    overflow-wrap: anywhere;
+  }
+
+  .workspace-shell main :where(.grid > *, .flex > *) {
+    min-width: 0;
+  }
 }
 
 .workspace-shell .font-display,

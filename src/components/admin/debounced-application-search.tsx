@@ -44,7 +44,9 @@ export function DebouncedApplicationSearch({
       if (value.trim()) next.set("search", value.trim());
       else next.delete("search");
       setSearch((previous) => ({ ...previous, requested: value.trim() }));
-      startTransition(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
+      startTransition(() =>
+        router.replace(`${pathname}?${next.toString()}`, { scroll: false }),
+      );
     }, 350);
     return () => window.clearTimeout(timer);
   }, [current, pathname, router, searchParams, value]);
@@ -59,7 +61,9 @@ export function DebouncedApplicationSearch({
       <Input
         name="search"
         value={value}
-        onChange={(event) => setSearch((previous) => ({ ...previous, value: event.target.value }))}
+        onChange={(event) =>
+          setSearch((previous) => ({ ...previous, value: event.target.value }))
+        }
         placeholder={placeholder}
         aria-label={label}
         aria-busy={isPending}

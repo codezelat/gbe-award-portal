@@ -101,7 +101,6 @@ export default async function PaymentPage() {
           applicationReference={row.application.reference ?? "Pending"}
           nomineeName={row.application.nomineeName}
           paymentReference={row.payment.paymentReference}
-          receiptReference={row.payment.receiptReference}
           amount={
             row.payment.amountMinor === null
               ? "Not recorded"

@@ -89,7 +89,9 @@ export default async function DraftPage({
       </Button>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="page-heading [overflow-wrap:anywhere]">{data.nomineeName}</h1>
+          <h1 className="page-heading [overflow-wrap:anywhere]">
+            {data.nomineeName}
+          </h1>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Badge variant="outline">
               {draftStepLabels[draft?.savedStep ?? 3]} saved
@@ -113,47 +115,63 @@ export default async function DraftPage({
           />
         ) : null}
       </header>
-      {Object.entries(data).some(([key, value]) => key !== "nomineeName" && Boolean(value)) ? <dl className="surface grid min-w-0 gap-6 rounded-xl p-4 sm:grid-cols-2 sm:p-6">
-        {[
-          ["Email", data.email],
-          ["Phone", data.phone],
-          ["Designation", data.designation],
-          ["Category", category?.name],
-          ["Payment method", data.paymentMethod?.replaceAll("_", " ")],
-        ]
-          .filter(([, value]) => value)
-          .map(([label, value]) => (
-            <div key={label} className="min-w-0">
-              <dt className="text-xs text-muted-foreground">{label}</dt>
-              <dd className="mt-1 text-sm [overflow-wrap:anywhere]">
-                {label === "Email" ? <a className="hover:underline" href={`mailto:${value}`}>{value}</a> : label === "Phone" ? <a className="hover:underline" href={`tel:${value}`}>{value}</a> : value}
+      {Object.entries(data).some(
+        ([key, value]) => key !== "nomineeName" && Boolean(value),
+      ) ? (
+        <dl className="surface grid min-w-0 gap-6 rounded-xl p-4 sm:grid-cols-2 sm:p-6">
+          {[
+            ["Email", data.email],
+            ["Phone", data.phone],
+            ["Designation", data.designation],
+            ["Category", category?.name],
+            ["Payment method", data.paymentMethod?.replaceAll("_", " ")],
+          ]
+            .filter(([, value]) => value)
+            .map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd className="mt-1 text-sm [overflow-wrap:anywhere]">
+                  {label === "Email" ? (
+                    <a className="hover:underline" href={`mailto:${value}`}>
+                      {value}
+                    </a>
+                  ) : label === "Phone" ? (
+                    <a className="hover:underline" href={`tel:${value}`}>
+                      {value}
+                    </a>
+                  ) : (
+                    value
+                  )}
+                </dd>
+              </div>
+            ))}
+          {website ? (
+            <div className="min-w-0">
+              <dt className="text-xs text-muted-foreground">Website</dt>
+              <dd className="mt-1 break-all text-sm">
+                <a
+                  href={website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  {data.businessWebsite}
+                </a>
               </dd>
             </div>
-          ))}
-        {website ? (
-          <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">Website</dt>
-            <dd className="mt-1 break-all text-sm">
-              <a
-                href={website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                {data.businessWebsite}
-              </a>
-            </dd>
-          </div>
-        ) : null}
-        {data.awardNomination ? (
-          <div className="min-w-0 sm:col-span-2">
-            <dt className="text-xs text-muted-foreground">Award nomination</dt>
-            <dd className="mt-2 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]">
-              {data.awardNomination}
-            </dd>
-          </div>
-        ) : null}
-      </dl> : null}
+          ) : null}
+          {data.awardNomination ? (
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="text-xs text-muted-foreground">
+                Award nomination
+              </dt>
+              <dd className="mt-2 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]">
+                {data.awardNomination}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
       {linked.length ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-base font-semibold">Attachments</h2>
