@@ -5,7 +5,8 @@
   "packageManager": "bun@1.3.12",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && bun run build:verify-invite-download",
+    "build:verify-invite-download": "bun scripts/verify-invite-download-build.mjs",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",

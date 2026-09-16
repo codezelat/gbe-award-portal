@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
       : undefined,
   poweredByHeader: false,
   outputFileTracingIncludes: {
+    // Sharp 0.35's native libvips binary is not inferred by Next's tracer.
+    // Include it only in routes that generate images, not in public pages.
+    "/api/admin/special-invites/download": [
+      "./node_modules/@img/sharp-*/lib/**/*",
+    ],
+    "/api/uploads/profile/complete": [
+      "./node_modules/@img/sharp-*/lib/**/*",
+    ],
     "/api/portal/applications/*/summary": [
       "./node_modules/@expo-google-fonts/noto-sans/**/*.ttf",
     ],

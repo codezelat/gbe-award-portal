@@ -109,6 +109,7 @@ bun run db:bootstrap-admin
 - Claims go through `/api/public/special-invites`, with same-origin, body-size, durable IP/draft rate limits and an existing verified draft credential. Lock order is draft, cycle, invite. Only one invite per draft, no stacking or replacement. The discount must leave a positive payable amount.
 - Claiming reserves the then-current discounted fee for exactly one hour. Retries never extend it. Submission consumes it atomically; expiry or draft deletion never releases it for reuse. Use `getDraftNominationPricing` for draft saves, restore, initiation and final completion. Keep the general offer schedule underneath so expiry can return to its current fee. Preserve submitted/active payment snapshots and require acknowledgement of changed prices.
 - Invite barcode images decode locally in an on-demand client module. Generated JPG/ZIP downloads are private, bounded to 100 images, produced in memory and rechecked for unused status before response. Never persist barcode images in the database or expose claimed codes through public routes. Keep expiry time-derived, without polling or a scheduler.
+- Preserve the route-scoped Sharp native-library includes in `next.config.ts`. `bun run build` also runs `build:verify-invite-download`, which generates a JPG from an isolated copy of the route's traced dependencies. A full local `node_modules` can hide a missing deployment binary, so development-server or unit-test success alone is insufficient for download changes.
 
 ## 5. Security and environment rules
 

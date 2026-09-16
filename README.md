@@ -221,6 +221,8 @@ Card checkout and bank transfer use the nomination's saved fee. The 2026 LKR sch
 
 Generation downloads a ZIP of individual **Code 128 JPGs**, each with its readable code below the barcode. Unused invites also have individual JPG downloads and can be cancelled with confirmation. Download endpoints recheck that codes are unused. Claimed, expired, cancelled and used codes cannot be downloaded again. Previously downloaded copies cannot be recalled, but a code still only works once.
 
+The production build explicitly includes Sharp's native image libraries for invite downloads and profile-image processing. `bun run build` checks JPG generation using only the invite route's traced deployment dependencies, not the full local installation. Rerun that check after a build with `bun run build:verify-invite-download`. A failed download does not cancel or consume an invite; retry the existing batch or individual JPG after resolving the error.
+
 On **3. Payment**, **Claim Special Invite** accepts typed codes or a JPG, PNG or WebP barcode image up to 5 MB. Image decoding is loaded on demand and happens entirely in the browser; the image is not uploaded or stored. Codes are case-insensitive. Claims require the existing, Turnstile-verified draft credential, same-origin checks and durable per-IP/per-draft rate limits.
 
 - Claiming subtracts the invite discount from the current fee and locks that price to the draft for exactly one hour. The discount must leave a positive payable amount; invites do not create free nominations.
