@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
-import { nominationDrafts } from "@/lib/db/schema";
+import { awardCycles, nominationDrafts } from "@/lib/db/schema";
+import { getDraftNominationPricing } from "@/server/services/special-invites";
 import {
   draftCredentialSchema,
   saveDraftSchema,
@@ -40,6 +41,10 @@ export async function POST(request: Request) {
         .where(eq(nominationDrafts.id, credential.id));
       const draft = assertDraftCredential(row, credential);
       const linked = await draftFileRows(draft.id);
+      const [cycle] = await getDb()
+        .select()
+        .from(awardCycles)
+        .where(eq(awardCycles.id, draft.cycleId));
       return NextResponse.json(
         {
           ok: true,
@@ -49,6 +54,9 @@ export async function POST(request: Request) {
             step: draft.savedStep,
             version: draft.version,
             submitted: Boolean(draft.submittedAt),
+            pricing: cycle
+              ? await getDraftNominationPricing(cycle, draft.id)
+              : undefined,
             pendingFiles: linked.filter((row) => row.file.status !== "ready")
               .length,
             files: linked

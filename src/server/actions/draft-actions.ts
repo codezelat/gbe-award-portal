@@ -9,6 +9,7 @@ import {
   auditLogs,
   files,
   nominationDrafts,
+  specialInvites,
   paymentAttempts,
   payments,
   uploadSessions,
@@ -114,6 +115,16 @@ export async function deleteInProgress(input: { id: string; source: string }) {
             and(
               eq(nominationDrafts.id, draft.id),
               isNull(nominationDrafts.submittedAt),
+            ),
+          );
+        await tx
+          .update(specialInvites)
+          .set({ revokedAt: now })
+          .where(
+            and(
+              eq(specialInvites.draftId, draft.id),
+              isNull(specialInvites.consumedAt),
+              isNull(specialInvites.revokedAt),
             ),
           );
         await tx.insert(auditLogs).values({

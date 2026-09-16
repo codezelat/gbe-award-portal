@@ -13,6 +13,7 @@ import {
   Settings,
   ShieldCheck,
   Tags,
+  TicketCheck,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -22,6 +23,11 @@ export const adminNavigation = [
   { href: "/admin/applications", label: "Applications", icon: FileArchive },
   { href: "/admin/applicants", label: "Applicants", icon: UsersRound },
   { href: "/admin/payments", label: "Payments", icon: Banknote },
+  {
+    href: "/admin/special-invites",
+    label: "Special invites",
+    icon: TicketCheck,
+  },
   { href: "/admin/files", label: "Files", icon: FolderOpen },
   { href: "/admin/communications", label: "Communications", icon: Mail },
   { href: "/admin/exports", label: "Exports", icon: BookOpen },

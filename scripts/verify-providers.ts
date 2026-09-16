@@ -30,6 +30,31 @@ if (draftPermissions.rows[0]?.allowed !== true)
   throw new Error(
     "Grant the runtime role SELECT, INSERT and UPDATE on nomination_drafts and nomination_draft_files.",
   );
+const invites = await getDb().execute(sql`select
+  to_regclass('public.special_invite_batches') as batches,
+  to_regclass('public.special_invites') as invites,
+  exists(select 1 from pg_constraint where
+    conrelid = to_regclass('public.special_invites') and
+    conname = 'special_invites_claim_fields_present' and convalidated
+  ) as hardened`);
+if (
+  !invites.rows[0]?.batches ||
+  !invites.rows[0]?.invites ||
+  !invites.rows[0]?.hardened
+)
+  throw new Error(
+    "Apply migrations 0012 and 0013 before deploying special invites.",
+  );
+const invitePermissions = await getDb().execute(sql`select
+  has_table_privilege(current_user, 'public.special_invite_batches', 'SELECT') and
+  has_table_privilege(current_user, 'public.special_invite_batches', 'INSERT') and
+  has_table_privilege(current_user, 'public.special_invites', 'SELECT') and
+  has_table_privilege(current_user, 'public.special_invites', 'INSERT') and
+  has_table_privilege(current_user, 'public.special_invites', 'UPDATE') as allowed`);
+if (invitePermissions.rows[0]?.allowed !== true)
+  throw new Error(
+    "Grant the runtime role SELECT/INSERT on special_invite_batches and SELECT/INSERT/UPDATE on special_invites.",
+  );
 if (env.GENIE_ENABLED === "true") {
   const result = await getDb().execute(sql`select
     has_table_privilege(current_user, 'public.payment_attempts', 'SELECT')

@@ -70,6 +70,10 @@ import { useNominationPricing } from "./nomination-offer";
 import { cardCheckoutAmount } from "@/lib/domain/card-checkout-amount";
 import type { NominationPricing } from "@/lib/domain/nomination-pricing";
 import {
+  SpecialInviteClaim,
+  SpecialInviteNotice,
+} from "./special-invite-claim";
+import {
   draftCredentialSchema,
   draftDataSchema,
   draftManifestSchema,
@@ -325,6 +329,13 @@ export function NominationForm({
         const manifest = draftManifestSchema.parse(result.data.files);
         draftCredential.current = credential;
         draftVersion.current = result.data.version;
+        if (result.data.pricing) {
+          updatePricing(result.data.pricing);
+          if (result.data.pricing.specialInvite?.status === "active")
+            setAcceptedAmountMinor(
+              result.data.pricing.amountMinor ?? undefined,
+            );
+        }
         for (const [key, value] of Object.entries(values)) {
           if (key === "paymentMethod") continue;
           form.setValue(key as keyof PublicApplicationInput, value);
@@ -366,7 +377,7 @@ export function NominationForm({
     return () => {
       cancelled = true;
     };
-  }, [cycleId, form]);
+  }, [cycleId, form, updatePricing]);
 
   function manifest() {
     return allFiles.map(({ id, file, kind, savedSize }) => ({
@@ -1013,8 +1024,21 @@ export function NominationForm({
         </FormSection>
       ) : null}
       {currentStep === 2 ? (
-        <FormSection headingRef={stepHeadingRef} number="3" title="Payment">
+        <FormSection
+          headingRef={stepHeadingRef}
+          number="3"
+          title="Payment"
+          action={
+            <SpecialInviteClaim
+              disabled={busy}
+              credential={draftCredential.current}
+              returnFocusRef={stepHeadingRef}
+              onClaim={setAcceptedAmountMinor}
+            />
+          }
+        >
           <FieldGroup>
+            <SpecialInviteNotice />
             <div className="rounded-md border border-champagne/50 bg-gold-wash/55 p-4 text-sm text-graphite">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <p className="font-medium text-foreground">
@@ -1022,7 +1046,13 @@ export function NominationForm({
                 </p>
                 <div className="flex items-baseline gap-2">
                   {standardFee && !cardTest ? (
-                    <span className="text-sm text-muted-foreground line-through">
+                    <span
+                      className={
+                        pricing.specialInvite?.status === "active"
+                          ? "text-sm text-destructive line-through"
+                          : "text-sm text-muted-foreground line-through"
+                      }
+                    >
                       {standardFee}
                     </span>
                   ) : null}
@@ -1035,7 +1065,9 @@ export function NominationForm({
               </div>
               {standardFee && !cardTest ? (
                 <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-antique-gold">
-                  Limited offer
+                  {pricing.specialInvite?.status === "active"
+                    ? "Special invite applied"
+                    : "Limited offer"}
                 </p>
               ) : null}
               {cardTest ? (
@@ -1126,6 +1158,7 @@ export function NominationForm({
           number="4"
           title="Confirm and submit"
         >
+          <SpecialInviteNotice className="mb-5" />
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-muted-foreground">
               {paymentMethod === "card" ? "Card payment" : "Bank transfer"}
@@ -1345,7 +1378,7 @@ function PaymentMethodDialog({
   const bankTransfer = paymentInstructions?.bankTransfer;
   if (!bankTransfer)
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-graphite">
         Payment instructions will be provided by the GBE Awards team.
       </p>
     );
@@ -1448,22 +1481,27 @@ function FormSection({
   number,
   title,
   children,
+  action,
 }: {
   headingRef?: React.Ref<HTMLHeadingElement>;
   number: string;
   title: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <section className="border-b border-mist px-5 py-7 last:border-b-0 md:px-8 md:py-9">
-      <h2
-        ref={headingRef}
-        tabIndex={-1}
-        className="section-title mb-6 outline-none"
-      >
-        <span className="mr-2 text-antique-gold">{number}.</span>
-        {title}
-      </h2>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="section-title max-w-full shrink-0 outline-none"
+        >
+          <span className="mr-2 text-antique-gold">{number}.</span>
+          {title}
+        </h2>
+        {action ? <div className="ml-auto min-w-0">{action}</div> : null}
+      </div>
       {children}
     </section>
   );

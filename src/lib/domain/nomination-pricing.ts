@@ -1,3 +1,5 @@
+import type { InviteSnapshot } from "./special-invite";
+
 // Owner-approved, absolute Colombo timestamps. Deployment never restarts the offer.
 export const NOMINATION_OFFER = {
   year: 2026,
@@ -66,6 +68,29 @@ export function nominationPricing(
     standardAmountMinor: configured?.standardAmountMinor ?? null,
     bannerText: configured?.bannerText ?? "",
     offer: configured,
+    specialInvite: null as InviteSnapshot | null,
+  };
+}
+
+export function withSpecialInvite(
+  pricing: NominationPricing,
+  invite: InviteSnapshot | null,
+): NominationPricing {
+  if (!invite) return pricing;
+  const current =
+    invite.status === "active" && invite.expiresAt <= pricing.serverNow
+      ? { ...invite, status: "expired" as const }
+      : invite;
+  return {
+    ...pricing,
+    ...(current.status === "active"
+      ? {
+          amountMinor: current.amountMinor,
+          standardAmountMinor: current.originalAmountMinor,
+          currency: current.currency,
+        }
+      : {}),
+    specialInvite: current,
   };
 }
 
@@ -83,7 +108,10 @@ export function assertNominationPrice(
   pricing: NominationPricing,
   acceptedAmountMinor: number | undefined,
 ) {
-  if (pricing.phase !== "none" && acceptedAmountMinor !== pricing.amountMinor)
+  if (
+    (pricing.phase !== "none" || pricing.specialInvite) &&
+    acceptedAmountMinor !== pricing.amountMinor
+  )
     throw new NominationPriceChangedError(pricing);
 }
 

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   formatOfferCountdown,
   nominationPricing,
+  withSpecialInvite,
   type NominationPricing,
   type PricingCycle,
 } from "@/lib/domain/nomination-pricing";
@@ -34,19 +35,31 @@ export function NominationPricingProvider({
     let timer: ReturnType<typeof setTimeout>;
     function checkBoundary() {
       const now = pricing.serverNow + Date.now() - clientAnchor;
-      const next = nominationPricing(cycle, now, pricing.offer);
-      if (next.phase !== pricing.phase) {
+      const next = withSpecialInvite(
+        nominationPricing(cycle, now, pricing.offer),
+        pricing.specialInvite,
+      );
+      if (
+        next.phase !== pricing.phase ||
+        next.specialInvite?.status !== pricing.specialInvite?.status
+      ) {
         updatePricing(next);
         return;
       }
-      const boundary =
+      const offerBoundary =
         next.phase === "upcoming"
           ? next.startsAt
           : next.phase === "active"
             ? next.endsAt
             : null;
+      const boundary = Math.min(
+        offerBoundary ?? Infinity,
+        next.specialInvite?.status === "active"
+          ? next.specialInvite.expiresAt
+          : Infinity,
+      );
       clearTimeout(timer);
-      if (boundary)
+      if (Number.isFinite(boundary))
         timer = setTimeout(
           checkBoundary,
           Math.min(2_147_483_647, Math.max(1, boundary - now)),
@@ -70,7 +83,12 @@ export function NominationPricingProvider({
 
 export function NominationOfferBanner() {
   const { pricing } = useNominationPricing();
-  if (pricing.phase !== "active" || !pricing.endsAt) return null;
+  if (
+    pricing.phase !== "active" ||
+    !pricing.endsAt ||
+    pricing.specialInvite?.status === "active"
+  )
+    return null;
   return (
     <aside
       aria-label="Nomination offer"
@@ -92,7 +110,7 @@ export function NominationOfferBanner() {
   );
 }
 
-function OfferCountdown({
+export function OfferCountdown({
   endsAt,
   serverNow,
 }: {

@@ -935,6 +935,15 @@ export default async function AdminApplicationDetail({
                     {verificationGaps.join(", ")}.
                   </p>
                 ) : null}
+                {payment?.expectedAmountMinor != null ? (
+                  <p className="mt-3 text-sm">
+                    Nomination fee: {payment.currency}{" "}
+                    {(payment.expectedAmountMinor / 100).toLocaleString(
+                      "en-GB",
+                      { maximumFractionDigits: 2 },
+                    )}
+                  </p>
+                ) : null}
                 {payment?.method === "card" ? (
                   <div className="mt-4">
                     <p className="text-sm">

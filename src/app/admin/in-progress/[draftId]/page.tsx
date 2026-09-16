@@ -8,7 +8,10 @@ import {
   applications,
   awardCategories,
   nominationDrafts,
+  specialInvites,
+  specialInviteBatches,
 } from "@/lib/db/schema";
+import { inviteState } from "@/lib/domain/special-invite";
 import {
   draftDataSchema,
   draftStepLabels,
@@ -76,6 +79,26 @@ export default async function DraftPage({
         .where(eq(awardCategories.id, data.categoryId))
     : [];
   const linked = draft ? await draftFileRows(draft.id) : [];
+  const [invite] = draft
+    ? await db
+        .select({
+          claim: specialInvites,
+          currency: specialInviteBatches.currency,
+        })
+        .from(specialInvites)
+        .innerJoin(
+          specialInviteBatches,
+          eq(specialInvites.batchId, specialInviteBatches.id),
+        )
+        .where(eq(specialInvites.draftId, draft.id))
+    : [];
+  const inviteLabel = invite
+    ? inviteState(invite.claim) === "active"
+      ? `${invite.currency} ${(invite.claim.amountMinor! / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}, until ${formatInTimeZone(invite.claim.expiresAt!, "Asia/Colombo", "d MMM, h:mm a")}`
+      : inviteState(invite.claim) === "expired"
+        ? "Expired"
+        : "Cancelled"
+    : undefined;
   const url = normaliseUrl(data.businessWebsite ?? undefined);
   const website = url && /^https?:\/\//i.test(url) ? url : null;
   return (
@@ -96,7 +119,7 @@ export default async function DraftPage({
             <Badge variant="outline">
               {draftStepLabels[draft?.savedStep ?? 3]} saved
             </Badge>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground/75">
               {formatInTimeZone(
                 (draft ?? legacy)!.updatedAt,
                 "Asia/Colombo",
@@ -125,6 +148,7 @@ export default async function DraftPage({
             ["Designation", data.designation],
             ["Category", category?.name],
             ["Payment method", data.paymentMethod?.replaceAll("_", " ")],
+            ["Special invite", inviteLabel],
           ]
             .filter(([, value]) => value)
             .map(([label, value]) => (

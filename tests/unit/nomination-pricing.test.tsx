@@ -6,6 +6,7 @@ import {
   NOMINATION_OFFER,
   nominationPricing,
   NominationPriceChangedError,
+  withSpecialInvite,
 } from "@/lib/domain/nomination-pricing";
 import {
   NominationOfferBanner,
@@ -131,6 +132,31 @@ function offer(now: number) {
   );
 }
 describe("lightweight offer banner", () => {
+  it("preserves a claimed price over the global offer boundary and releases it after its own hour", () => {
+    vi.useFakeTimers();
+    const now = NOMINATION_OFFER.endsAt - 1000;
+    render(
+      <NominationPricingProvider
+        cycle={cycle}
+        initialPricing={withSpecialInvite(nominationPricing(cycle, now), {
+          id: "invite",
+          status: "active",
+          currency: "LKR",
+          originalAmountMinor: 6500000,
+          amountMinor: 6000000,
+          expiresAt: now + 3600000,
+        })}
+      >
+        <NominationOfferBanner />
+        <Fee />
+      </NominationPricingProvider>,
+    );
+    expect(screen.queryByLabelText("Nomination offer")).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByLabelText("Current fee")).toHaveTextContent("6000000");
+    act(() => vi.advanceTimersByTime(3599000));
+    expect(screen.getByLabelText("Current fee")).toHaveTextContent("8500000");
+  });
   it("follows the serialized admin schedule instead of the default campaign", () => {
     vi.useFakeTimers();
     const now = NOMINATION_OFFER.endsAt + 10000;

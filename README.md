@@ -215,6 +215,29 @@ Card checkout uses Genie Business hosted payment pages, not an embedded card for
 
 Card checkout and bank transfer use the nomination's saved fee. The 2026 LKR schedule below applies to new submissions. The owner-confirmed LKR 10 live test is complete and the temporary override is disabled (`CARD_TEST_AMOUNT_MINOR = null` in `src/lib/domain/card-checkout-amount.ts`). Existing active checkouts retain their original amount, and receipts record the amount actually paid. Do not rewrite previous test payments or receipts. No additional environment variable is required for normal pricing.
 
+### Special invites
+
+**Special invites** in `/admin/special-invites` follows the selected award cycle. Super admins issue a batch by entering a discount and quantity (1 to 100). Staff can track claims and open the linked draft or nomination. A batch generates cryptographically random six-character uppercase letter/number codes, with a database uniqueness constraint and collision retries. Generating the same request again cannot create a duplicate batch.
+
+Generation downloads a ZIP of individual **Code 128 JPGs**, each with its readable code below the barcode. Unused invites also have individual JPG downloads and can be cancelled with confirmation. Download endpoints recheck that codes are unused. Claimed, expired, cancelled and used codes cannot be downloaded again. Previously downloaded copies cannot be recalled, but a code still only works once.
+
+On **3. Payment**, **Claim Special Invite** accepts typed codes or a JPG, PNG or WebP barcode image up to 5 MB. Image decoding is loaded on demand and happens entirely in the browser; the image is not uploaded or stored. Codes are case-insensitive. Claims require the existing, Turnstile-verified draft credential, same-origin checks and durable per-IP/per-draft rate limits.
+
+- Claiming subtracts the invite discount from the current fee and locks that price to the draft for exactly one hour. The discount must leave a positive payable amount; invites do not create free nominations.
+- One invite can be claimed per draft. Retrying the same claim is safe and never extends its timer. Codes cannot transfer to another draft or be reused after expiry.
+- A red countdown and crossed-out original fee appear during the claim. This replaces the general offer banner while the invite is active, so applicants see only their applicable deadline. The browser restores the claim after a reload in the same tab and updates on expiry without polling or a cron.
+- Card and bank-transfer choices remain available. Final submission, not payment verification, consumes the invite in the same transaction as the nomination. A submitted card nomination can finish its hosted checkout later at the saved amount. Bank transfers still require proof.
+- Expiry before submission restores the current fee and requires a new price acknowledgement without removing details or files. A claimed price survives later general-offer changes. Deleting its draft cancels the claim permanently; no code is returned to the unused pool. Existing nominations and payment attempts are never repriced.
+
+#### Deploying special invites
+
+1. Create a Neon restore point or backup branch. Apply reviewed additive migrations `0012_groovy_jetstream.sql` and `0013_woozy_scarecrow.sql` with `bun run db:migrate`, using the local owner connection `DATABASE_URL_DIRECT`. They add invite tables and integrity checks only; they do not update historical nomination/payment data.
+2. Grant the existing runtime role `SELECT, INSERT` on `public.special_invite_batches` and `SELECT, INSERT, UPDATE` on `public.special_invites`. No delete permission is needed. `bun run providers:verify` checks these permissions.
+3. Deploy the application only after the migration and grants. **No new environment variables, Redis service, storage bucket or scheduler are required.** Keep the current `BETTER_AUTH_SECRET` stable: invite codes are encrypted at rest with a domain-specific key derived from it. Rotating this secret requires decrypting/re-encrypting outstanding codes under controlled maintenance before switching the key.
+4. Check issuing, ZIP/JPG download, claim, expiry and submission on an isolated test cycle/database first. Do not create test codes or nominations in production without explicit approval.
+
+Rollback: keep these additive tables and roll application code back to the previous release if necessary. Do not drop invite records or rewrite discounted payment snapshots. Outstanding invites cannot be claimed on the previous release; preserve their records for recovery.
+
 ### Nomination offers
 
 Super admins manage offers in **Award cycles > Edit offer** (`/admin/cycles`). The compact editor controls the banner wording, Colombo start/end times, offer fee and regular fee. Amounts are entered in the cycle's currency, not minor units. Saves validate the dates and discount, require configuration permission, retain an audit record and reject conflicting edits from another window. Turning an offer off applies the regular fee immediately and removes its banner.
@@ -231,7 +254,7 @@ Until an admin saves a replacement, the owner-approved 2026 LKR schedule in `src
 
 The red countdown appears only during the configured window on `/apply`. At expiry, it disappears along with the crossed-out price and offer label. An open form updates its fee at schedule boundaries without a reload. Admin edits are picked up on page load, step saves and submission; an applicant must review a changed fee before proceeding. Countdown ticks are local and isolated from the form, with no database polling or additional cron. The loading boundary uses the same configuration as the page.
 
-Both public initiation paths and final submission use `src/server/services/nomination-offers.ts` to enforce the server-time price. Final submission locks the cycle while reading the latest settings so a concurrent offer edit cannot change the accepted fee midway through finalization. A stale or missing price acknowledgement returns `409 PRICE_CHANGED` with the current fee; saved details and uploads remain available. Bank-transfer nominations and proof must reach final submission before the deadline for the offer price. Drafts and incomplete upload sessions do not reserve it. Submitted nominations, active card attempts, receipts and historical amounts are unchanged. Other cycles use their base fee until an offer is configured.
+Both public initiation paths and final submission use `src/server/services/nomination-offers.ts` to enforce the server-time price. Final submission locks the cycle while reading the latest settings so a concurrent offer edit cannot change the accepted fee midway through finalization. A stale or missing price acknowledgement returns `409 PRICE_CHANGED` with the current fee; saved details and uploads remain available. Bank-transfer nominations and proof must reach final submission before the deadline for the offer price. Drafts and incomplete upload sessions do not reserve the general offer fee unless a special invite has locked a price for its one-hour claim window. Submitted nominations, active card attempts, receipts and historical amounts are unchanged. Other cycles use their base fee until an offer is configured.
 
 Deploy before an offer begins to show its full window. A deployment during an offer shows only the remaining time. The initial 2026 default starts automatically without a database write; later changes are made through the admin editor after deploying this feature. The cycle's stored base fee and existing payment records are never rewritten by an offer save.
 

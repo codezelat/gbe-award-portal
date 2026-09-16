@@ -10,6 +10,7 @@ import {
   awardCategories,
   awardCycles,
   systemSettings,
+  specialInviteBatches,
 } from "@/lib/db/schema";
 function requireConfig(membership: { role: string; permissions: unknown }) {
   if (!hasPermission(membership, "configuration.manage"))
@@ -286,6 +287,17 @@ export async function saveCycleAction(formData: FormData) {
       throw new Error(
         "The currency cannot change while this cycle has a nomination offer.",
       );
+    if (current.currency !== (input.currency?.toUpperCase() || null)) {
+      const [issued] = await tx
+        .select({ id: specialInviteBatches.id })
+        .from(specialInviteBatches)
+        .where(eq(specialInviteBatches.cycleId, id))
+        .limit(1);
+      if (issued)
+        throw new Error(
+          "The currency cannot change after special invites have been issued.",
+        );
+    }
     await tx
       .update(awardCycles)
       .set({

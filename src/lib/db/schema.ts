@@ -478,6 +478,96 @@ export const nominationDraftFiles = pgTable(
   },
   (t) => [index("nomination_draft_files_draft_idx").on(t.draftId)],
 );
+
+export const specialInviteBatches = pgTable(
+  "special_invite_batches",
+  {
+    // Client-generated request ID makes issuing a batch safe to retry.
+    id: uuid("id").primaryKey(),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => awardCycles.id),
+    discountMinor: bigint("discount_minor", { mode: "number" }).notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    quantity: integer("quantity").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => profiles.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("special_invite_batches_cycle_idx").on(t.cycleId, t.createdAt),
+    check(
+      "special_invite_batches_discount_positive",
+      sql`${t.discountMinor} > 0`,
+    ),
+    check(
+      "special_invite_batches_quantity_valid",
+      sql`${t.quantity} between 1 and 100`,
+    ),
+  ],
+);
+
+export const specialInvites = pgTable(
+  "special_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => specialInviteBatches.id),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => awardCycles.id),
+    codeHash: text("code_hash").notNull().unique(),
+    codeEncrypted: text("code_encrypted").notNull(),
+    draftId: uuid("draft_id")
+      .unique()
+      .references(() => nominationDrafts.id),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    originalAmountMinor: bigint("original_amount_minor", { mode: "number" }),
+    amountMinor: bigint("amount_minor", { mode: "number" }),
+    applicationId: uuid("application_id")
+      .unique()
+      .references(() => applications.id),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("special_invites_cycle_created_idx").on(t.cycleId, t.createdAt, t.id),
+    index("special_invites_batch_idx").on(t.batchId),
+    index("special_invites_unused_idx")
+      .on(t.cycleId)
+      .where(sql`${t.draftId} is null and ${t.revokedAt} is null`),
+    check(
+      "special_invites_claim_valid",
+      sql`(
+    ${t.draftId} is null and ${t.claimedAt} is null and ${t.expiresAt} is null and ${t.originalAmountMinor} is null and ${t.amountMinor} is null
+  ) or (
+    ${t.draftId} is not null and ${t.claimedAt} is not null and ${t.expiresAt} = ${t.claimedAt} + interval '1 hour'
+    and ${t.originalAmountMinor} > ${t.amountMinor} and ${t.amountMinor} > 0
+  )`,
+    ),
+    check(
+      "special_invites_consumption_valid",
+      sql`(
+    ${t.consumedAt} is null and ${t.applicationId} is null
+  ) or (
+    ${t.consumedAt} is not null and ${t.applicationId} is not null and ${t.draftId} is not null
+    and ${t.revokedAt} is null and ${t.consumedAt} >= ${t.claimedAt} and ${t.consumedAt} < ${t.expiresAt}
+  )`,
+    ),
+    check(
+      "special_invites_claim_fields_present",
+      sql`${t.draftId} is null or (${t.expiresAt} is not null and ${t.originalAmountMinor} is not null and ${t.amountMinor} is not null)`,
+    ),
+  ],
+);
 export const applicationFiles = pgTable("application_files", {
   id: uuid("id").primaryKey().defaultRandom(),
   applicationId: uuid("application_id")

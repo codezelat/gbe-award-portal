@@ -1,0 +1,1 @@
+ALTER TABLE "special_invites" ADD CONSTRAINT "special_invites_claim_fields_present" CHECK ("special_invites"."draft_id" is null or ("special_invites"."expires_at" is not null and "special_invites"."original_amount_minor" is not null and "special_invites"."amount_minor" is not null));

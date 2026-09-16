@@ -35,7 +35,10 @@ import {
   assertNominationPrice,
   NominationPriceChangedError,
 } from "@/lib/domain/nomination-pricing";
-import { getNominationPricing } from "@/server/services/nomination-offers";
+import {
+  consumeSpecialInvite,
+  getDraftNominationPricing,
+} from "@/server/services/special-invites";
 
 export const runtime = "nodejs";
 const inputSchema = z.object({
@@ -215,7 +218,11 @@ export async function POST(request: Request) {
         .where(eq(awardCycles.id, row.cycle.id))
         .for("share");
       if (!currentCycle) throw new Error("Award cycle is unavailable.");
-      const pricing = await getNominationPricing(currentCycle, tx);
+      const pricing = await getDraftNominationPricing(
+        currentCycle,
+        draft?.id,
+        tx,
+      );
       assertNominationPrice(pricing, input.acceptedAmountMinor);
       await tx
         .insert(cycleSequences)
@@ -273,7 +280,7 @@ export async function POST(request: Request) {
         .update(payments)
         .set({
           paymentReference,
-          ...(pricing.phase !== "none"
+          ...(pricing.phase !== "none" || pricing.specialInvite
             ? { expectedAmountMinor: pricing.amountMinor }
             : {}),
           updatedAt: new Date(),
@@ -317,6 +324,13 @@ export async function POST(request: Request) {
             .where(eq(payments.applicationId, row.application.id));
       }
       const submittedAt = new Date(pricing.serverNow);
+      if (draft)
+        await consumeSpecialInvite(
+          tx,
+          draft.id,
+          row.application.id,
+          pricing.serverNow,
+        );
       const snapshot = {
         nomineeName: row.application.nomineeName,
         designation: row.application.designation,

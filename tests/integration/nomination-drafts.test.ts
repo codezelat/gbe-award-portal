@@ -22,6 +22,7 @@ import {
 } from "../../src/lib/validation/nomination-draft";
 import { initiateApplicationSchema } from "../../src/lib/validation/application";
 
+const security = vi.hoisted(() => ({ origin: vi.fn(), rate: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ getDb: () => db }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -34,7 +35,7 @@ vi.mock("@/server/dal/auth", () => ({
     permission !== "configuration.manage" || configAllowed,
 }));
 vi.mock("@/server/security/request", () => ({
-  assertSameOrigin: async () => new Headers(),
+  assertSameOrigin: security.origin,
 }));
 vi.mock("@/server/security/turnstile", () => ({
   verifyTurnstile: async (token: string) => {
@@ -42,7 +43,7 @@ vi.mock("@/server/security/turnstile", () => ({
   },
 }));
 vi.mock("@/server/security/rate-limit", () => ({
-  enforceRateLimit: async () => {},
+  enforceRateLimit: security.rate,
 }));
 vi.mock("@/server/services/feature-flags", () => ({
   requireFeatureFlag: async () => {},
@@ -112,11 +113,30 @@ const { saveNominationOfferAction } =
 const { cleanupStaleUploads } = await import("../../src/server/jobs/cleanup");
 const { purgeIncompleteNominationShell } =
   await import("../../src/server/services/incomplete-nomination-cleanup");
+const {
+  issueSpecialInvites,
+  claimSpecialInvite,
+  getDraftNominationPricing,
+  revokeUnusedInvite,
+} = await import("../../src/server/services/special-invites");
+const inviteCodes =
+  await import("../../src/server/security/special-invite-code");
+const { decryptInviteCode } = inviteCodes;
+const { generateSpecialInvites } =
+  await import("../../src/server/actions/special-invite-actions");
+const { GET: downloadInvites } =
+  await import("../../src/app/api/admin/special-invites/download/route");
+const { POST: claimInviteRequest } =
+  await import("../../src/app/api/public/special-invites/route");
+const { getSpecialInvites } =
+  await import("../../src/server/dal/special-invites");
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOMINATION_OFFER.startsAt);
   staffAllowed = true;
   configAllowed = false;
+  security.origin.mockReset().mockResolvedValue(new Headers());
+  security.rate.mockReset().mockResolvedValue(undefined);
   const key = crypto.randomUUID();
   const [cycle] = await db
     .insert(schema.awardCycles)
@@ -165,7 +185,10 @@ beforeEach(async () => {
 afterAll(async () => {
   await client.end();
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 const credential = (): DraftCredential => ({
   id: crypto.randomUUID(),
   secret: crypto.randomUUID().replaceAll("-", "").repeat(2),
@@ -248,6 +271,395 @@ const finish = (
       body: JSON.stringify({ ...session, acceptedAmountMinor: amount }),
     }),
   );
+
+async function issue(quantity = 1, discountMinor = 500000) {
+  const input = {
+    requestId: crypto.randomUUID(),
+    cycleId,
+    discountMinor,
+    quantity,
+  };
+  const result = await issueSpecialInvites(input, actorId);
+  const rows = await db
+    .select()
+    .from(schema.specialInvites)
+    .where(eq(schema.specialInvites.batchId, result.batchId));
+  return {
+    input,
+    result,
+    rows,
+    code: decryptInviteCode(rows[0].codeEncrypted),
+  };
+}
+
+describe("special invites", () => {
+  it("protects public claims with origin checks, body validation and both rate limits", async () => {
+    const invite = await issue();
+    const { key } = await prepared();
+    const body = JSON.stringify({
+      credential: key,
+      code: invite.code.toLowerCase(),
+    });
+    const request = (text = body) =>
+      claimInviteRequest(
+        new Request("https://example.test/api/public/special-invites", {
+          method: "POST",
+          body: text,
+        }),
+      );
+    security.origin.mockRejectedValueOnce(new Error("Unexpected origin"));
+    expect((await request()).status).toBe(400);
+    expect((await request("x".repeat(2049))).status).toBe(400);
+    expect((await request("{")).status).toBe(400);
+    expect(
+      (await request(JSON.stringify({ credential: key, code: "BAD" }))).status,
+    ).toBe(400);
+    security.rate.mockRejectedValueOnce(new Error("Rate exceeded"));
+    expect((await request()).status).toBe(429);
+    security.rate
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Rate exceeded"));
+    expect((await request()).status).toBe(429);
+    const [unchanged] = await db
+      .select()
+      .from(schema.specialInvites)
+      .where(eq(schema.specialInvites.id, invite.rows[0].id));
+    expect(unchanged.draftId).toBeNull();
+    const response = await request();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const result = await response.json();
+    expect(result.pricing.amountMinor).toBe(6000000);
+    expect(JSON.stringify(result)).not.toContain(invite.code);
+    expect(security.rate).toHaveBeenCalledWith(
+      `invite-draft:${key.id}`,
+      5,
+      900,
+    );
+    expect(security.rate).toHaveBeenCalledWith(
+      expect.stringMatching(/^invite-ip:/),
+      20,
+      900,
+    );
+  });
+  it("retries a generated code collision without issuing duplicates", async () => {
+    const existing = await issue();
+    const generator = vi.spyOn(inviteCodes, "generateInviteCode");
+    generator.mockReturnValueOnce(existing.code);
+    const next = await issue();
+    expect(next.code).not.toBe(existing.code);
+    expect(next.rows).toHaveLength(1);
+    expect(generator).toHaveBeenCalledTimes(2);
+  });
+  it("rejects the wrong cycle, closed nominations and drafts without saved contact details", async () => {
+    const invite = await issue();
+    const key = credential();
+    await save(key);
+    await expect(claimSpecialInvite(key, invite.code)).rejects.toThrow(
+      /contact details/,
+    );
+    const ready = await prepared();
+    const [cycle] = await db
+      .select()
+      .from(schema.awardCycles)
+      .where(eq(schema.awardCycles.id, cycleId));
+    const otherId = crypto.randomUUID();
+    await db
+      .insert(schema.awardCycles)
+      .values({ ...cycle, id: otherId, slug: otherId });
+    const other = await issueSpecialInvites(
+      { ...invite.input, requestId: crypto.randomUUID(), cycleId: otherId },
+      actorId,
+    );
+    const [otherCode] = await db
+      .select()
+      .from(schema.specialInvites)
+      .where(eq(schema.specialInvites.batchId, other.batchId));
+    await expect(
+      claimSpecialInvite(ready.key, decryptInviteCode(otherCode.codeEncrypted)),
+    ).rejects.toThrow(/invalid or no longer/);
+    await db
+      .update(schema.awardCycles)
+      .set({ status: "closed" })
+      .where(eq(schema.awardCycles.id, cycleId));
+    await expect(claimSpecialInvite(ready.key, invite.code)).rejects.toThrow(
+      /not currently open/,
+    );
+    const [unused] = await db
+      .select()
+      .from(schema.specialInvites)
+      .where(eq(schema.specialInvites.id, invite.rows[0].id));
+    expect(unused.draftId).toBeNull();
+  });
+  it("issues unique encrypted codes and idempotent concurrent batches without changing historical fees", async () => {
+    const input = {
+      requestId: crypto.randomUUID(),
+      cycleId,
+      discountMinor: 500000,
+      quantity: 100,
+    };
+    const result = await Promise.all([
+      issueSpecialInvites(input, actorId),
+      issueSpecialInvites(input, actorId),
+    ]);
+    expect(result[0]).toEqual(result[1]);
+    const rows = await db
+      .select()
+      .from(schema.specialInvites)
+      .where(eq(schema.specialInvites.batchId, input.requestId));
+    expect(rows).toHaveLength(100);
+    const codes = rows.map((row) => decryptInviteCode(row.codeEncrypted));
+    expect(new Set(codes).size).toBe(100);
+    expect(codes.every((code) => /^[A-Z0-9]{6}$/.test(code))).toBe(true);
+    expect(rows.every((row) => !codes.includes(row.codeEncrypted))).toBe(true);
+    await expect(
+      issueSpecialInvites({ ...input, quantity: 1 }, actorId),
+    ).rejects.toThrow(/request changed/);
+    const [cycle] = await db
+      .select()
+      .from(schema.awardCycles)
+      .where(eq(schema.awardCycles.id, cycleId));
+    expect(cycle.nominationFeeMinor).toBe(6500000);
+  });
+  it("validates positive payable amounts, quantity and staff issuing permissions", async () => {
+    const input = {
+      requestId: crypto.randomUUID(),
+      cycleId,
+      amount: "5000",
+      quantity: 1,
+    };
+    expect((await generateSpecialInvites(input)).ok).toBe(false);
+    configAllowed = true;
+    expect((await generateSpecialInvites({ ...input, quantity: 101 })).ok).toBe(
+      false,
+    );
+    expect(
+      (await generateSpecialInvites({ ...input, amount: "65000" })).ok,
+    ).toBe(false);
+    expect((await generateSpecialInvites({ ...input, amount: "-1" })).ok).toBe(
+      false,
+    );
+    expect((await generateSpecialInvites(input)).ok).toBe(true);
+  });
+  it("reserves to exactly one draft, accepts case-insensitive retries and never restarts its hour", async () => {
+    const invite = await issue();
+    const a = await prepared(),
+      b = await prepared();
+    const outcomes = await Promise.allSettled([
+      claimSpecialInvite(a.key, invite.code),
+      claimSpecialInvite(b.key, invite.code),
+    ]);
+    expect(outcomes.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const [stored] = await db
+      .select()
+      .from(schema.specialInvites)
+      .where(eq(schema.specialInvites.id, invite.rows[0].id));
+    const owner = stored.draftId === a.key.id ? a : b;
+    vi.setSystemTime(Date.now() + 60000);
+    const pricing = await claimSpecialInvite(
+      owner.key,
+      invite.code.toLowerCase(),
+    );
+    expect(pricing.specialInvite?.expiresAt).toBe(
+      NOMINATION_OFFER.startsAt + 3600000,
+    );
+    expect(pricing.amountMinor).toBe(6000000);
+    const [extra] = (await issue()).rows;
+    await expect(
+      claimSpecialInvite(owner.key, decryptInviteCode(extra.codeEncrypted)),
+    ).rejects.toThrow(/one special invite/);
+    await expect(
+      claimSpecialInvite({ ...owner.key, secret: "0".repeat(64) }, invite.code),
+    ).rejects.toThrow(/no longer available/);
+    const resumed = await draftRequest(
+      new Request("https://example.test", {
+        method: "POST",
+        body: JSON.stringify({ action: "resume", credential: owner.key }),
+      }),
+    );
+    expect((await resumed.json()).data.pricing.amountMinor).toBe(6000000);
+    expect(
+      await db
+        .select()
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.applicationId, stored.applicationId!)),
+    ).toHaveLength(0);
+  });
+  it.each([false, true])(
+    "consumes exactly once on %s bank submission, keeps discounted snapshots and moves the admin link",
+    async (bank) => {
+      const invite = await issue();
+      const { key, input } = await prepared(bank);
+      await claimSpecialInvite(key, invite.code);
+      const before = await getSpecialInvites({
+        cycleId,
+        history: true,
+        page: 1,
+      });
+      expect(before.rows[0].href).toContain(`/admin/in-progress/${key.id}`);
+      const session = await initiateDraftSubmission({
+        ...input,
+        acceptedAmountMinor: 6000000,
+      });
+      const responses = await Promise.all([
+        finish(session, 6000000),
+        finish(session, 6000000),
+      ]);
+      expect(responses.map((r) => r.status)).toEqual([200, 200]);
+      const [used] = await db
+        .select()
+        .from(schema.specialInvites)
+        .where(eq(schema.specialInvites.id, invite.rows[0].id));
+      expect(used.consumedAt).not.toBeNull();
+      const [payment] = await db
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.applicationId, used.applicationId!));
+      expect(payment.expectedAmountMinor).toBe(6000000);
+      expect(payment.method).toBe(bank ? "bank_transfer" : "card");
+      expect(
+        (await getSpecialInvites({ cycleId, history: true, page: 1 })).rows[0]
+          .href,
+      ).toBe(`/admin/applications/${used.applicationId}`);
+      vi.setSystemTime(NOMINATION_OFFER.endsAt + 1);
+      expect((await finish(session, 8500000)).status).toBe(200);
+      const [unchanged] = await db
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.id, payment.id));
+      expect(unchanged.expectedAmountMinor).toBe(6000000);
+      await db
+        .update(schema.applications)
+        .set({ deletedAt: new Date() })
+        .where(eq(schema.applications.id, used.applicationId!));
+      const hidden = (
+        await getSpecialInvites({ cycleId, history: true, page: 1 })
+      ).rows[0];
+      expect(hidden).toMatchObject({ status: "used", href: null, name: null });
+      expect(
+        (await getSpecialInvites({ cycleId, history: false, page: 1 })).total,
+      ).toBe(0);
+    },
+  );
+  it("locks the claimed fee across offer edits then expires exactly at an hour without consuming or losing files", async () => {
+    const invite = await issue();
+    const { key, input, saved } = await prepared(true);
+    await claimSpecialInvite(key, invite.code);
+    await saveNominationOffer({
+      cycleId,
+      expectedRevision: "",
+      actorId,
+      offer: { ...NOMINATION_OFFER, enabled: false },
+    });
+    expect(
+      (
+        await save(
+          key,
+          saved.version,
+          2,
+          { ...contact(), paymentMethod: "bank_transfer" },
+          input.files,
+        )
+      ).pricing.amountMinor,
+    ).toBe(6000000);
+    vi.setSystemTime(NOMINATION_OFFER.startsAt + 59 * 60000);
+    const session = await initiateDraftSubmission({
+      ...input,
+      acceptedAmountMinor: 6000000,
+    });
+    vi.setSystemTime(NOMINATION_OFFER.startsAt + 3600000);
+    const expired = await finish(session, 6000000);
+    expect(expired.status).toBe(409);
+    expect((await expired.json()).pricing).toMatchObject({
+      amountMinor: 8500000,
+      specialInvite: { status: "expired" },
+    });
+    await expect(claimSpecialInvite(key, invite.code)).rejects.toThrow(
+      /expired/,
+    );
+    const other = await prepared();
+    await expect(claimSpecialInvite(other.key, invite.code)).rejects.toThrow(
+      /no longer available/,
+    );
+    expect((await finish(session, 8500000)).status).toBe(200);
+    const [row] = await db
+      .select()
+      .from(schema.specialInvites)
+      .where(eq(schema.specialInvites.id, invite.rows[0].id));
+    expect(row.consumedAt).toBeNull();
+  });
+  it("does not download claimed/used/cancelled invites and cancellation cannot undo a claim", async () => {
+    configAllowed = true;
+    const invite = await issue(2);
+    const download = (query: string) =>
+      downloadInvites(
+        new Request(
+          `https://example.test/api/admin/special-invites/download?${query}`,
+        ),
+      );
+    const jpg = await download(`id=${invite.rows[0].id}`);
+    expect(jpg.status).toBe(200);
+    expect(jpg.headers.get("content-type")).toBe("image/jpeg");
+    const { key } = await prepared();
+    await claimSpecialInvite(key, invite.code);
+    expect((await download(`id=${invite.rows[0].id}`)).status).toBe(409);
+    await expect(
+      revokeUnusedInvite(invite.rows[0].id, actorId),
+    ).rejects.toThrow(/Only unused/);
+    await revokeUnusedInvite(invite.rows[1].id, actorId);
+    expect((await download(`batch=${invite.result.batchId}`)).status).toBe(409);
+    configAllowed = false;
+    expect((await download(`batch=${invite.result.batchId}`)).status).toBe(403);
+  });
+  it("cancels a deleted draft's claim permanently and never links deleted personal data", async () => {
+    const invite = await issue();
+    const { key } = await prepared();
+    await claimSpecialInvite(key, invite.code);
+    expect((await deleteInProgress({ id: key.id, source: "draft" })).ok).toBe(
+      true,
+    );
+    const result = await getSpecialInvites({ cycleId, history: true, page: 1 });
+    expect(result.rows[0]).toMatchObject({
+      status: "cancelled",
+      href: null,
+      name: null,
+    });
+    const other = await prepared();
+    await expect(claimSpecialInvite(other.key, invite.code)).rejects.toThrow(
+      /no longer available/,
+    );
+  });
+  it("does not accept a cancelled code, or one whose discount now exceeds the fee", async () => {
+    const invite = await issue();
+    const { key } = await prepared();
+    await db
+      .update(schema.specialInvites)
+      .set({ revokedAt: new Date() })
+      .where(eq(schema.specialInvites.id, invite.rows[0].id));
+    await expect(claimSpecialInvite(key, invite.code)).rejects.toThrow(
+      /invalid or no longer/,
+    );
+    const next = await issue();
+    await saveNominationOffer({
+      cycleId,
+      expectedRevision: "",
+      actorId,
+      offer: { ...NOMINATION_OFFER, amountMinor: 100000 },
+    });
+    await expect(claimSpecialInvite(key, next.code)).rejects.toThrow(
+      /current fee/,
+    );
+    const cycle = {
+      id: cycleId,
+      year: 2026,
+      currency: "LKR",
+      nominationFeeMinor: 6500000,
+    };
+    expect(
+      (await getDraftNominationPricing(cycle, key.id)).specialInvite,
+    ).toBeNull();
+  });
+});
 
 describe("durable in-progress nominations", () => {
   it("persists an audited offer, rejects stale edits and leaves the base fee alone", async () => {
