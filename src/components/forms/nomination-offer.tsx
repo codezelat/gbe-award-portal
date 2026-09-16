@@ -34,7 +34,7 @@ export function NominationPricingProvider({
     let timer: ReturnType<typeof setTimeout>;
     function checkBoundary() {
       const now = pricing.serverNow + Date.now() - clientAnchor;
-      const next = nominationPricing(cycle, now);
+      const next = nominationPricing(cycle, now, pricing.offer);
       if (next.phase !== pricing.phase) {
         updatePricing(next);
         return;
@@ -47,7 +47,10 @@ export function NominationPricingProvider({
             : null;
       clearTimeout(timer);
       if (boundary)
-        timer = setTimeout(checkBoundary, Math.max(1, boundary - now));
+        timer = setTimeout(
+          checkBoundary,
+          Math.min(2_147_483_647, Math.max(1, boundary - now)),
+        );
     }
     checkBoundary();
     window.addEventListener("pageshow", checkBoundary);
@@ -74,10 +77,10 @@ export function NominationOfferBanner() {
       className="bg-[#b42332] px-4 py-3 text-white"
     >
       <div className="mx-auto flex max-w-[1100px] flex-col items-center justify-center gap-2 text-center sm:flex-row sm:gap-x-6">
-        <p className="text-sm font-semibold leading-6">
-          Last chance: Nominate with Discount
+        <p className="min-w-0 break-words text-sm font-semibold leading-6">
+          {pricing.bannerText}
         </p>
-        <span className="inline-flex items-center gap-3 whitespace-nowrap text-base font-semibold">
+        <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-3 whitespace-nowrap text-base font-semibold">
           Offer ends in
           <OfferCountdown
             endsAt={pricing.endsAt}

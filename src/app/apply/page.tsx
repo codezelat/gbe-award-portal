@@ -6,10 +6,9 @@ import { NominationForm } from "@/components/forms/nomination-form";
 import { ProgrammeDetailsButton } from "@/components/programme/programme-details-button";
 import { RecognitionMarquee } from "@/components/recognition/recognition-marquee";
 import { brand } from "@/config/brand";
-import { getOpenCycleCategories } from "@/server/dal/categories";
+import { getPublicNomination } from "@/server/dal/public-nomination";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
 import { genieAvailable } from "@/server/services/genie-client";
-import { nominationPricing } from "@/lib/domain/nomination-pricing";
 import {
   NominationOfferBanner,
   NominationPricingProvider,
@@ -48,18 +47,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ApplyPage() {
-  const [{ categories, cycle, unavailable }, paymentInstructions] =
-    await Promise.all([
-      getOpenCycleCategories(),
-      getPublicPaymentInstructions(),
-    ]);
+  const [{ categories, cycle, unavailable, pricing }, paymentInstructions] =
+    await Promise.all([getPublicNomination(), getPublicPaymentInstructions()]);
   const supportEmail = cycle?.supportEmail ?? "info@gbeaward.com";
   const pricingCycle = {
     year: cycle?.year ?? 0,
     nominationFeeMinor: cycle?.nominationFeeMinor ?? null,
     currency: cycle?.currency ?? null,
   };
-  const pricing = nominationPricing(pricingCycle);
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [

@@ -431,6 +431,7 @@ export function NominationForm({
         result.message ?? "Could not save this step. Please retry.",
       );
     draftVersion.current = result.data.version;
+    if (result.data.pricing) updatePricing(result.data.pricing);
     const controller = new AbortController();
     abortRef.current = controller;
     const outcomes = await Promise.allSettled(
@@ -471,6 +472,7 @@ export function NominationForm({
       throw new Error(
         confirmed.message ?? "Could not verify the saved files. Please retry.",
       );
+    return result.data.pricing as NominationPricing | undefined;
   }
 
   function updateFile(id: string, patch: Partial<SelectedUpload>) {
@@ -730,7 +732,13 @@ export function NominationForm({
       setFileError(undefined);
       setSavingStep(true);
       form.clearErrors("root");
-      await saveStep(currentStep);
+      const refreshedPricing = await saveStep(currentStep);
+      if (
+        currentStep === 2 &&
+        refreshedPricing &&
+        refreshedPricing.amountMinor !== feeMinor
+      )
+        return;
       if (currentStep === 2) setAcceptedAmountMinor(feeMinor);
       if (session) beginFreshUploadSession();
       form.setValue("turnstileToken", "");
@@ -840,7 +848,7 @@ export function NominationForm({
           className="border-b border-mist bg-gold-wash px-5 py-4 text-sm leading-6 md:px-8"
         >
           <p>
-            The offer ended. Fee:{" "}
+            The fee changed. Current fee:{" "}
             <strong>{formatFee(feeMinor, currency)}</strong>. Review your
             payment before submitting.
           </p>

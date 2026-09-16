@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { nominationPricing } from "@/lib/domain/nomination-pricing";
+import { getNominationOffer } from "@/server/services/nomination-offers";
+import { NominationOfferEditor } from "@/components/admin/nomination-offer-editor";
 const local = (date: Date | null) =>
   date ? format(date, "yyyy-MM-dd'T'HH:mm") : "";
 export default async function CyclesPage() {
@@ -21,6 +23,9 @@ export default async function CyclesPage() {
     .select()
     .from(awardCycles)
     .orderBy(desc(awardCycles.year));
+  const offers = await Promise.all(
+    cycles.map((cycle) => getNominationOffer(cycle)),
+  );
   return (
     <>
       <h1 className="page-heading">Award cycles</h1>
@@ -114,8 +119,17 @@ export default async function CyclesPage() {
         </form>
       </details>
       <div className="mt-7 flex flex-col gap-6">
-        {cycles.map((cycle) => (
+        {cycles.map((cycle, index) => (
           <section key={cycle.id} className="surface rounded-lg p-6">
+            <NominationOfferEditor
+              cycleId={cycle.id}
+              {...offers[index]}
+              pricing={nominationPricing(
+                cycle,
+                offers[index].serverNow,
+                offers[index].offer,
+              )}
+            />
             <form
               action={saveCycleAction}
               className="grid gap-5 md:grid-cols-2"
@@ -210,10 +224,10 @@ export default async function CyclesPage() {
                   defaultValue={cycle.nominationFeeMinor ?? ""}
                   className="h-11 bg-white"
                 />
-                {nominationPricing(cycle).phase !== "none" ? (
+                {offers[index].offer ? (
                   <span className="text-xs font-normal text-muted-foreground">
-                    Scheduled: LKR 65,000 until 17 Sep, 12 PM Colombo. Then LKR
-                    85,000.
+                    Applies before the scheduled offer starts. Manage offer and
+                    regular fees above.
                   </span>
                 ) : null}
               </label>

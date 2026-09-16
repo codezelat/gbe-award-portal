@@ -1,14 +1,7 @@
 import { PublicNominationSkeleton } from "@/components/shared/loading-skeletons";
-import {
-  nominationPricing,
-  NOMINATION_OFFER,
-} from "@/lib/domain/nomination-pricing";
+import { getPublicNomination } from "@/server/dal/public-nomination";
 
-export default function Loading() {
-  const pricing = nominationPricing({
-    year: NOMINATION_OFFER.year,
-    currency: NOMINATION_OFFER.currency,
-    nominationFeeMinor: NOMINATION_OFFER.amountMinor,
-  });
+export default async function Loading() {
+  const { pricing } = await getPublicNomination();
   return <PublicNominationSkeleton offerActive={pricing.phase === "active"} />;
 }

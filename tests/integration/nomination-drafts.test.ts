@@ -30,7 +30,8 @@ vi.mock("@/server/dal/auth", () => ({
     if (!staffAllowed) throw new Error("Staff access required.");
     return { profile: { id: actorId }, membership: { role: "staff" } };
   },
-  hasPermission: () => true,
+  hasPermission: (_membership: unknown, permission: string) =>
+    permission !== "configuration.manage" || configAllowed,
 }));
 vi.mock("@/server/security/request", () => ({
   assertSameOrigin: async () => new Headers(),
@@ -91,6 +92,7 @@ const objects = new Map<string, Buffer>();
 const pdf = Buffer.from("%PDF-1.4\nDraft test attachment\n");
 let cycleId: string, categoryId: string, actorId: string;
 let staffAllowed = true;
+let configAllowed = false;
 let nextPayment = 1000;
 const { saveNominationDraft, confirmDraftFiles, initiateDraftSubmission } =
   await import("../../src/server/services/nomination-drafts");
@@ -103,6 +105,10 @@ const { POST: draftRequest } =
 const { deleteInProgress } =
   await import("../../src/server/actions/draft-actions");
 const { getInProgress } = await import("../../src/server/dal/in-progress");
+const { getNominationOffer, saveNominationOffer, nominationOfferKey } =
+  await import("../../src/server/services/nomination-offers");
+const { saveNominationOfferAction } =
+  await import("../../src/server/actions/nomination-offer-actions");
 const { cleanupStaleUploads } = await import("../../src/server/jobs/cleanup");
 const { purgeIncompleteNominationShell } =
   await import("../../src/server/services/incomplete-nomination-cleanup");
@@ -110,6 +116,7 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOMINATION_OFFER.startsAt);
   staffAllowed = true;
+  configAllowed = false;
   const key = crypto.randomUUID();
   const [cycle] = await db
     .insert(schema.awardCycles)
@@ -243,6 +250,150 @@ const finish = (
   );
 
 describe("durable in-progress nominations", () => {
+  it("persists an audited offer, rejects stale edits and leaves the base fee alone", async () => {
+    const cycle = {
+      id: cycleId,
+      year: 2026,
+      currency: "LKR",
+      nominationFeeMinor: 6500000,
+    };
+    expect((await getNominationOffer(cycle)).revision).toBe("");
+    const revision = await saveNominationOffer({
+      cycleId,
+      expectedRevision: "",
+      offer: NOMINATION_OFFER,
+      actorId,
+    });
+    expect((await getNominationOffer(cycle)).revision).toBe(revision);
+    await expect(
+      saveNominationOffer({
+        cycleId,
+        expectedRevision: "",
+        offer: { ...NOMINATION_OFFER, amountMinor: 1 },
+        actorId,
+      }),
+    ).rejects.toThrow("another window");
+    const [stored] = await db
+      .select()
+      .from(schema.awardCycles)
+      .where(eq(schema.awardCycles.id, cycleId));
+    expect(stored.nominationFeeMinor).toBe(6500000);
+    const logs = await db
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.entityId, cycleId));
+    expect(logs).toHaveLength(1);
+    expect(logs[0].action).toBe("nomination offer saved");
+  });
+  it("serializes concurrent first saves so one editor cannot overwrite another", async () => {
+    const results = await Promise.allSettled(
+      [6500000, 6000000].map((amountMinor) =>
+        saveNominationOffer({
+          cycleId,
+          expectedRevision: "",
+          actorId,
+          offer: { ...NOMINATION_OFFER, amountMinor },
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+  });
+  it("guards offer saves by configuration permission and validates server-side", async () => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries({
+      cycleId,
+      revision: "",
+      enabled: "on",
+      currency: "LKR",
+      amount: "65000",
+      standardAmount: "85000",
+      startsAt: "2026-09-16T12:00",
+      endsAt: "2026-09-17T12:00",
+      bannerText: NOMINATION_OFFER.bannerText,
+    }))
+      data.set(key, value);
+    const initial = { status: "idle" as const, message: "" };
+    expect((await saveNominationOfferAction(initial, data)).status).toBe(
+      "error",
+    );
+    expect(
+      await db
+        .select()
+        .from(schema.systemSettings)
+        .where(eq(schema.systemSettings.key, nominationOfferKey(cycleId))),
+    ).toHaveLength(0);
+    configAllowed = true;
+    data.set("endsAt", "2026-09-15T12:00");
+    expect((await saveNominationOfferAction(initial, data)).message).toContain(
+      "End time",
+    );
+    data.set("endsAt", "2026-09-17T12:00");
+    expect((await saveNominationOfferAction(initial, data)).status).toBe(
+      "success",
+    );
+  });
+  it.each([true, false])(
+    "rechecks admin offer changes at final submission and preserves settled submissions (bank: %s)",
+    async (bank) => {
+      const { input, key } = await prepared(bank);
+      const session = await initiateDraftSubmission(input);
+      const revision = await saveNominationOffer({
+        cycleId,
+        expectedRevision: "",
+        actorId,
+        offer: { ...NOMINATION_OFFER, enabled: false },
+      });
+      const stale = await finish(session);
+      expect(stale.status).toBe(409);
+      expect(await stale.json()).toMatchObject({
+        code: "PRICE_CHANGED",
+        pricing: { phase: "disabled", amountMinor: 8500000 },
+      });
+      const [draft] = await db
+        .select()
+        .from(schema.nominationDrafts)
+        .where(eq(schema.nominationDrafts.id, key.id));
+      expect(draft.submittedAt).toBeNull();
+      expect((await finish(session, 8500000)).status).toBe(200);
+      await saveNominationOffer({
+        cycleId,
+        expectedRevision: revision,
+        actorId,
+        offer: { ...NOMINATION_OFFER, amountMinor: 5000000 },
+      });
+      expect((await finish(session, 5000000)).status).toBe(200);
+      const [payment] = await db
+        .select()
+        .from(schema.payments)
+        .where(
+          eq(schema.payments.applicationId, session.sessionToken.split(".")[0]),
+        );
+      expect(payment.expectedAmountMinor).toBe(8500000);
+      expect(payment.proofApplicationFileId !== null).toBe(bank);
+    },
+  );
+  it("refreshes pricing on draft steps and fails closed for malformed stored offers", async () => {
+    await saveNominationOffer({
+      cycleId,
+      expectedRevision: "",
+      actorId,
+      offer: { ...NOMINATION_OFFER, amountMinor: 6000000 },
+    });
+    expect((await save(credential())).pricing.amountMinor).toBe(6000000);
+    await db
+      .update(schema.systemSettings)
+      .set({ value: { invalid: true } })
+      .where(eq(schema.systemSettings.key, nominationOfferKey(cycleId)));
+    await expect(
+      getNominationOffer({
+        id: cycleId,
+        year: 2026,
+        currency: "LKR",
+        nominationFeeMinor: 6500000,
+      }),
+    ).rejects.toThrow();
+  });
   it("enforces the same price on legacy clients without draft credentials", async () => {
     const { input } = await prepared();
     const { draftCredential: omitted, ...legacy } = input;

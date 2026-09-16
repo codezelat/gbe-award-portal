@@ -1,8 +1,6 @@
 import "server-only";
-import {
-  assertNominationPrice,
-  nominationPricing,
-} from "@/lib/domain/nomination-pricing";
+import { assertNominationPrice } from "@/lib/domain/nomination-pricing";
+import { getNominationPricing } from "@/server/services/nomination-offers";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import {
   GetObjectCommand,
@@ -287,7 +285,11 @@ export async function saveNominationDraft(
         headers: { "content-type": file.mimeTypeClaimed! },
       })),
   );
-  return { version: result.version, uploads };
+  return {
+    version: result.version,
+    uploads,
+    pricing: await getNominationPricing(cycle),
+  };
 }
 export async function confirmDraftFiles(
   credential: DraftCredential,
@@ -413,7 +415,7 @@ export async function initiateDraftSubmission(
       now > cycle.closesAt
     )
       throw new Error("Nominations are not currently open for this category.");
-    const pricing = nominationPricing(cycle);
+    const pricing = await getNominationPricing(cycle, tx);
     if (
       input.paymentMethod === "card" &&
       (!pricing.amountMinor || cycle.currency !== "LKR")

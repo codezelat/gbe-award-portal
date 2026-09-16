@@ -215,9 +215,13 @@ Card checkout uses Genie Business hosted payment pages, not an embedded card for
 
 Card checkout and bank transfer use the nomination's saved fee. The 2026 LKR schedule below applies to new submissions. The owner-confirmed LKR 10 live test is complete and the temporary override is disabled (`CARD_TEST_AMOUNT_MINOR = null` in `src/lib/domain/card-checkout-amount.ts`). Existing active checkouts retain their original amount, and receipts record the amount actually paid. Do not rewrite previous test payments or receipts. No additional environment variable is required for normal pricing.
 
-### Final nomination offer
+### Nomination offers
 
-The owner-approved schedule in `src/lib/domain/nomination-pricing.ts` uses fixed Asia/Colombo timestamps, not deployment time:
+Super admins manage offers in **Award cycles > Edit offer** (`/admin/cycles`). The compact editor controls the banner wording, Colombo start/end times, offer fee and regular fee. Amounts are entered in the cycle's currency, not minor units. Saves validate the dates and discount, require configuration permission, retain an audit record and reject conflicting edits from another window. Turning an offer off applies the regular fee immediately and removes its banner.
+
+Each cycle's configuration is stored in the existing `system_settings` table under `nomination_offer:<cycle ID>`. No migration, environment variable or additional scheduler is needed. Before the start, the cycle base fee applies; during the offer, the offer fee applies; at and after the end, the regular fee applies. Do not change a cycle's currency while it has an offer. A malformed saved configuration blocks pricing rather than silently charging a fallback amount.
+
+Until an admin saves a replacement, the owner-approved 2026 LKR schedule in `src/lib/domain/nomination-pricing.ts` remains the default. Its fixed Asia/Colombo timestamps do not restart on deployment:
 
 | Period | New nomination fee |
 | --- | --- |
@@ -225,11 +229,11 @@ The owner-approved schedule in `src/lib/domain/nomination-pricing.ts` uses fixed
 | 16 September 2026, 12:00 PM to 17 September 2026, 12:00 PM (exclusive) | LKR 65,000 |
 | From 17 September 2026, 12:00 PM | LKR 85,000 |
 
-The red countdown appears only during the 24-hour window on `/apply`. At expiry, it disappears along with the crossed-out price and offer label. An open form updates its fee without a reload; the applicant must review a changed fee before proceeding. Countdown ticks are local and isolated from the form, with no database polling or additional cron.
+The red countdown appears only during the configured window on `/apply`. At expiry, it disappears along with the crossed-out price and offer label. An open form updates its fee at schedule boundaries without a reload. Admin edits are picked up on page load, step saves and submission; an applicant must review a changed fee before proceeding. Countdown ticks are local and isolated from the form, with no database polling or additional cron. The loading boundary uses the same configuration as the page.
 
-Both public initiation paths and final submission enforce the server-time price. A stale or missing price acknowledgement returns `409 PRICE_CHANGED` with the current fee; saved details and uploads remain available. Bank-transfer nominations and proof must reach final submission before the deadline for the offer price. Drafts and incomplete upload sessions do not reserve it. Submitted nominations, active card attempts, receipts and historical amounts are unchanged. Other years and currencies use their configured cycle fee.
+Both public initiation paths and final submission use `src/server/services/nomination-offers.ts` to enforce the server-time price. Final submission locks the cycle while reading the latest settings so a concurrent offer edit cannot change the accepted fee midway through finalization. A stale or missing price acknowledgement returns `409 PRICE_CHANGED` with the current fee; saved details and uploads remain available. Bank-transfer nominations and proof must reach final submission before the deadline for the offer price. Drafts and incomplete upload sessions do not reserve it. Submitted nominations, active card attempts, receipts and historical amounts are unchanged. Other cycles use their base fee until an offer is configured.
 
-Deploy this code before the offer begins to show the full window. A deployment during the offer shows only the remaining time; a deployment after it uses LKR 85,000 immediately. No environment variable, production database write or migration is needed. The cycle's stored base fee remains unchanged, with the schedule noted in `/admin/cycles`.
+Deploy before an offer begins to show its full window. A deployment during an offer shows only the remaining time. The initial 2026 default starts automatically without a database write; later changes are made through the admin editor after deploying this feature. The cycle's stored base fee and existing payment records are never rewritten by an offer save.
 
 Internal `RCT-` references remain in payment records and staff views, but are not displayed on public or applicant payment-confirmation screens. Nomination references and payment status remain visible.
 

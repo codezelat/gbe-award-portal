@@ -26,9 +26,9 @@ import { requireGenie } from "@/server/services/genie-client";
 import { initiateDraftSubmission } from "@/server/services/nomination-drafts";
 import {
   assertNominationPrice,
-  nominationPricing,
   NominationPriceChangedError,
 } from "@/lib/domain/nomination-pricing";
+import { getNominationPricing } from "@/server/services/nomination-offers";
 
 export const runtime = "nodejs";
 const hash = (value: string) =>
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
       throw new Error(
         "The selected category is not available in the current open award cycle.",
       );
-    const pricing = nominationPricing(match.cycle);
+    const pricing = await getNominationPricing(match.cycle);
     assertNominationPrice(pricing, input.acceptedAmountMinor);
     if (
       input.paymentMethod === "card" &&

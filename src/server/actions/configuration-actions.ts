@@ -4,6 +4,7 @@ import { z } from "zod";
 import { and, count, eq, ne } from "drizzle-orm";
 import { requireStaff, hasPermission } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
+import { getNominationOffer } from "@/server/services/nomination-offers";
 import {
   auditLogs,
   awardCategories,
@@ -274,6 +275,17 @@ export async function saveCycleAction(formData: FormData) {
   }
   const { id, ...values } = input;
   await getDb().transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(awardCycles)
+      .where(eq(awardCycles.id, id))
+      .for("update");
+    if (!current) throw new Error("Award cycle not found.");
+    const { offer } = await getNominationOffer(current, tx);
+    if (offer && offer.currency !== (input.currency?.toUpperCase() || null))
+      throw new Error(
+        "The currency cannot change while this cycle has a nomination offer.",
+      );
     await tx
       .update(awardCycles)
       .set({

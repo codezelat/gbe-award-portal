@@ -33,9 +33,9 @@ import { setPaymentSession } from "@/server/security/payment-session";
 import { draftFileRows } from "@/server/services/nomination-drafts";
 import {
   assertNominationPrice,
-  nominationPricing,
   NominationPriceChangedError,
 } from "@/lib/domain/nomination-pricing";
+import { getNominationPricing } from "@/server/services/nomination-offers";
 
 export const runtime = "nodejs";
 const inputSchema = z.object({
@@ -209,7 +209,13 @@ export async function POST(request: Request) {
       }
       // Only an unsubmitted nomination reaches here. Recheck after uploads and
       // locks, so an unfinished draft cannot carry the offer past its deadline.
-      const pricing = nominationPricing(row.cycle);
+      const [currentCycle] = await tx
+        .select()
+        .from(awardCycles)
+        .where(eq(awardCycles.id, row.cycle.id))
+        .for("share");
+      if (!currentCycle) throw new Error("Award cycle is unavailable.");
+      const pricing = await getNominationPricing(currentCycle, tx);
       assertNominationPrice(pricing, input.acceptedAmountMinor);
       await tx
         .insert(cycleSequences)

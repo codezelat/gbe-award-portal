@@ -6,7 +6,28 @@ export const NOMINATION_OFFER = {
   endsAt: Date.parse("2026-09-17T12:00:00+05:30"),
   amountMinor: 6_500_000,
   standardAmountMinor: 8_500_000,
+  enabled: true,
+  bannerText: "Last chance: Nominate with Discount",
 } as const;
+
+export type NominationOffer = {
+  enabled: boolean;
+  currency: string;
+  startsAt: number;
+  endsAt: number;
+  amountMinor: number;
+  standardAmountMinor: number;
+  bannerText: string;
+};
+
+export function defaultNominationOffer(
+  cycle: PricingCycle,
+): NominationOffer | null {
+  return cycle.year === NOMINATION_OFFER.year &&
+    cycle.currency === NOMINATION_OFFER.currency
+    ? { ...NOMINATION_OFFER }
+    : null;
+}
 
 export type PricingCycle = {
   year: number;
@@ -15,32 +36,36 @@ export type PricingCycle = {
 };
 export type NominationPricing = ReturnType<typeof nominationPricing>;
 
-export function nominationPricing(cycle: PricingCycle, now = Date.now()) {
-  const scheduled =
-    cycle.year === NOMINATION_OFFER.year &&
-    cycle.currency === NOMINATION_OFFER.currency;
-  const phase = !scheduled
+export function nominationPricing(
+  cycle: PricingCycle,
+  now = Date.now(),
+  offer: NominationOffer | null = defaultNominationOffer(cycle),
+) {
+  const configured = offer?.currency === cycle.currency ? offer : null;
+  const phase = !configured
     ? "none"
-    : now < NOMINATION_OFFER.startsAt
-      ? "upcoming"
-      : now < NOMINATION_OFFER.endsAt
-        ? "active"
-        : "ended";
+    : !configured.enabled
+      ? "disabled"
+      : now < configured.startsAt
+        ? "upcoming"
+        : now < configured.endsAt
+          ? "active"
+          : "ended";
   return {
     amountMinor:
-      phase === "ended"
-        ? NOMINATION_OFFER.standardAmountMinor
+      phase === "ended" || phase === "disabled"
+        ? configured!.standardAmountMinor
         : phase === "active"
-          ? NOMINATION_OFFER.amountMinor
+          ? configured!.amountMinor
           : cycle.nominationFeeMinor,
     currency: cycle.currency,
     phase,
     serverNow: now,
-    startsAt: scheduled ? NOMINATION_OFFER.startsAt : null,
-    endsAt: scheduled ? NOMINATION_OFFER.endsAt : null,
-    standardAmountMinor: scheduled
-      ? NOMINATION_OFFER.standardAmountMinor
-      : null,
+    startsAt: configured?.startsAt ?? null,
+    endsAt: configured?.endsAt ?? null,
+    standardAmountMinor: configured?.standardAmountMinor ?? null,
+    bannerText: configured?.bannerText ?? "",
+    offer: configured,
   };
 }
 
