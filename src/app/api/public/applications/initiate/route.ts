@@ -24,6 +24,11 @@ import { enforceRateLimit } from "@/server/security/rate-limit";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
 import { requireGenie } from "@/server/services/genie-client";
 import { initiateDraftSubmission } from "@/server/services/nomination-drafts";
+import {
+  assertNominationPrice,
+  nominationPricing,
+  NominationPriceChangedError,
+} from "@/lib/domain/nomination-pricing";
 
 export const runtime = "nodejs";
 const hash = (value: string) =>
@@ -148,10 +153,12 @@ export async function POST(request: Request) {
       throw new Error(
         "The selected category is not available in the current open award cycle.",
       );
+    const pricing = nominationPricing(match.cycle);
+    assertNominationPrice(pricing, input.acceptedAmountMinor);
     if (
       input.paymentMethod === "card" &&
-      (!match.cycle.nominationFeeMinor ||
-        match.cycle.nominationFeeMinor <= 0 ||
+      (!pricing.amountMinor ||
+        pricing.amountMinor <= 0 ||
         match.cycle.currency !== "LKR")
     )
       throw new Error(
@@ -211,7 +218,7 @@ export async function POST(request: Request) {
             ? "awaiting_payment"
             : "proof_submitted",
         method: input.paymentMethod,
-        expectedAmountMinor: match.cycle.nominationFeeMinor,
+        expectedAmountMinor: pricing.amountMinor,
         currency: match.cycle.currency,
       });
       const rawToken = sessionToken(created.id, input.idempotencyKey);
@@ -239,6 +246,16 @@ export async function POST(request: Request) {
       data: { sessionToken: `${application.id}.${rawToken}`, uploads },
     });
   } catch (error) {
+    if (error instanceof NominationPriceChangedError)
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "PRICE_CHANGED",
+          message: error.message,
+          pricing: error.pricing,
+        },
+        { status: 409, headers: { "Cache-Control": "no-store" } },
+      );
     console.error(
       JSON.stringify({
         level: "error",

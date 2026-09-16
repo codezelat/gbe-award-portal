@@ -1,4 +1,16 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  NOMINATION_OFFER,
+  nominationPricing,
+} from "../../src/lib/domain/nomination-pricing";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
@@ -41,12 +53,14 @@ vi.mock("@/server/security/payment-session", () => ({
   setPaymentSession: vi.fn(),
 }));
 vi.mock("@/lib/env", () => ({
+  requireProvider: () => {},
   env: {
     BETTER_AUTH_SECRET: "isolated-test-secret",
     R2_PRIVATE_BUCKET: "test",
     SUPPORT_EMAIL: "admin@example.test",
   },
 }));
+vi.mock("@/server/services/genie-client", () => ({ requireGenie: () => {} }));
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: async (_client: unknown, command: { input: { Key: string } }) =>
     `https://storage.example.test/${command.input.Key}`,
@@ -82,6 +96,8 @@ const { saveNominationDraft, confirmDraftFiles, initiateDraftSubmission } =
   await import("../../src/server/services/nomination-drafts");
 const { POST: complete } =
   await import("../../src/app/api/public/applications/complete/route");
+const { POST: initiate } =
+  await import("../../src/app/api/public/applications/initiate/route");
 const { POST: draftRequest } =
   await import("../../src/app/api/public/drafts/route");
 const { deleteInProgress } =
@@ -91,6 +107,8 @@ const { cleanupStaleUploads } = await import("../../src/server/jobs/cleanup");
 const { purgeIncompleteNominationShell } =
   await import("../../src/server/services/incomplete-nomination-cleanup");
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOMINATION_OFFER.startsAt);
   staffAllowed = true;
   const key = crypto.randomUUID();
   const [cycle] = await db
@@ -140,6 +158,7 @@ beforeEach(async () => {
 afterAll(async () => {
   await client.end();
 });
+afterEach(() => vi.useRealTimers());
 const credential = (): DraftCredential => ({
   id: crypto.randomUUID(),
   secret: crypto.randomUUID().replaceAll("-", "").repeat(2),
@@ -204,18 +223,135 @@ async function prepared(withFile = false) {
     idempotencyKey: crypto.randomUUID(),
     draftCredential: key,
     files: manifest,
+    acceptedAmountMinor: nominationPricing({
+      year: 2026,
+      currency: "LKR",
+      nominationFeeMinor: 6_500_000,
+    }).amountMinor,
   });
   return { key, input, saved, manifest };
 }
-const finish = (session: { sessionToken: string; idempotencyKey: string }) =>
+const finish = (
+  session: { sessionToken: string; idempotencyKey: string },
+  amount = 6_500_000,
+) =>
   complete(
     new Request("https://example.test", {
       method: "POST",
-      body: JSON.stringify(session),
+      body: JSON.stringify({ ...session, acceptedAmountMinor: amount }),
     }),
   );
 
 describe("durable in-progress nominations", () => {
+  it("enforces the same price on legacy clients without draft credentials", async () => {
+    const { input } = await prepared();
+    const { draftCredential: omitted, ...legacy } = input;
+    expect(omitted).toBeDefined();
+    vi.setSystemTime(NOMINATION_OFFER.endsAt);
+    const request = (amount?: number) =>
+      new Request("https://example.test", {
+        method: "POST",
+        body: JSON.stringify({ ...legacy, acceptedAmountMinor: amount }),
+      });
+    expect((await initiate(request())).status).toBe(409);
+    expect((await initiate(request(6_500_000))).status).toBe(409);
+    const response = await initiate(request(8_500_000));
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(
+      (
+        await finish(
+          { ...result.data, idempotencyKey: input.idempotencyKey },
+          8_500_000,
+        )
+      ).status,
+    ).toBe(200);
+    const [payment] = await db
+      .select()
+      .from(schema.payments)
+      .where(
+        eq(
+          schema.payments.applicationId,
+          result.data.sessionToken.split(".")[0],
+        ),
+      );
+    expect(payment.expectedAmountMinor).toBe(8_500_000);
+  });
+  it.each([true, false])(
+    "checks the final deadline and preserves retries (bank transfer: %s)",
+    async (bank) => {
+      vi.setSystemTime(NOMINATION_OFFER.endsAt - 60_000);
+      const { input } = await prepared(bank);
+      const session = await initiateDraftSubmission(input);
+      const applicationId = session.sessionToken.split(".")[0];
+      vi.setSystemTime(NOMINATION_OFFER.endsAt);
+      const stale = await finish(session);
+      expect(stale.status).toBe(409);
+      expect(await stale.json()).toMatchObject({
+        code: "PRICE_CHANGED",
+        pricing: { amountMinor: 8_500_000 },
+      });
+      const [unsubmitted] = await db
+        .select()
+        .from(schema.applications)
+        .where(eq(schema.applications.id, applicationId));
+      expect(unsubmitted.reference).toBeNull();
+      expect(unsubmitted.submittedAt).toBeNull();
+      expect(
+        await db
+          .select()
+          .from(schema.emailOutbox)
+          .where(eq(schema.emailOutbox.applicationId, applicationId)),
+      ).toHaveLength(0);
+      const retry = await finish(session, 8_500_000);
+      expect(retry.status).toBe(200);
+      const [payment] = await db
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.applicationId, applicationId));
+      expect(payment.expectedAmountMinor).toBe(8_500_000);
+      expect(payment.proofApplicationFileId !== null).toBe(bank);
+      // A completed retry returns the original result, not a repriced nomination.
+      expect((await finish(session)).status).toBe(200);
+      expect(
+        await db
+          .select()
+          .from(schema.emailOutbox)
+          .where(eq(schema.emailOutbox.applicationId, applicationId)),
+      ).toHaveLength(2);
+    },
+  );
+
+  it("does not reserve a discount for an unsubmitted draft", async () => {
+    const { input } = await prepared();
+    vi.setSystemTime(NOMINATION_OFFER.endsAt);
+    await expect(initiateDraftSubmission(input)).rejects.toMatchObject({
+      name: "NominationPriceChangedError",
+    });
+    const session = await initiateDraftSubmission({
+      ...input,
+      acceptedAmountMinor: 8_500_000,
+    });
+    expect((await finish(session, 8_500_000)).status).toBe(200);
+  });
+
+  it.each([true, false])(
+    "never reprices a nomination already submitted during the offer (bank: %s)",
+    async (bank) => {
+      const { input } = await prepared(bank);
+      const session = await initiateDraftSubmission(input);
+      expect((await finish(session)).status).toBe(200);
+      vi.setSystemTime(NOMINATION_OFFER.endsAt);
+      expect((await finish(session, 8_500_000)).status).toBe(200);
+      const [payment] = await db
+        .select()
+        .from(schema.payments)
+        .where(
+          eq(schema.payments.applicationId, session.sessionToken.split(".")[0]),
+        );
+      expect(payment.expectedAmountMinor).toBe(6_500_000);
+    },
+  );
   it("saves the first step without creating a nomination, payment or email", async () => {
     const key = credential();
     const saved = await save(key);

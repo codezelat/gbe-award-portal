@@ -9,7 +9,11 @@ import { brand } from "@/config/brand";
 import { getOpenCycleCategories } from "@/server/dal/categories";
 import { getPublicPaymentInstructions } from "@/server/dal/settings";
 import { genieAvailable } from "@/server/services/genie-client";
-import { cardCheckoutAmount } from "@/lib/domain/card-checkout-amount";
+import { nominationPricing } from "@/lib/domain/nomination-pricing";
+import {
+  NominationOfferBanner,
+  NominationPricingProvider,
+} from "@/components/forms/nomination-offer";
 
 const description =
   "Submit a nomination for the Global Business Excellence Awards 2026 and showcase outstanding achievement, innovation and impact.";
@@ -50,6 +54,12 @@ export default async function ApplyPage() {
       getPublicPaymentInstructions(),
     ]);
   const supportEmail = cycle?.supportEmail ?? "info@gbeaward.com";
+  const pricingCycle = {
+    year: cycle?.year ?? 0,
+    nominationFeeMinor: cycle?.nominationFeeMinor ?? null,
+    currency: cycle?.currency ?? null,
+  };
+  const pricing = nominationPricing(pricingCycle);
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
@@ -82,60 +92,53 @@ export default async function ApplyPage() {
     ],
   };
   return (
-    <div className="flex min-h-svh flex-col">
-      <PublicHeader compactSignIn />
-      <main id="main-content" className="flex-1">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
-          }}
-        />
-        <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18">
-          <div className="mb-9 flex flex-col gap-6 border-b border-mist pb-9 sm:flex-row sm:items-end sm:justify-between">
-            <div className="max-w-2xl">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-antique-gold">
-                2026 nominations
-              </p>
-              <h1 className="page-heading max-w-2xl">
-                {cycle?.heading ?? "GBE Awards Public Nomination"}
-              </h1>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-graphite">
-                {cycle?.introCopy ??
-                  "The nomination window is currently unavailable. Please contact the GBE Awards team for guidance."}
-              </p>
-              <a
-                className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm text-antique-gold underline-offset-4 hover:underline"
-                href={`mailto:${supportEmail}`}
-              >
-                <Mail aria-hidden /> {supportEmail}
-              </a>
-            </div>
-            <div className="shrink-0 sm:pb-1">
-              <ProgrammeDetailsButton />
-            </div>
-          </div>
-          <NominationForm
-            cycleId={cycle?.id}
-            cardEnabled={genieAvailable()}
-            cardFeeMinor={
-              cycle
-                ? cardCheckoutAmount(
-                    cycle.nominationFeeMinor ?? 0,
-                    cycle.currency ?? "LKR",
-                  )
-                : undefined
-            }
-            categories={categories}
-            unavailable={unavailable}
-            feeMinor={cycle?.nominationFeeMinor ?? undefined}
-            currency={cycle?.currency ?? undefined}
-            paymentInstructions={paymentInstructions ?? undefined}
+    <NominationPricingProvider cycle={pricingCycle} initialPricing={pricing}>
+      <div className="flex min-h-svh flex-col">
+        <PublicHeader compactSignIn />
+        <NominationOfferBanner />
+        <main id="main-content" className="flex-1">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(structuredData).replace(/</g, "\\u003c"),
+            }}
           />
-          <RecognitionMarquee />
-        </section>
-      </main>
-      <PublicFooter />
-    </div>
+          <section className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18">
+            <div className="mb-9 flex flex-col gap-6 border-b border-mist pb-9 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-antique-gold">
+                  2026 nominations
+                </p>
+                <h1 className="page-heading max-w-2xl">
+                  {cycle?.heading ?? "GBE Awards Public Nomination"}
+                </h1>
+                <p className="mt-4 max-w-2xl text-base leading-7 text-graphite">
+                  {cycle?.introCopy ??
+                    "The nomination window is currently unavailable. Please contact the GBE Awards team for guidance."}
+                </p>
+                <a
+                  className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm text-antique-gold underline-offset-4 hover:underline"
+                  href={`mailto:${supportEmail}`}
+                >
+                  <Mail aria-hidden /> {supportEmail}
+                </a>
+              </div>
+              <div className="shrink-0 sm:pb-1">
+                <ProgrammeDetailsButton />
+              </div>
+            </div>
+            <NominationForm
+              cycleId={cycle?.id}
+              cardEnabled={genieAvailable()}
+              categories={categories}
+              unavailable={unavailable}
+              paymentInstructions={paymentInstructions ?? undefined}
+            />
+            <RecognitionMarquee />
+          </section>
+        </main>
+        <PublicFooter />
+      </div>
+    </NominationPricingProvider>
   );
 }

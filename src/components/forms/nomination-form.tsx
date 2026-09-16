@@ -66,6 +66,9 @@ import {
   type SelectedUpload,
 } from "@/components/uploads/file-picker";
 import { Turnstile } from "./turnstile";
+import { useNominationPricing } from "./nomination-offer";
+import { cardCheckoutAmount } from "@/lib/domain/card-checkout-amount";
+import type { NominationPricing } from "@/lib/domain/nomination-pricing";
 import {
   draftCredentialSchema,
   draftDataSchema,
@@ -104,6 +107,8 @@ type InitiateResponse =
   | {
       ok: false;
       message: string;
+      code?: string;
+      pricing?: NominationPricing;
       fieldErrors?: Record<string, string[]>;
     };
 type SubmissionStage =
@@ -172,21 +177,24 @@ export function NominationForm({
   cycleId,
   categories,
   unavailable,
-  feeMinor,
-  currency,
   paymentInstructions,
   cardEnabled = false,
-  cardFeeMinor,
 }: {
   cycleId?: string;
   categories: Category[];
   unavailable?: boolean;
-  feeMinor?: number;
-  currency?: string;
   paymentInstructions?: PaymentInstructions;
   cardEnabled?: boolean;
-  cardFeeMinor?: number;
 }) {
+  const { pricing, updatePricing } = useNominationPricing();
+  const feeMinor = pricing.amountMinor ?? undefined;
+  const currency = pricing.currency ?? undefined;
+  const cardFeeMinor =
+    feeMinor === undefined
+      ? undefined
+      : cardCheckoutAmount(feeMinor, currency ?? "LKR");
+  const [acceptedAmountMinor, setAcceptedAmountMinor] = useState(feeMinor);
+  const priceNeedsReview = acceptedAmountMinor !== feeMinor;
   const [supporting, setSupporting] = useState<SelectedUpload[]>([]);
   const [payment, setPayment] = useState<SelectedUpload[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<"bank_transfer" | "card">(
@@ -263,7 +271,11 @@ export function NominationForm({
     currency,
   );
   const standardFee = formatFee(
-    paymentInstructions?.standardFeeMinor,
+    (pricing.standardAmountMinor ??
+      paymentInstructions?.standardFeeMinor ??
+      0) > (feeMinor ?? 0)
+      ? (pricing.standardAmountMinor ?? paymentInstructions?.standardFeeMinor)
+      : undefined,
     currency,
   );
 
@@ -506,6 +518,10 @@ export function NominationForm({
 
   async function runSubmission(values: PublicApplicationInput) {
     if (submitLock.current || stepLock.current || restoring) return;
+    if (priceNeedsReview) {
+      setCurrentStep(2);
+      return;
+    }
     submitLock.current = true;
     submissionCompleteRef.current = false;
     if (paymentMethod === "bank_transfer" && payment.length !== 1) {
@@ -526,12 +542,23 @@ export function NominationForm({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             ...values,
+            acceptedAmountMinor,
             paymentMethod,
             draftCredential: draftCredential.current,
             files: manifest(),
           }),
         });
         const initiated = (await response.json()) as InitiateResponse;
+        if (
+          !initiated.ok &&
+          initiated.code === "PRICE_CHANGED" &&
+          initiated.pricing
+        ) {
+          updatePricing(initiated.pricing);
+          setCurrentStep(2);
+          setStage("idle");
+          return;
+        }
         if (!initiated.ok) throw new Error(initiated.message);
         activeSession = initiated.data;
         setSession(activeSession);
@@ -594,13 +621,22 @@ export function NominationForm({
         body: JSON.stringify({
           sessionToken: activeSession.sessionToken,
           idempotencyKey: activeSession.idempotencyKey ?? values.idempotencyKey,
+          acceptedAmountMinor,
         }),
       });
       const result = (await complete.json()) as {
         ok: boolean;
         message?: string;
+        code?: string;
+        pricing?: NominationPricing;
         data?: { reference: string; paymentUrl?: string };
       };
+      if (!result.ok && result.code === "PRICE_CHANGED" && result.pricing) {
+        updatePricing(result.pricing);
+        setCurrentStep(2);
+        setStage("idle");
+        return;
+      }
       if (!result.ok || !result.data?.reference)
         throw new Error(result.message ?? "Final confirmation failed.");
       // The nomination is durable. Allow the intentional payment redirect
@@ -695,6 +731,7 @@ export function NominationForm({
       setSavingStep(true);
       form.clearErrors("root");
       await saveStep(currentStep);
+      if (currentStep === 2) setAcceptedAmountMinor(feeMinor);
       if (session) beginFreshUploadSession();
       form.setValue("turnstileToken", "");
       setTurnstileReset((value) => value + 1);
@@ -797,6 +834,29 @@ export function NominationForm({
           ))}
         </ol>
       </div>
+      {priceNeedsReview ? (
+        <div
+          role="status"
+          className="border-b border-mist bg-gold-wash px-5 py-4 text-sm leading-6 md:px-8"
+        >
+          <p>
+            The offer ended. Fee:{" "}
+            <strong>{formatFee(feeMinor, currency)}</strong>. Review your
+            payment before submitting.
+          </p>
+          {currentStep === 3 ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 min-h-11"
+              disabled={busy}
+              onClick={() => setCurrentStep(2)}
+            >
+              Review fee
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {errors.root || visibleErrors.length || fileError ? (
         <Alert
           variant="destructive"
@@ -1058,6 +1118,12 @@ export function NominationForm({
           number="4"
           title="Confirm and submit"
         >
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">
+              {paymentMethod === "card" ? "Card payment" : "Bank transfer"}
+            </span>
+            <span className="font-semibold">{fee}</span>
+          </div>
           <FieldSet>
             <FieldLegend className="sr-only">
               Nomination declaration and security verification

@@ -292,10 +292,23 @@ export function MessagesPageSkeleton() {
   );
 }
 
-export function PublicNominationSkeleton() {
+export function PublicNominationSkeleton({
+  offerActive = false,
+}: {
+  offerActive?: boolean;
+}) {
   return (
     <div className="flex min-h-svh flex-col">
-      <PublicHeader />
+      <PublicHeader compactSignIn />
+      {offerActive ? (
+        <div
+          aria-hidden
+          className="flex h-24 flex-col items-center justify-center gap-2 bg-[#b42332] px-4 sm:h-16 sm:flex-row sm:gap-6"
+        >
+          <Skeleton className="h-5 w-60 max-w-full bg-white/20" />
+          <Skeleton className="h-10 w-56 max-w-full bg-white/20" />
+        </div>
+      ) : null}
       <main id="main-content" className="flex-1">
         <section
           className="mx-auto max-w-[900px] px-5 pb-10 pt-12 md:pb-16 md:pt-18"

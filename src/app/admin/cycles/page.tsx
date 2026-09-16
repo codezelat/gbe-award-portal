@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
+import { nominationPricing } from "@/lib/domain/nomination-pricing";
 const local = (date: Date | null) =>
   date ? format(date, "yyyy-MM-dd'T'HH:mm") : "";
 export default async function CyclesPage() {
@@ -201,7 +202,7 @@ export default async function CyclesPage() {
                 />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium">
-                Fee in minor units
+                Base fee in minor units
                 <Input
                   name="nominationFeeMinor"
                   type="number"
@@ -209,6 +210,12 @@ export default async function CyclesPage() {
                   defaultValue={cycle.nominationFeeMinor ?? ""}
                   className="h-11 bg-white"
                 />
+                {nominationPricing(cycle).phase !== "none" ? (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Scheduled: LKR 65,000 until 17 Sep, 12 PM Colombo. Then LKR
+                    85,000.
+                  </span>
+                ) : null}
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium">
                 Currency

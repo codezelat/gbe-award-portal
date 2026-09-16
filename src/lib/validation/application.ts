@@ -108,6 +108,7 @@ export const fileManifestItemSchema = z.object({
 });
 export const initiateApplicationSchema = publicApplicationSchema
   .extend({
+    acceptedAmountMinor: z.number().int().nonnegative().optional(),
     draftCredential: z
       .object({ id: z.uuid(), secret: z.string().regex(/^[a-f0-9]{64}$/) })
       .optional(),

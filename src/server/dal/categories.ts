@@ -11,6 +11,7 @@ export async function getOpenCycleCategories() {
       id: awardCategories.id,
       name: awardCategories.name,
       cycleId: awardCycles.id,
+      year: awardCycles.year,
       heading: awardCycles.heading,
       introCopy: awardCycles.introCopy,
       supportEmail: awardCycles.supportEmail,
@@ -29,6 +30,7 @@ export async function getOpenCycleCategories() {
     cycle: first
       ? {
           id: first.cycleId,
+          year: first.year,
           heading: first.heading,
           introCopy: first.introCopy,
           supportEmail: first.supportEmail,

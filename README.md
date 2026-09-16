@@ -213,7 +213,23 @@ bun run providers:verify
 
 Card checkout uses Genie Business hosted payment pages, not an embedded card form. The portal never receives card numbers or CVVs. New nominations snapshot the cycle fee; existing payment amounts and evidence are unchanged. A saved card nomination gets a secure, HTTP-only payment session for seven days, without creating an account. Invited applicants can also resume their own eligible payment from `/portal/payment`.
 
-Card checkout and bank transfer use the nomination's saved fee (currently LKR 65,000 for new nominations). The owner-confirmed LKR 10 live test is complete and the temporary override is disabled (`CARD_TEST_AMOUNT_MINOR = null` in `src/lib/domain/card-checkout-amount.ts`). Existing active checkouts retain their original amount, and receipts record the amount actually paid. Do not rewrite previous test payments or receipts. No additional environment variable is required for normal pricing.
+Card checkout and bank transfer use the nomination's saved fee. The 2026 LKR schedule below applies to new submissions. The owner-confirmed LKR 10 live test is complete and the temporary override is disabled (`CARD_TEST_AMOUNT_MINOR = null` in `src/lib/domain/card-checkout-amount.ts`). Existing active checkouts retain their original amount, and receipts record the amount actually paid. Do not rewrite previous test payments or receipts. No additional environment variable is required for normal pricing.
+
+### Final nomination offer
+
+The owner-approved schedule in `src/lib/domain/nomination-pricing.ts` uses fixed Asia/Colombo timestamps, not deployment time:
+
+| Period | New nomination fee |
+| --- | --- |
+| Before 16 September 2026, 12:00 PM | Configured cycle base fee |
+| 16 September 2026, 12:00 PM to 17 September 2026, 12:00 PM (exclusive) | LKR 65,000 |
+| From 17 September 2026, 12:00 PM | LKR 85,000 |
+
+The red countdown appears only during the 24-hour window on `/apply`. At expiry, it disappears along with the crossed-out price and offer label. An open form updates its fee without a reload; the applicant must review a changed fee before proceeding. Countdown ticks are local and isolated from the form, with no database polling or additional cron.
+
+Both public initiation paths and final submission enforce the server-time price. A stale or missing price acknowledgement returns `409 PRICE_CHANGED` with the current fee; saved details and uploads remain available. Bank-transfer nominations and proof must reach final submission before the deadline for the offer price. Drafts and incomplete upload sessions do not reserve it. Submitted nominations, active card attempts, receipts and historical amounts are unchanged. Other years and currencies use their configured cycle fee.
+
+Deploy this code before the offer begins to show the full window. A deployment during the offer shows only the remaining time; a deployment after it uses LKR 85,000 immediately. No environment variable, production database write or migration is needed. The cycle's stored base fee remains unchanged, with the schedule noted in `/admin/cycles`.
 
 Internal `RCT-` references remain in payment records and staff views, but are not displayed on public or applicant payment-confirmation screens. Nomination references and payment status remain visible.
 

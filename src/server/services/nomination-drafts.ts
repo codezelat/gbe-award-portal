@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  assertNominationPrice,
+  nominationPricing,
+} from "@/lib/domain/nomination-pricing";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import {
   GetObjectCommand,
@@ -409,9 +413,10 @@ export async function initiateDraftSubmission(
       now > cycle.closesAt
     )
       throw new Error("Nominations are not currently open for this category.");
+    const pricing = nominationPricing(cycle);
     if (
       input.paymentMethod === "card" &&
-      (!cycle.nominationFeeMinor || cycle.currency !== "LKR")
+      (!pricing.amountMinor || cycle.currency !== "LKR")
     )
       throw new Error("Card payment is unavailable for this cycle.");
     const linked = await draftFileRows(draft.id, tx);
@@ -471,6 +476,7 @@ export async function initiateDraftSubmission(
       )
         throw new Error("This nomination has already been submitted.");
     }
+    assertNominationPrice(pricing, input.acceptedAmountMinor);
     const values = {
       cycleId: cycle.id,
       categoryId: category.id,
@@ -519,7 +525,7 @@ export async function initiateDraftSubmission(
         applicationId: appId,
         method: input.paymentMethod,
         status: values.paymentStatus,
-        expectedAmountMinor: cycle.nominationFeeMinor,
+        expectedAmountMinor: pricing.amountMinor,
         currency: cycle.currency,
       })
       .onConflictDoUpdate({
@@ -527,7 +533,7 @@ export async function initiateDraftSubmission(
         set: {
           method: input.paymentMethod,
           status: values.paymentStatus,
-          expectedAmountMinor: cycle.nominationFeeMinor,
+          expectedAmountMinor: pricing.amountMinor,
           currency: cycle.currency,
           updatedAt: now,
         },

@@ -31,11 +31,17 @@ import { z } from "zod";
 import { requireFeatureFlag } from "@/server/services/feature-flags";
 import { setPaymentSession } from "@/server/security/payment-session";
 import { draftFileRows } from "@/server/services/nomination-drafts";
+import {
+  assertNominationPrice,
+  nominationPricing,
+  NominationPriceChangedError,
+} from "@/lib/domain/nomination-pricing";
 
 export const runtime = "nodejs";
 const inputSchema = z.object({
   sessionToken: z.string(),
   idempotencyKey: z.uuid(),
+  acceptedAmountMinor: z.number().int().nonnegative().optional(),
 });
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -201,6 +207,10 @@ export async function POST(request: Request) {
         if (completed?.reference) return completed.reference;
         throw new Error("This upload session is already being finalised.");
       }
+      // Only an unsubmitted nomination reaches here. Recheck after uploads and
+      // locks, so an unfinished draft cannot carry the offer past its deadline.
+      const pricing = nominationPricing(row.cycle);
+      assertNominationPrice(pricing, input.acceptedAmountMinor);
       await tx
         .insert(cycleSequences)
         .values({
@@ -255,7 +265,13 @@ export async function POST(request: Request) {
       const paymentReference = `PAY-${row.cycle.year}-${String(paymentNumber).padStart(6, "0")}`;
       await tx
         .update(payments)
-        .set({ paymentReference, updatedAt: new Date() })
+        .set({
+          paymentReference,
+          ...(pricing.phase !== "none"
+            ? { expectedAmountMinor: pricing.amountMinor }
+            : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(payments.applicationId, row.application.id));
       for (const item of readyFiles) {
         const [stored] = item.storedFileId
@@ -294,7 +310,7 @@ export async function POST(request: Request) {
             .set({ proofApplicationFileId: link.id, updatedAt: new Date() })
             .where(eq(payments.applicationId, row.application.id));
       }
-      const submittedAt = new Date();
+      const submittedAt = new Date(pricing.serverNow);
       const snapshot = {
         nomineeName: row.application.nomineeName,
         designation: row.application.designation,
@@ -407,6 +423,16 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof NominationPriceChangedError)
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "PRICE_CHANGED",
+          message: error.message,
+          pricing: error.pricing,
+        },
+        { status: 409, headers: { "Cache-Control": "no-store" } },
+      );
     console.error(
       JSON.stringify({
         level: "error",
