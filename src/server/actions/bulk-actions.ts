@@ -1,22 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireStaff, hasPermission } from "@/server/dal/auth";
 import { getDb } from "@/lib/db";
 import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import {
-  applicationMessages,
   applications,
   auditLogs,
-  emailOutbox,
   profiles,
   staffMemberships,
 } from "@/lib/db/schema";
-import { enforceRateLimit } from "@/server/security/rate-limit";
-import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
-import { changeApplicationStatusWithTx } from "@/server/services/application-transition-service";
 
 const idsFrom = (formData: FormData) =>
   z.array(z.uuid()).min(1).max(100).parse(formData.getAll("applicationIds"));
@@ -41,6 +36,7 @@ export async function bulkAssignReviewerAction(formData: FormData) {
           eq(profiles.id, reviewerId),
           eq(profiles.accountKind, "staff"),
           eq(profiles.isActive, true),
+          isNull(staffMemberships.suspendedAt),
         ),
       )
       .limit(1);
@@ -53,7 +49,9 @@ export async function bulkAssignReviewerAction(formData: FormData) {
         assignedReviewerId: applications.assignedReviewerId,
       })
       .from(applications)
-      .where(nonDeletedApplications(inArray(applications.id, ids)));
+      .where(nonDeletedApplications(inArray(applications.id, ids)))
+      .orderBy(applications.id)
+      .for("update");
     if (
       scoped.length !== new Set(ids).size ||
       (!hasPermission(membership, "applications.view_all") &&
@@ -80,163 +78,6 @@ export async function bulkAssignReviewerAction(formData: FormData) {
       requestId: crypto.randomUUID(),
     });
   });
-  revalidatePath("/admin/applications");
-}
-
-const safeBulkStatuses = {
-  under_review: {
-    from: ["submitted", "resubmitted"],
-    applicantLabel: "Under review",
-  },
-  archived: {
-    from: ["rejected", "withdrawn", "not_selected"],
-    applicantLabel: "Archived",
-  },
-} as const;
-
-export async function bulkChangeSafeStatusAction(formData: FormData) {
-  scheduleEmailOutboxProcessing();
-  const { profile, membership } = await requireStaff();
-  if (!hasPermission(membership, "applications.change_status"))
-    throw new Error("Status-change permission is required.");
-  const ids = idsFrom(formData);
-  await enforceRateLimit(`bulk-status:${profile.id}`, 20, 3600);
-  const to = z.enum(["under_review", "archived"]).parse(formData.get("to"));
-  const reason = z
-    .string()
-    .trim()
-    .max(1000)
-    .optional()
-    .parse(formData.get("reason") || undefined);
-  if (to === "archived" && (!reason || reason.length < 8))
-    throw new Error("A meaningful archive reason is required.");
-  const rule = safeBulkStatuses[to];
-  const db = getDb();
-  await db.transaction(async (tx) => {
-    const rows = await tx
-      .select({
-        id: applications.id,
-        status: applications.workflowStatus,
-        assignedReviewerId: applications.assignedReviewerId,
-        email: applications.emailNormalised,
-        reference: applications.reference,
-      })
-      .from(applications)
-      .where(nonDeletedApplications(inArray(applications.id, ids)));
-    if (rows.length !== new Set(ids).size)
-      throw new Error("One or more selected applications no longer exist.");
-    if (
-      !hasPermission(membership, "applications.view_all") &&
-      rows.some((row) => row.assignedReviewerId !== profile.id)
-    )
-      throw new Error("One or more applications are not assigned to you.");
-    if (to === "archived" && !hasPermission(membership, "applications.edit"))
-      throw new Error("Archiving permission is required.");
-    if (
-      rows.some((row) => !(rule.from as readonly string[]).includes(row.status))
-    )
-      throw new Error(
-        `Every selected application must be in: ${rule.from.join(", ")}.`,
-      );
-    for (const row of rows) {
-      await changeApplicationStatusWithTx(tx, {
-        applicationId: row.id,
-        to,
-        actorProfileId: profile.id,
-        reason,
-        requestId: crypto.randomUUID(),
-      });
-    }
-    await tx.insert(auditLogs).values({
-      actorProfileId: profile.id,
-      actorType: "staff",
-      action: "applications bulk status changed",
-      entityType: "application_batch",
-      afterRedacted: { to, count: rows.length },
-      reason,
-      metadataRedacted: { applicationIds: ids },
-      requestId: crypto.randomUUID(),
-    });
-  });
-  revalidatePath("/admin/applications");
-}
-
-const communicationTemplates = {
-  review_update: {
-    subject: "Your GBE Awards nomination is being reviewed",
-    body: "The GBE Awards team is continuing its review of your nomination. No action is required unless we contact you separately.",
-  },
-  deadline_reminder: {
-    subject: "Reminder: check your GBE Awards portal",
-    body: "Please sign in to your GBE Awards portal to review any current action or document request before its stated deadline.",
-  },
-} as const;
-
-export async function bulkSendTemplateAction(formData: FormData) {
-  scheduleEmailOutboxProcessing();
-  const { profile, membership } = await requireStaff();
-  if (!hasPermission(membership, "messages.send"))
-    throw new Error("Messaging permission is required.");
-  const ids = idsFrom(formData);
-  await enforceRateLimit(`bulk-message:${profile.id}`, 10, 3600);
-  const key = z
-    .enum(["review_update", "deadline_reminder"])
-    .parse(formData.get("template"));
-  const template = communicationTemplates[key];
-  const db = getDb();
-  await db.transaction(async (tx) => {
-    const rows = await tx
-      .select({
-        id: applications.id,
-        email: applications.emailNormalised,
-        ownerProfileId: applications.ownerProfileId,
-        reference: applications.reference,
-        assignedReviewerId: applications.assignedReviewerId,
-      })
-      .from(applications)
-      .where(nonDeletedApplications(inArray(applications.id, ids)));
-    if (rows.length !== new Set(ids).size)
-      throw new Error("One or more selected applications no longer exist.");
-    if (
-      !hasPermission(membership, "applications.view_all") &&
-      rows.some((row) => row.assignedReviewerId !== profile.id)
-    )
-      throw new Error("One or more applications are not assigned to you.");
-    for (const row of rows) {
-      const [message] = await tx
-        .insert(applicationMessages)
-        .values({
-          applicationId: row.id,
-          senderProfileId: profile.id,
-          senderType: "staff",
-          visibility: "applicant",
-          subject: template.subject,
-          body: template.body,
-        })
-        .returning({ id: applicationMessages.id });
-      await tx.insert(emailOutbox).values({
-        templateKey: key,
-        recipientEmail: row.email,
-        recipientProfileId: row.ownerProfileId,
-        applicationId: row.id,
-        payload: {
-          title: template.subject,
-          message: template.body,
-          reference: row.reference,
-          url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/portal/messages`,
-        },
-        idempotencyKey: `bulk_message:${message.id}`,
-      });
-    }
-    await tx.insert(auditLogs).values({
-      actorProfileId: profile.id,
-      actorType: "staff",
-      action: "approved bulk communication queued",
-      entityType: "application_batch",
-      afterRedacted: { template: key, count: rows.length },
-      metadataRedacted: { applicationIds: ids },
-      requestId: crypto.randomUUID(),
-    });
-  });
-  revalidatePath("/admin/applications");
+  revalidatePath("/admin", "layout");
+  revalidatePath("/portal", "layout");
 }

@@ -8,7 +8,6 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { Download, UserRoundCheck } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,20 +16,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ApplicationBulkActions } from "@/components/admin/application-bulk-actions";
+import type {
+  BulkPermissions,
+  BulkSelection,
+} from "@/lib/domain/bulk-applications";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  bulkAssignReviewerAction,
-  bulkChangeSafeStatusAction,
-  bulkSendTemplateAction,
-} from "@/server/actions/bulk-actions";
-export type ApplicationTableRow = {
+export type ApplicationTableRow = BulkSelection & {
   id: string;
   reference: string | null;
   nomineeName: string;
@@ -39,7 +37,6 @@ export type ApplicationTableRow = {
   awardNomination: string;
   emailDisplay: string;
   phoneDisplay: string;
-  workflowStatus: string;
   paymentStatus: string;
   submittedLabel: string;
   reviewerName: string;
@@ -49,10 +46,12 @@ export function ApplicationsTable({
   rows,
   reviewers,
   exportBase,
+  permissions,
 }: {
   rows: ApplicationTableRow[];
   reviewers: Array<{ id: string; name: string }>;
   exportBase: string;
+  permissions: BulkPermissions;
 }) {
   const router = useRouter();
   const [selection, setSelection] = useState<Record<string, boolean>>({});
@@ -61,19 +60,20 @@ export function ApplicationsTable({
       {
         id: "select",
         header: ({ table }) => (
-          <input
-            type="checkbox"
+          <Checkbox
             aria-label="Select all visible applications"
             checked={table.getIsAllPageRowsSelected()}
-            onChange={table.getToggleAllPageRowsSelectedHandler()}
+            indeterminate={table.getIsSomePageRowsSelected()}
+            onCheckedChange={(checked) =>
+              table.toggleAllPageRowsSelected(checked)
+            }
           />
         ),
         cell: ({ row }) => (
-          <input
-            type="checkbox"
-            aria-label={`Select ${row.original.reference}`}
+          <Checkbox
+            aria-label={`Select ${row.original.reference ?? row.original.nomineeName}`}
             checked={row.getIsSelected()}
-            onChange={row.getToggleSelectedHandler()}
+            onCheckedChange={(checked) => row.toggleSelected(checked)}
           />
         ),
       },
@@ -185,6 +185,27 @@ export function ApplicationsTable({
   const exportUrl = `${exportBase}&${selected.map((id) => `id=${encodeURIComponent(id)}`).join("&")}`;
   return (
     <>
+      {selected.length > 0 && (
+        <ApplicationBulkActions
+          selected={table.getSelectedRowModel().rows.map((row) => row.original)}
+          reviewers={reviewers}
+          permissions={permissions}
+          exportUrl={exportUrl}
+          onClear={() => setSelection({})}
+        />
+      )}
+      {rows.length > 0 && (
+        <label className="flex min-h-12 items-center gap-3 border-b px-4 text-sm xl:hidden">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            indeterminate={table.getIsSomePageRowsSelected()}
+            onCheckedChange={(checked) =>
+              table.toggleAllPageRowsSelected(checked)
+            }
+          />
+          Select this page
+        </label>
+      )}
       <div className="hidden xl:block">
         <Table className="table-fixed">
           <TableHeader className="sticky top-0 z-10 bg-white">
@@ -271,12 +292,11 @@ export function ApplicationsTable({
               className="p-4 transition-colors hover:bg-muted/35"
             >
               <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
+                <Checkbox
                   className="mt-1"
                   aria-label={`Select ${row.original.reference ?? row.original.nomineeName}`}
                   checked={row.getIsSelected()}
-                  onChange={row.getToggleSelectedHandler()}
+                  onCheckedChange={(checked) => row.toggleSelected(checked)}
                 />
                 <div className="min-w-0 flex-1">
                   <Link
@@ -314,126 +334,6 @@ export function ApplicationsTable({
           </p>
         )}
       </div>
-      {selected.length ? (
-        <div className="glass-shell sticky bottom-4 z-20 mx-3 mb-3 max-h-[65dvh] overflow-y-auto rounded-lg p-3 shadow-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <strong className="text-sm">{selected.length} selected</strong>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                render={<a href={exportUrl} />}
-              >
-                <Download data-icon="inline-start" />
-                Export
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setSelection({})}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-          <details className="group mt-2 border-t pt-2">
-            <summary className="cursor-pointer list-none py-1 text-sm font-medium text-antique-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              Bulk actions{" "}
-              <span
-                aria-hidden
-                className="inline-block transition-transform group-open:rotate-180"
-              >
-                ⌄
-              </span>
-            </summary>
-            <div className="mt-3 grid gap-3 xl:grid-cols-3">
-              <form
-                action={bulkAssignReviewerAction}
-                className="flex min-w-0 flex-wrap gap-2"
-              >
-                {selected.map((id) => (
-                  <input
-                    key={id}
-                    type="hidden"
-                    name="applicationIds"
-                    value={id}
-                  />
-                ))}
-                <select
-                  name="reviewerId"
-                  aria-label="Assign selected applications to a staff member"
-                  className="h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm"
-                >
-                  <option value="">Unassigned</option>
-                  {reviewers.map((reviewer) => (
-                    <option key={reviewer.id} value={reviewer.id}>
-                      {reviewer.name}
-                    </option>
-                  ))}
-                </select>
-                <Button size="sm" variant="outline">
-                  <UserRoundCheck data-icon="inline-start" />
-                  Assign
-                </Button>
-              </form>
-              <form
-                action={bulkChangeSafeStatusAction}
-                className="flex min-w-0 flex-wrap gap-2"
-              >
-                {selected.map((id) => (
-                  <input
-                    key={id}
-                    type="hidden"
-                    name="applicationIds"
-                    value={id}
-                  />
-                ))}
-                <select
-                  name="to"
-                  aria-label="Safe bulk status"
-                  className="h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm"
-                >
-                  <option value="under_review">Move to under review</option>
-                  <option value="archived">Archive eligible</option>
-                </select>
-                <Input
-                  name="reason"
-                  aria-label="Bulk status reason"
-                  placeholder="Archive reason if required"
-                  className="h-11 w-full min-w-0 bg-white"
-                />
-                <Button size="sm" variant="outline">
-                  Apply status
-                </Button>
-              </form>
-              <form
-                action={bulkSendTemplateAction}
-                className="flex min-w-0 flex-wrap gap-2"
-              >
-                {selected.map((id) => (
-                  <input
-                    key={id}
-                    type="hidden"
-                    name="applicationIds"
-                    value={id}
-                  />
-                ))}
-                <select
-                  name="template"
-                  aria-label="Approved communication template"
-                  className="h-11 w-full min-w-0 rounded-md border bg-white px-3 text-sm"
-                >
-                  <option value="review_update">Review update</option>
-                  <option value="deadline_reminder">Deadline reminder</option>
-                </select>
-                <Button size="sm" variant="outline">
-                  Send template
-                </Button>
-              </form>
-            </div>
-          </details>
-        </div>
-      ) : null}
     </>
   );
 }

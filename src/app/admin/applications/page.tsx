@@ -29,7 +29,9 @@ import {
   awardCategories,
   awardCycles,
   profiles,
+  staffMemberships,
 } from "@/lib/db/schema";
+import { bulkStatusOptions } from "@/lib/domain/bulk-applications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatInTimeZone } from "date-fns-tz";
@@ -247,7 +249,14 @@ export default async function ApplicationsPage({
     db
       .select({ id: profiles.id, name: profiles.displayName })
       .from(profiles)
-      .where(eq(profiles.accountKind, "staff"))
+      .innerJoin(staffMemberships, eq(staffMemberships.profileId, profiles.id))
+      .where(
+        and(
+          eq(profiles.accountKind, "staff"),
+          eq(profiles.isActive, true),
+          isNull(staffMemberships.suspendedAt),
+        ),
+      )
       .orderBy(asc(profiles.displayName)),
     db
       .select({ id: awardCycles.id, name: awardCycles.name })
@@ -522,10 +531,25 @@ export default async function ApplicationsPage({
           </Button>
         ) : null}
       </form>
-      <div className="surface min-w-0 overflow-hidden rounded-lg">
+      <div className="surface min-w-0 overflow-clip rounded-lg">
         <ApplicationsTable
+          key={JSON.stringify(params)}
+          permissions={{
+            status: hasPermission(membership, "applications.change_status")
+              ? bulkStatusOptions
+                  .filter((option) =>
+                    hasPermission(membership, option.permission),
+                  )
+                  .map((option) => option.value)
+              : [],
+            assign: hasPermission(membership, "applications.edit"),
+            message: hasPermission(membership, "messages.send"),
+            export: hasPermission(membership, "exports.create"),
+          }}
           rows={rows.map((row) => ({
             id: row.id,
+            updatedAt: row.updatedAt.toISOString(),
+            deleted: !!row.deletedAt,
             reference: row.reference,
             nomineeName: row.nomineeName,
             designation: row.designation,
