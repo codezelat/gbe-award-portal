@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
@@ -38,11 +39,15 @@ export default async function SettingsPage() {
   const map = new Map(rows.map((row) => [row.key, row.value]));
   return (
     <>
-      <h1 className="page-heading">Settings</h1>
-      <p className="mt-2 text-graphite">
-        Audited operational settings. Credentials and provider secrets never
-        belong here.
-      </p>
+      <AdminPageHeader
+        title={<>Settings</>}
+        description={
+          <>
+            Audited operational settings. Credentials and provider secrets never
+            belong here.
+          </>
+        }
+      />
       <div className="mt-7 grid gap-4 lg:grid-cols-2">
         {supported.map((key) => (
           <form

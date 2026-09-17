@@ -291,6 +291,26 @@
   .workspace-shell main :where(.grid > *, .flex > *) {
     min-width: 0;
   }
+
+  /* All administration sections share the same card and table rhythm. */
+  [data-workspace="admin"] main :where(.surface, .glass-feature) {
+    border-radius: 0.75rem;
+  }
+
+  [data-workspace="admin"] main :where(table) {
+    width: 100%;
+    font-size: 0.875rem;
+  }
+
+  [data-workspace="admin"] main :where(th) {
+    color: var(--muted-foreground);
+    font-weight: 500;
+    text-align: left;
+  }
+
+  [data-workspace="admin"] main :where(td, th) {
+    padding-block: 0.875rem;
+  }
 }
 
 .workspace-shell .font-display,

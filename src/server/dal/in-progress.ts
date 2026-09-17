@@ -6,6 +6,7 @@ import {
   eq,
   ilike,
   isNull,
+  isNotNull,
   notExists,
   or,
   sql,
@@ -17,6 +18,7 @@ import {
   awardCategories,
   nominationDrafts,
 } from "@/lib/db/schema";
+import { pendingCardPayment } from "./application-visibility";
 
 export async function getInProgress({
   cycleId,
@@ -83,7 +85,27 @@ export async function getInProgress({
         ),
       ),
     );
-  const all = unionAll(drafts, legacy).as("in_progress");
+  const awaitingCard = db
+    .select({
+      id: applications.id,
+      source: sql<string>`'card'`,
+      nomineeName: applications.nomineeName,
+      email: applications.emailDisplay,
+      nomination: applications.awardNomination,
+      category: applications.categoryNameSnapshot,
+      step: sql<number>`3`,
+      updatedAt: applications.updatedAt,
+    })
+    .from(applications)
+    .where(
+      and(
+        isNull(applications.deletedAt),
+        isNotNull(applications.submittedAt),
+        pendingCardPayment(),
+        cycleId ? eq(applications.cycleId, cycleId) : undefined,
+      ),
+    );
+  const all = unionAll(drafts, legacy, awaitingCard).as("in_progress");
   const where = search
     ? or(
         ilike(all.nomineeName, `%${search}%`),

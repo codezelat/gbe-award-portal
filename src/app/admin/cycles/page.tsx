@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -28,11 +29,15 @@ export default async function CyclesPage() {
   );
   return (
     <>
-      <h1 className="page-heading">Award cycles</h1>
-      <p className="mt-2 text-graphite">
-        Guarded configuration for dates, public copy, declaration and lifecycle
-        state.
-      </p>
+      <AdminPageHeader
+        title={<>Award cycles</>}
+        description={
+          <>
+            Guarded configuration for dates, public copy, declaration and
+            lifecycle state.
+          </>
+        }
+      />
       <details className="glass-feature mt-7 rounded-lg p-5">
         <summary className="cursor-pointer font-semibold">
           Create future award cycle

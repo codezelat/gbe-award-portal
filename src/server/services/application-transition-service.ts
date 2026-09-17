@@ -1,7 +1,10 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { nonDeletedApplications } from "@/server/dal/application-visibility";
+import {
+  nonDeletedApplications,
+  pendingCardPayment,
+} from "@/server/dal/application-visibility";
 import {
   applications,
   applicationStatusHistory,
@@ -61,6 +64,7 @@ export async function changeApplicationStatusWithTx(
   const [current] = await tx
     .select({
       status: applications.workflowStatus,
+      checkoutPending: pendingCardPayment(),
       email: applications.emailNormalised,
       reference: applications.reference,
       paymentStatus: applications.paymentStatus,
@@ -71,6 +75,10 @@ export async function changeApplicationStatusWithTx(
     .where(nonDeletedApplications(eq(applications.id, input.applicationId)))
     .limit(1);
   if (!current) throw new Error("Application not found.");
+  if (current.checkoutPending)
+    throw new Error(
+      "Payment is still pending. This nomination is in In-progress.",
+    );
   if (
     input.to === "entry_confirmed" &&
     !["verified", "waived", "not_required"].includes(current.paymentStatus)

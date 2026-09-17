@@ -1,4 +1,7 @@
-import { and, asc, eq, ilike, or } from "drizzle-orm";
+import { parsePage } from "@/lib/domain/pagination";
+import { OffsetPagination } from "@/components/shared/offset-pagination";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { nonDeletedApplications } from "@/server/dal/application-visibility";
@@ -16,41 +19,57 @@ export default async function ApplicantsPage({
   searchParams: Promise<{ search?: string; page?: string }>;
 }) {
   const { search, page: pageParam } = await searchParams;
-  const page = Math.max(
-    1,
-    Math.min(10_000, Number.parseInt(pageParam ?? "1", 10) || 1),
-  );
+  const page = parsePage(pageParam);
   const pageSize = 50;
   const db = getDb();
-  const rows = await db
-    .select({ profile: profiles, email: user.email, application: applications })
+  const where = and(
+    eq(profiles.accountKind, "applicant"),
+    search
+      ? or(
+          ilike(profiles.displayName, `%${search}%`),
+          ilike(user.email, `%${search}%`),
+        )
+      : undefined,
+  );
+  const [total] = await db
+    .select({ value: count() })
     .from(profiles)
     .innerJoin(user, eq(profiles.authUserId, user.id))
-    .leftJoin(
-      applications,
-      nonDeletedApplications(eq(applications.ownerProfileId, profiles.id)),
-    )
-    .where(
-      and(
-        eq(profiles.accountKind, "applicant"),
-        search
-          ? or(
-              ilike(profiles.displayName, `%${search}%`),
-              ilike(user.email, `%${search}%`),
-            )
-          : undefined,
-      ),
-    )
-    .orderBy(asc(profiles.displayName))
+    .where(where);
+  const latestApplication = db
+    .select()
+    .from(applications)
+    .where(nonDeletedApplications(eq(applications.ownerProfileId, profiles.id)))
+    .orderBy(desc(applications.createdAt), desc(applications.id))
+    .limit(1)
+    .as("latest_application");
+  const rows = await db
+    .select({
+      profile: profiles,
+      email: user.email,
+      application: {
+        reference: latestApplication.reference,
+        accountAccessStatus: latestApplication.accountAccessStatus,
+      },
+    })
+    .from(profiles)
+    .innerJoin(user, eq(profiles.authUserId, user.id))
+    .leftJoinLateral(latestApplication, sql`true`)
+    .where(where)
+    .orderBy(asc(profiles.displayName), asc(profiles.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   return (
     <>
-      <h1 className="page-heading">Applicants</h1>
-      <p className="mt-2 text-graphite">
-        Approved applicant profiles, linked nominations and account access
-        controls.
-      </p>
+      <AdminPageHeader
+        title={<>Applicants</>}
+        description={
+          <>
+            Approved applicant profiles, linked nominations and account access
+            controls.
+          </>
+        }
+      />
       <form className="mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
         <Input
           name="search"
@@ -58,7 +77,7 @@ export default async function ApplicantsPage({
           placeholder="Search name or email"
           className="h-11 flex-1 bg-white"
         />
-        <Button>Search</Button>
+        <Button className="h-11">Search</Button>
       </form>
       <div className="mt-6 flex flex-col gap-3">
         {rows.map(({ profile, email, application }) => (
@@ -130,38 +149,15 @@ export default async function ApplicantsPage({
           </article>
         ))}
       </div>
-      <nav
-        className="mt-5 flex flex-wrap items-center justify-between gap-3"
-        aria-label="Pagination"
-      >
-        <Button
-          variant="outline"
-          disabled={page === 1}
-          render={
-            page > 1 ? (
-              <a
-                href={`/admin/applicants?page=${page - 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
-              />
-            ) : undefined
-          }
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-muted-foreground">Page {page}</span>
-        <Button
-          variant="outline"
-          disabled={rows.length < pageSize}
-          render={
-            rows.length === pageSize ? (
-              <a
-                href={`/admin/applicants?page=${page + 1}${search ? `&search=${encodeURIComponent(search)}` : ""}`}
-              />
-            ) : undefined
-          }
-        >
-          Next
-        </Button>
-      </nav>
+      <OffsetPagination
+        page={page}
+        pageSize={pageSize}
+        total={total.value}
+        shown={rows.length}
+        href={(next) =>
+          `/admin/applicants?page=${next}${search ? `&search=${encodeURIComponent(search)}` : ""}`
+        }
+      />
     </>
   );
 }

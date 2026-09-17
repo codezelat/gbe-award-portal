@@ -1,3 +1,6 @@
+import { OffsetPagination } from "@/components/shared/offset-pagination";
+import { parsePage } from "@/lib/domain/pagination";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import Link from "next/link";
 import {
   and,
@@ -39,7 +42,7 @@ export default async function ActivityPage({
   const query = await searchParams;
   const { membership } = await requireStaff();
   if (!hasPermission(membership, "audit.view")) notFound();
-  const page = Math.max(1, Number.parseInt(query.page ?? "1", 10) || 1);
+  const page = parsePage(query.page);
   const requestedSize = Number.parseInt(query.pageSize ?? "25", 10);
   const pageSize = pageSizes.includes(requestedSize as 25 | 50 | 100)
     ? requestedSize
@@ -116,13 +119,12 @@ export default async function ActivityPage({
   };
   return (
     <>
-      <h1 className="page-heading">Audit activity</h1>
-      <p className="mt-2 text-graphite">
-        Immutable, read-only business and security activity with Colombo-time
-        display.
-      </p>
-      <form className="surface mt-6 grid gap-3 rounded-lg p-4 md:grid-cols-2 xl:grid-cols-4">
-        <label className="relative xl:col-span-2">
+      <AdminPageHeader
+        title={<>Audit activity</>}
+        description={<>Review staff actions and system activity.</>}
+      />
+      <form className="surface mt-6 grid gap-3 rounded-lg p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" />
           <Input
             name="search"
@@ -131,62 +133,79 @@ export default async function ActivityPage({
             className="h-11 bg-white pl-9"
           />
         </label>
-        <Input
-          name="actor"
-          defaultValue={query.actor}
-          placeholder="Actor name"
-          className="h-11 bg-white"
-        />
-        <Input
-          name="action"
-          defaultValue={query.action}
-          placeholder="Action contains"
-          className="h-11 bg-white"
-        />
-        <select
-          name="entity"
-          defaultValue={query.entity ?? ""}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          <option value="">All entity types</option>
-          {entityRows.map(({ value }) => (
-            <option key={value} value={value}>
-              {value.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <Input
-          name="application"
-          defaultValue={query.application}
-          placeholder="Application reference"
-          className="h-11 bg-white"
-        />
-        <Input
-          name="dateFrom"
-          type="date"
-          defaultValue={query.dateFrom}
-          aria-label="Audit from date"
-          className="h-11 bg-white"
-        />
-        <Input
-          name="dateTo"
-          type="date"
-          defaultValue={query.dateTo}
-          aria-label="Audit to date"
-          className="h-11 bg-white"
-        />
-        <select
-          name="pageSize"
-          defaultValue={pageSize}
-          className="h-11 rounded-md border bg-white px-3 text-sm"
-        >
-          {pageSizes.map((size) => (
-            <option key={size} value={size}>
-              {size} per page
-            </option>
-          ))}
-        </select>
         <Button className="h-11">Apply filters</Button>
+        <details
+          className="sm:col-span-2"
+          open={Boolean(
+            query.actor ||
+            query.action ||
+            query.entity ||
+            query.application ||
+            query.dateFrom ||
+            query.dateTo,
+          )}
+        >
+          <summary className="flex min-h-11 w-fit cursor-pointer items-center text-sm text-muted-foreground">
+            More filters
+          </summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <Input
+              name="actor"
+              defaultValue={query.actor}
+              placeholder="Actor name"
+              className="h-11 bg-white"
+            />
+            <Input
+              name="action"
+              defaultValue={query.action}
+              placeholder="Action contains"
+              className="h-11 bg-white"
+            />
+            <select
+              name="entity"
+              defaultValue={query.entity ?? ""}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">All entity types</option>
+              {entityRows.map(({ value }) => (
+                <option key={value} value={value}>
+                  {value.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+            <Input
+              name="application"
+              defaultValue={query.application}
+              placeholder="Application reference"
+              className="h-11 bg-white"
+            />
+            <Input
+              name="dateFrom"
+              type="date"
+              defaultValue={query.dateFrom}
+              aria-label="Audit from date"
+              className="h-11 bg-white"
+            />
+            <Input
+              name="dateTo"
+              type="date"
+              defaultValue={query.dateTo}
+              aria-label="Audit to date"
+              className="h-11 bg-white"
+            />
+            <select
+              name="pageSize"
+              defaultValue={pageSize}
+              className="h-11 rounded-md border bg-white px-3 text-sm"
+            >
+              {pageSizes.map((size) => (
+                <option key={size} value={size}>
+                  {size} per page
+                </option>
+              ))}
+            </select>
+          </div>
+        </details>
       </form>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <p>{total.value} matching audit event(s)</p>
@@ -197,8 +216,16 @@ export default async function ActivityPage({
         ) : null}
       </div>
       <div className="data-table-scroll mt-5 overflow-x-auto rounded-lg border bg-white">
-        <table className="w-full min-w-[1050px] text-left text-sm">
-          <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+        <table
+          className={`w-full text-left text-sm ${rows.length ? "min-w-[1050px]" : ""}`}
+        >
+          <thead
+            className={
+              rows.length
+                ? "sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground"
+                : "hidden"
+            }
+          >
             <tr>
               <th className="px-4 py-3">Time</th>
               <th className="px-4 py-3">Actor</th>
@@ -264,32 +291,13 @@ export default async function ActivityPage({
           </tbody>
         </table>
       </div>
-      <nav
-        className="mt-5 flex flex-wrap items-center justify-between gap-3"
-        aria-label="Audit pagination"
-      >
-        <Button
-          variant="outline"
-          disabled={page === 1}
-          render={page > 1 ? <Link href={pageHref(page - 1)} /> : undefined}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          Page {page} of {Math.max(1, Math.ceil(total.value / pageSize))}
-        </span>
-        <Button
-          variant="outline"
-          disabled={page * pageSize >= total.value}
-          render={
-            page * pageSize < total.value ? (
-              <Link href={pageHref(page + 1)} />
-            ) : undefined
-          }
-        >
-          Next
-        </Button>
-      </nav>
+      <OffsetPagination
+        page={page}
+        pageSize={pageSize}
+        total={total.value}
+        shown={rows.length}
+        href={pageHref}
+      />
     </>
   );
 }

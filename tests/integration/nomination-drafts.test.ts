@@ -56,6 +56,7 @@ vi.mock("@/server/security/payment-session", () => ({
 }));
 vi.mock("@/lib/env", () => ({
   requireProvider: () => {},
+  publicEnv: { NEXT_PUBLIC_APP_URL: "http://localhost:3000" },
   env: {
     BETTER_AUTH_SECRET: "isolated-test-secret",
     R2_PRIVATE_BUCKET: "test",
@@ -881,7 +882,7 @@ describe("durable in-progress nominations", () => {
           .select()
           .from(schema.emailOutbox)
           .where(eq(schema.emailOutbox.applicationId, applicationId)),
-      ).toHaveLength(2);
+      ).toHaveLength(bank ? 2 : 0);
     },
   );
 

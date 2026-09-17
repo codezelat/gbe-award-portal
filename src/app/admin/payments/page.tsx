@@ -1,3 +1,5 @@
+import { OffsetPagination } from "@/components/shared/offset-pagination";
+import { parsePage } from "@/lib/domain/pagination";
 import Link from "next/link";
 import {
   and,
@@ -52,7 +54,7 @@ export default async function PaymentsPage({
   const query = await searchParams;
   const { membership } = await requireStaff();
   if (!hasPermission(membership, "payments.view")) notFound();
-  const page = Math.max(1, Number.parseInt(query.page ?? "1", 10) || 1);
+  const page = parsePage(query.page);
   const requestedSize = Number.parseInt(query.pageSize ?? "25", 10);
   const pageSize = pageSizes.includes(requestedSize as 25 | 50 | 100)
     ? requestedSize
@@ -207,8 +209,16 @@ export default async function PaymentsPage({
         ) : null}
       </div>
       <div className="data-table-scroll mt-5 overflow-x-auto rounded-lg border bg-white">
-        <table className="w-full min-w-[1050px] text-left text-sm">
-          <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+        <table
+          className={`w-full text-left text-sm ${rows.length ? "min-w-[1050px]" : ""}`}
+        >
+          <thead
+            className={
+              rows.length
+                ? "sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground"
+                : "hidden"
+            }
+          >
             <tr>
               <th className="px-4 py-3">Application</th>
               <th className="px-4 py-3">Payer context</th>
@@ -435,32 +445,13 @@ export default async function PaymentsPage({
           </tbody>
         </table>
       </div>
-      <nav
-        className="mt-5 flex flex-wrap items-center justify-between gap-3"
-        aria-label="Payment pagination"
-      >
-        <Button
-          variant="outline"
-          disabled={page === 1}
-          render={page > 1 ? <Link href={pageHref(page - 1)} /> : undefined}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          Page {page} of {Math.max(1, Math.ceil(total.value / pageSize))}
-        </span>
-        <Button
-          variant="outline"
-          disabled={page * pageSize >= total.value}
-          render={
-            page * pageSize < total.value ? (
-              <Link href={pageHref(page + 1)} />
-            ) : undefined
-          }
-        >
-          Next
-        </Button>
-      </nav>
+      <OffsetPagination
+        page={page}
+        pageSize={pageSize}
+        total={total.value}
+        shown={rows.length}
+        href={pageHref}
+      />
     </>
   );
 }

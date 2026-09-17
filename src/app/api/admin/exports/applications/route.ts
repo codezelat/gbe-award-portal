@@ -1,3 +1,4 @@
+import { administrativeSubmissions } from "@/server/dal/application-visibility";
 import {
   and,
   desc,
@@ -9,7 +10,6 @@ import {
   isNotNull,
   isNull,
   lte,
-  ne,
   or,
   sql,
   type SQL,
@@ -55,10 +55,7 @@ export async function GET(request: Request) {
   const format = url.searchParams.get("format") === "csv" ? "csv" : "xlsx";
   await requireExportFormat(format);
   // Match the applications list, including its deliberately selected archive view.
-  const filters: SQL[] = [
-    isNotNull(applications.submittedAt),
-    ne(applications.workflowStatus, "uploading"),
-  ];
+  const filters: SQL[] = [administrativeSubmissions()];
   const search = url.searchParams.get("search");
   const status = url.searchParams.get("status");
   const paymentStatus = url.searchParams.get("paymentStatus");

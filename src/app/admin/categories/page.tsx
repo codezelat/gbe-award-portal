@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { asc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -22,11 +23,15 @@ export default async function CategoriesPage() {
   ]);
   return (
     <>
-      <h1 className="page-heading">Categories</h1>
-      <p className="mt-2 text-graphite">
-        Create, order and activate award categories without altering historical
-        submission snapshots.
-      </p>
+      <AdminPageHeader
+        title={<>Categories</>}
+        description={
+          <>
+            Create, order and activate award categories without altering
+            historical submission snapshots.
+          </>
+        }
+      />
       <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="surface overflow-hidden rounded-lg">
           <div className="divide-y">

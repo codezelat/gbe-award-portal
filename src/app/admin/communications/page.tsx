@@ -1,3 +1,6 @@
+import { OffsetPagination } from "@/components/shared/offset-pagination";
+import { parsePage } from "@/lib/domain/pagination";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import Link from "next/link";
 import {
   and,
@@ -48,7 +51,7 @@ export default async function CommunicationsPage({
     !hasPermission(membership, "applications.view_all")
   )
     notFound();
-  const page = Math.max(1, Number.parseInt(query.page ?? "1", 10) || 1);
+  const page = parsePage(query.page);
   const requestedSize = Number.parseInt(query.pageSize ?? "25", 10);
   const pageSize = pageSizes.includes(requestedSize as 25 | 50 | 100)
     ? requestedSize
@@ -122,11 +125,10 @@ export default async function CommunicationsPage({
   };
   return (
     <>
-      <h1 className="page-heading">Communications</h1>
-      <p className="mt-2 text-graphite">
-        Transactional delivery state, approved copy and audited applicant
-        messages.
-      </p>
+      <AdminPageHeader
+        title={<>Communications</>}
+        description={<>Track email delivery and message applicants.</>}
+      />
       <div className="mt-6 grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
           <form className="surface grid gap-3 rounded-lg p-4 md:grid-cols-2 lg:grid-cols-3">
@@ -200,8 +202,16 @@ export default async function CommunicationsPage({
             ) : null}
           </div>
           <div className="data-table-scroll mt-5 overflow-x-auto rounded-lg border bg-white">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+            <table
+              className={`w-full text-left text-sm ${rows.length ? "min-w-[980px]" : ""}`}
+            >
+              <thead
+                className={
+                  rows.length
+                    ? "sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground"
+                    : "hidden"
+                }
+              >
                 <tr>
                   <th className="px-4 py-3">Recipient</th>
                   <th className="px-4 py-3">Template</th>
@@ -283,32 +293,13 @@ export default async function CommunicationsPage({
               </tbody>
             </table>
           </div>
-          <nav
-            className="mt-5 flex flex-wrap items-center justify-between gap-3"
-            aria-label="Communication pagination"
-          >
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              render={page > 1 ? <Link href={pageHref(page - 1)} /> : undefined}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {Math.max(1, Math.ceil(total.value / pageSize))}
-            </span>
-            <Button
-              variant="outline"
-              disabled={page * pageSize >= total.value}
-              render={
-                page * pageSize < total.value ? (
-                  <Link href={pageHref(page + 1)} />
-                ) : undefined
-              }
-            >
-              Next
-            </Button>
-          </nav>
+          <OffsetPagination
+            page={page}
+            pageSize={pageSize}
+            total={total.value}
+            shown={rows.length}
+            href={pageHref}
+          />
         </div>
         <aside className="flex flex-col gap-5">
           <section className="glass-feature rounded-lg p-5">

@@ -28,6 +28,12 @@ export type InProgressRow = {
   canDelete: boolean;
 };
 
+function detailHref(row: InProgressRow) {
+  return row.source === "card"
+    ? `/admin/applications/${row.id}`
+    : `/admin/in-progress/${row.id}?source=${row.source}`;
+}
+
 function Nomination({ row }: { row: InProgressRow }) {
   return (
     <div className="min-w-0">
@@ -80,7 +86,7 @@ export function InProgressTable({ rows }: { rows: InProgressRow[] }) {
                     <TooltipTrigger
                       render={
                         <Link
-                          href={`/admin/in-progress/${row.id}?source=${row.source}`}
+                          href={detailHref(row)}
                           className="line-clamp-2 whitespace-normal font-semibold leading-6 [overflow-wrap:anywhere] hover:text-primary hover:underline focus-visible:outline-ring"
                         />
                       }
@@ -113,7 +119,7 @@ export function InProgressTable({ rows }: { rows: InProgressRow[] }) {
                       className="h-11"
                       render={
                         <Link
-                          href={`/admin/in-progress/${row.id}?source=${row.source}`}
+                          href={detailHref(row)}
                           aria-label={`View ${row.nomineeName}`}
                         />
                       }
@@ -138,7 +144,7 @@ export function InProgressTable({ rows }: { rows: InProgressRow[] }) {
         {rows.map((row) => (
           <article key={`${row.source}:${row.id}`} className="min-w-0 p-4">
             <Link
-              href={`/admin/in-progress/${row.id}?source=${row.source}`}
+              href={detailHref(row)}
               className="line-clamp-2 rounded-sm font-semibold leading-6 [overflow-wrap:anywhere] hover:text-primary focus-visible:outline-ring"
             >
               {row.nomineeName}
@@ -168,7 +174,7 @@ export function InProgressTable({ rows }: { rows: InProgressRow[] }) {
                 className="h-11"
                 render={
                   <Link
-                    href={`/admin/in-progress/${row.id}?source=${row.source}`}
+                    href={detailHref(row)}
                     aria-label={`View ${row.nomineeName}`}
                   />
                 }

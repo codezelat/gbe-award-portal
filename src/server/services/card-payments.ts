@@ -1,4 +1,6 @@
 import "server-only";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
+import { queueNominationReceived } from "./nomination-notifications";
 import { and, asc, eq, isNull, lt, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import {
@@ -42,7 +44,7 @@ export async function reconcileCardAttempt(
   // The webhook is only a notification. All financial decisions use this authenticated lookup.
   const remote = await getGenieTransaction(transactionId);
   assertGenieMatch(remote, { ...attempt, appId: env.GENIE_APP_ID! });
-  await db.transaction(async (tx) => {
+  const settled = await db.transaction(async (tx) => {
     const [payment] = await tx
       .select()
       .from(payments)
@@ -170,6 +172,7 @@ export async function reconcileCardAttempt(
       .update(applications)
       .set({ paymentStatus: "verified", updatedAt: now, lastActivityAt: now })
       .where(eq(applications.id, payment.applicationId));
+    await queueNominationReceived(tx, payment.applicationId);
     await tx.insert(auditLogs).values({
       actorType: "system",
       action: "card payment verified by Genie",
@@ -184,7 +187,9 @@ export async function reconcileCardAttempt(
       },
       requestId: crypto.randomUUID(),
     });
+    return true;
   });
+  if (settled) scheduleEmailOutboxProcessing();
 }
 
 export async function startCardCheckout(applicationId: string) {

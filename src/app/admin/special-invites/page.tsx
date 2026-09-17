@@ -1,3 +1,4 @@
+import { OffsetPagination } from "@/components/shared/offset-pagination";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -296,40 +297,13 @@ export default async function SpecialInvitesPage({
           </div>
         </div>
       )}
-      {result.pages > 1 ? (
-        <nav
-          aria-label="Pagination"
-          className="mt-5 flex items-center justify-between gap-2"
-        >
-          <Button
-            variant="outline"
-            className="h-11"
-            disabled={result.page === 1}
-            render={
-              result.page > 1 ? (
-                <Link href={href(result.page - 1)} />
-              ) : undefined
-            }
-          >
-            Previous
-          </Button>
-          <span className="text-sm">
-            {result.page} / {result.pages}
-          </span>
-          <Button
-            variant="outline"
-            className="h-11"
-            disabled={result.page === result.pages}
-            render={
-              result.page < result.pages ? (
-                <Link href={href(result.page + 1)} />
-              ) : undefined
-            }
-          >
-            Next
-          </Button>
-        </nav>
-      ) : null}
+      <OffsetPagination
+        page={result.page}
+        pageSize={25}
+        total={result.total}
+        shown={result.rows.length}
+        href={href}
+      />
     </div>
   );
 }

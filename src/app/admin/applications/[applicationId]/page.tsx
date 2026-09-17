@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, getTableColumns } from "drizzle-orm";
+import { pendingCardPayment } from "@/server/dal/application-visibility";
 import { notFound } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -60,7 +61,10 @@ export default async function AdminApplicationDetail({
   const { profile: staffProfile, membership } = await requireStaff();
   const db = getDb();
   const [application] = await db
-    .select()
+    .select({
+      ...getTableColumns(applications),
+      checkoutPending: pendingCardPayment(),
+    })
     .from(applications)
     .where(eq(applications.id, applicationId))
     .limit(1);
@@ -182,7 +186,7 @@ export default async function AdminApplicationDetail({
     ["Telephone", application.phoneDisplay],
     ["Category", application.categoryNameSnapshot],
     [
-      "Submitted",
+      application.checkoutPending ? "Saved" : "Submitted",
       application.submittedAt
         ? formatInTimeZone(
             application.submittedAt,
@@ -195,6 +199,7 @@ export default async function AdminApplicationDetail({
   const allowed =
     transitionMap[application.workflowStatus as WorkflowStatus] ?? [];
   const visibleAllowed = allowed.filter((status) => {
+    if (application.checkoutPending) return false;
     if (status === "approved")
       return hasPermission(membership, "applications.approve");
     if (status === "rejected")
@@ -222,11 +227,15 @@ export default async function AdminApplicationDetail({
     <>
       <header className="mb-7 border-b pb-6">
         <Link
-          href="/admin/applications"
+          href={
+            application.checkoutPending
+              ? "/admin/in-progress"
+              : "/admin/applications"
+          }
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
-          Applications
+          {application.checkoutPending ? "In-progress" : "Applications"}
         </Link>
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
@@ -238,7 +247,9 @@ export default async function AdminApplicationDetail({
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={application.workflowStatus} />
+            {!application.checkoutPending ? (
+              <StatusBadge status={application.workflowStatus} />
+            ) : null}
             <StatusBadge status={application.paymentStatus} />
             {hasPermission(membership, "applications.edit") ? (
               <ApplicationEditDialog
@@ -796,47 +807,54 @@ export default async function AdminApplicationDetail({
               </div>
             </details>
           ) : null}
-          <details
-            className="surface group rounded-xl"
-            open={application.workflowStatus === "changes_requested"}
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              <span>Update review status</span>
-              <StatusBadge status={application.workflowStatus} />
-            </summary>
-            <form
-              action={changeStatusAction}
-              className="flex flex-col gap-3 border-t px-5 pb-5 pt-4"
+          {!application.checkoutPending &&
+          visibleAllowed.some((status) => status !== "changes_requested") ? (
+            <details
+              className="surface group rounded-xl"
+              open={application.workflowStatus === "changes_requested"}
             >
-              <input type="hidden" name="applicationId" value={applicationId} />
-              <select
-                name="to"
-                aria-label="Next workflow status"
-                required
-                className="h-11 rounded-md border bg-white px-3"
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <span>Update review status</span>
+                <StatusBadge status={application.workflowStatus} />
+              </summary>
+              <form
+                action={changeStatusAction}
+                className="flex flex-col gap-3 border-t px-5 pb-5 pt-4"
               >
-                <option value="">Choose a valid next status</option>
-                {visibleAllowed
-                  .filter((status) => status !== "changes_requested")
-                  .map((status) => (
-                    <option key={status} value={status}>
-                      {status.replaceAll("_", " ")}
-                    </option>
-                  ))}
-              </select>
-              <Textarea
-                name="applicantMessage"
-                aria-label="Applicant-facing status message"
-                placeholder="Message to applicant (only when needed)"
-              />
-              <Textarea
-                name="reason"
-                aria-label="Internal status change reason"
-                placeholder="Internal reason (required for rejection/backward actions)"
-              />
-              <Button>Save review status</Button>
-            </form>
-          </details>
+                <input
+                  type="hidden"
+                  name="applicationId"
+                  value={applicationId}
+                />
+                <select
+                  name="to"
+                  aria-label="Next workflow status"
+                  required
+                  className="h-11 rounded-md border bg-white px-3"
+                >
+                  <option value="">Choose a valid next status</option>
+                  {visibleAllowed
+                    .filter((status) => status !== "changes_requested")
+                    .map((status) => (
+                      <option key={status} value={status}>
+                        {status.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                </select>
+                <Textarea
+                  name="applicantMessage"
+                  aria-label="Applicant-facing status message"
+                  placeholder="Message to applicant (only when needed)"
+                />
+                <Textarea
+                  name="reason"
+                  aria-label="Internal status change reason"
+                  placeholder="Internal reason (required for rejection/backward actions)"
+                />
+                <Button>Save review status</Button>
+              </form>
+            </details>
+          ) : null}
           {(visibleAllowed as readonly string[]).includes(
             "changes_requested",
           ) ? (

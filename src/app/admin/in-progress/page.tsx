@@ -1,3 +1,4 @@
+import { OffsetPagination } from "@/components/shared/offset-pagination";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -82,7 +83,10 @@ export default async function InProgressPage({
         <InProgressTable
           rows={result.rows.map((row) => ({
             ...row,
-            stepLabel: draftStepLabels[row.step] ?? "Confirmation",
+            stepLabel:
+              row.source === "card"
+                ? "Awaiting payment"
+                : (draftStepLabels[row.step] ?? "Confirmation"),
             updatedLabel: formatInTimeZone(
               row.updatedAt,
               "Asia/Colombo",
@@ -90,44 +94,18 @@ export default async function InProgressPage({
             ),
             canDelete:
               hasPermission(membership, "applications.edit") &&
-              (row.source === "draft" || membership.role === "super_admin"),
+              (row.source === "draft" ||
+                (row.source === "upload" && membership.role === "super_admin")),
           }))}
         />
       )}
-      {result.pages > 1 ? (
-        <nav
-          aria-label="Pagination"
-          className="mt-5 flex flex-wrap items-center justify-between gap-3"
-        >
-          <Button
-            variant="outline"
-            className="h-11"
-            disabled={result.page === 1}
-            render={
-              result.page > 1 ? (
-                <Link href={href(result.page - 1)} />
-              ) : undefined
-            }
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {result.page} of {result.pages}
-          </span>
-          <Button
-            variant="outline"
-            className="h-11"
-            disabled={result.page === result.pages}
-            render={
-              result.page < result.pages ? (
-                <Link href={href(result.page + 1)} />
-              ) : undefined
-            }
-          >
-            Next
-          </Button>
-        </nav>
-      ) : null}
+      <OffsetPagination
+        page={result.page}
+        pageSize={25}
+        total={result.total}
+        shown={result.rows.length}
+        href={href}
+      />
     </div>
   );
 }

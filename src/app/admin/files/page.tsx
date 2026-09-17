@@ -1,3 +1,6 @@
+import { OffsetPagination } from "@/components/shared/offset-pagination";
+import { parsePage } from "@/lib/domain/pagination";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import Link from "next/link";
 import {
   and,
@@ -44,7 +47,7 @@ export default async function FilesPage({
   const query = await searchParams;
   const { profile, membership } = await requireStaff();
   if (!hasPermission(membership, "files.view")) notFound();
-  const page = Math.max(1, Number.parseInt(query.page ?? "1", 10) || 1);
+  const page = parsePage(query.page);
   const requestedSize = Number.parseInt(query.pageSize ?? "25", 10);
   const pageSize = pageSizes.includes(requestedSize as 25 | 50 | 100)
     ? requestedSize
@@ -135,11 +138,12 @@ export default async function FilesPage({
   };
   return (
     <>
-      <h1 className="page-heading">File administration</h1>
-      <p className="mt-2 text-graphite">
-        Authorised validation, evidence history and retention controls. Raw R2
-        credentials and permanent private URLs are never exposed.
-      </p>
+      <AdminPageHeader
+        title={<>File administration</>}
+        description={
+          <>Review uploaded documents and their validation status.</>
+        }
+      />
       <form className="surface mt-6 grid gap-3 rounded-lg p-4 lg:grid-cols-[minmax(0,1fr)_180px_220px_120px_auto]">
         <label className="relative">
           <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" />
@@ -196,8 +200,16 @@ export default async function FilesPage({
         ) : null}
       </div>
       <div className="data-table-scroll mt-5 overflow-x-auto rounded-lg border bg-white">
-        <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+        <table
+          className={`w-full text-left text-sm ${rows.length ? "min-w-[1120px]" : ""}`}
+        >
+          <thead
+            className={
+              rows.length
+                ? "sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground"
+                : "hidden"
+            }
+          >
             <tr>
               <th className="px-4 py-3">File</th>
               <th className="px-4 py-3">Application</th>
@@ -342,32 +354,13 @@ export default async function FilesPage({
           </tbody>
         </table>
       </div>
-      <nav
-        className="mt-5 flex flex-wrap items-center justify-between gap-3"
-        aria-label="File pagination"
-      >
-        <Button
-          variant="outline"
-          disabled={page === 1}
-          render={page > 1 ? <Link href={pageHref(page - 1)} /> : undefined}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          Page {page} of {Math.max(1, Math.ceil(total.value / pageSize))}
-        </span>
-        <Button
-          variant="outline"
-          disabled={page * pageSize >= total.value}
-          render={
-            page * pageSize < total.value ? (
-              <Link href={pageHref(page + 1)} />
-            ) : undefined
-          }
-        >
-          Next
-        </Button>
-      </nav>
+      <OffsetPagination
+        page={page}
+        pageSize={pageSize}
+        total={total.value}
+        shown={rows.length}
+        href={pageHref}
+      />
     </>
   );
 }

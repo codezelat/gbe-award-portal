@@ -1,4 +1,7 @@
-import { and, asc, eq, ilike, or } from "drizzle-orm";
+import { parsePage } from "@/lib/domain/pagination";
+import { OffsetPagination } from "@/components/shared/offset-pagination";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { and, asc, count, eq, ilike, or } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { profiles, staffMemberships, user } from "@/lib/db/schema";
@@ -19,9 +22,24 @@ export default async function StaffPage({
   searchParams: Promise<{ search?: string; page?: string }>;
 }) {
   const { search, page: pageParam } = await searchParams;
-  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const page = parsePage(pageParam);
   const { membership: currentMembership } = await requireStaff();
   if (!hasPermission(currentMembership, "staff.manage")) notFound();
+  const where = and(
+    eq(profiles.accountKind, "staff"),
+    search
+      ? or(
+          ilike(profiles.displayName, `%${search}%`),
+          ilike(user.email, `%${search}%`),
+        )
+      : undefined,
+  );
+  const [total] = await getDb()
+    .select({ value: count() })
+    .from(staffMemberships)
+    .innerJoin(profiles, eq(staffMemberships.profileId, profiles.id))
+    .innerJoin(user, eq(profiles.authUserId, user.id))
+    .where(where);
   const rows = await getDb()
     .select({
       profile: profiles,
@@ -32,28 +50,16 @@ export default async function StaffPage({
     .from(staffMemberships)
     .innerJoin(profiles, eq(staffMemberships.profileId, profiles.id))
     .innerJoin(user, eq(profiles.authUserId, user.id))
-    .where(
-      search
-        ? and(
-            eq(profiles.accountKind, "staff"),
-            or(
-              ilike(profiles.displayName, `%${search}%`),
-              ilike(user.email, `%${search}%`),
-            ),
-          )
-        : eq(profiles.accountKind, "staff"),
-    )
-    .orderBy(asc(profiles.displayName))
+    .where(where)
+    .orderBy(asc(profiles.displayName), asc(profiles.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
-  const suffix = search ? `&search=${encodeURIComponent(search)}` : "";
   return (
     <>
-      <h1 className="page-heading">Staff</h1>
-      <p className="mt-2 text-graphite">
-        Staff run day-to-day nomination operations. Super admins manage people
-        and system settings. MFA is mandatory for everyone here.
-      </p>
+      <AdminPageHeader
+        title={<>Staff</>}
+        description={<>Manage staff access and invitations. MFA is required.</>}
+      />
       <form className="mt-6 flex max-w-xl flex-col gap-3 sm:flex-row">
         <Input
           name="search"
@@ -61,7 +67,7 @@ export default async function StaffPage({
           placeholder="Search staff name or email"
           className="h-11 flex-1 bg-white"
         />
-        <Button>Search</Button>
+        <Button className="h-11">Search</Button>
       </form>
       <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex flex-col gap-3">
@@ -104,34 +110,15 @@ export default async function StaffPage({
               </Button>
             </form>
           ))}
-          <nav
-            className="mt-2 flex flex-wrap items-center justify-between gap-3"
-            aria-label="Pagination"
-          >
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              render={
-                page > 1 ? (
-                  <a href={`/admin/staff?page=${page - 1}${suffix}`} />
-                ) : undefined
-              }
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">Page {page}</span>
-            <Button
-              variant="outline"
-              disabled={rows.length < pageSize}
-              render={
-                rows.length === pageSize ? (
-                  <a href={`/admin/staff?page=${page + 1}${suffix}`} />
-                ) : undefined
-              }
-            >
-              Next
-            </Button>
-          </nav>
+          <OffsetPagination
+            page={page}
+            pageSize={pageSize}
+            total={total.value}
+            shown={rows.length}
+            href={(next) =>
+              `/admin/staff?page=${next}${search ? `&search=${encodeURIComponent(search)}` : ""}`
+            }
+          />
         </div>
         <section className="glass-feature h-fit rounded-lg p-5">
           <h2 className="text-lg font-semibold">Invite staff member</h2>

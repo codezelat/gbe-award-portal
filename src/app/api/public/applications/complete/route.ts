@@ -1,3 +1,4 @@
+import { queueNominationReceived } from "@/server/services/nomination-notifications";
 import { createHash, randomInt } from "node:crypto";
 import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { fileTypeFromBuffer } from "file-type";
@@ -11,7 +12,6 @@ import {
   auditLogs,
   awardCycles,
   cycleSequences,
-  emailOutbox,
   files,
   payments,
   uploadSessions,
@@ -402,32 +402,8 @@ export async function POST(request: Request) {
         metadataRedacted: { fileCount: readyFiles.length },
         requestId,
       });
-      await tx.insert(emailOutbox).values({
-        templateKey: "nomination_received",
-        recipientEmail: row.application.emailNormalised,
-        applicationId: row.application.id,
-        payload: {
-          reference,
-          paymentReference,
-          nomineeName: row.application.nomineeName,
-        },
-        idempotencyKey: `nomination_received:${row.application.id}:1`,
-      });
-      await tx.insert(emailOutbox).values({
-        templateKey: "admin_nomination_received",
-        recipientEmail: env.SUPPORT_EMAIL,
-        applicationId: row.application.id,
-        payload: {
-          title: "New GBE Awards nomination",
-          reference,
-          nomineeName: row.application.nomineeName,
-          categoryName: row.application.categoryNameSnapshot,
-          awardNomination: row.application.awardNomination,
-          submittedAt: submittedAt.toISOString(),
-          url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin/applications/${row.application.id}`,
-        },
-        idempotencyKey: `admin_nomination_received:${row.application.id}:1`,
-      });
+      if (row.payment.method !== "card")
+        await queueNominationReceived(tx, row.application.id);
       return reference;
     });
     if (row.payment.method === "card")

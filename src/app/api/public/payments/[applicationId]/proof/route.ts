@@ -1,3 +1,5 @@
+import { queueNominationReceived } from "@/server/services/nomination-notifications";
+import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 import {
   GetObjectCommand,
   HeadObjectCommand,
@@ -218,18 +220,18 @@ export async function POST(
           lastActivityAt: now,
         })
         .where(eq(applications.id, applicationId));
-      await tx
-        .insert(auditLogs)
-        .values({
-          actorType: "public",
-          action: "bank transfer proof submitted",
-          entityType: "payment",
-          entityId: payment.id,
-          applicationId,
-          metadataRedacted: { fileId: file.id },
-          requestId: crypto.randomUUID(),
-        });
+      await tx.insert(auditLogs).values({
+        actorType: "public",
+        action: "bank transfer proof submitted",
+        entityType: "payment",
+        entityId: payment.id,
+        applicationId,
+        metadataRedacted: { fileId: file.id },
+        requestId: crypto.randomUUID(),
+      });
+      await queueNominationReceived(tx, applicationId);
     });
+    scheduleEmailOutboxProcessing();
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(

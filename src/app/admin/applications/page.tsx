@@ -1,4 +1,7 @@
+import { administrativeSubmissions } from "@/server/dal/application-visibility";
+import { TablePagination } from "@/components/shared/table-pagination";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   and,
@@ -14,7 +17,6 @@ import {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
   type SQL,
@@ -72,9 +74,15 @@ export default async function ApplicationsPage({
   const cursorHistory =
     params.cursors
       ?.split(",")
-      .filter((value) => value.length < 500)
-      .slice(0, 50) ?? [];
+      .filter((value) => value.length < 500 && decodeCursor(value)) ?? [];
   const currentCursor = cursorHistory.at(-1);
+  const cursorHref = (history: string[]) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params))
+      if (value && key !== "cursors") query.set(key, value);
+    if (history.length) query.set("cursors", history.join(","));
+    return `/admin/applications?${query}`;
+  };
   const page = cursorHistory.length + 1;
   const pageSize = [25, 50, 100].includes(Number(params.pageSize))
     ? Number(params.pageSize)
@@ -89,6 +97,15 @@ export default async function ApplicationsPage({
     ? params.sort!
     : "submitted";
   const sortDirection = params.direction === "asc" ? "asc" : "desc";
+  if (
+    params.cursors &&
+    (cursorHistory.length !== params.cursors.split(",").length ||
+      (["submitted", "activity"].includes(sort) &&
+        cursorHistory.some((value) =>
+          Number.isNaN(new Date(decodeCursor(value)!.key).valueOf()),
+        )))
+  )
+    redirect(cursorHref([]));
   const sortColumn = {
     submitted: applications.submittedAt,
     activity: applications.lastActivityAt,
@@ -96,10 +113,7 @@ export default async function ApplicationsPage({
     status: applications.workflowStatus,
     category: applications.categoryNameSnapshot,
   }[sort]!;
-  const filters: SQL[] = [
-    ne(applications.workflowStatus, "uploading"),
-    isNotNull(applications.submittedAt),
-  ];
+  const filters: SQL[] = [administrativeSubmissions()];
   let cursorApplied = false;
   if (params.deleted === "only")
     filters.push(isNotNull(applications.deletedAt));
@@ -242,6 +256,7 @@ export default async function ApplicationsPage({
   ]);
   const hasMore = result.length > pageSize;
   const rows = result.slice(0, pageSize);
+  if (!rows.length && cursorHistory.length) redirect(cursorHref([]));
   const last = rows.at(-1);
   const nextCursor =
     hasMore && last
@@ -540,36 +555,23 @@ export default async function ApplicationsPage({
           reviewers={reviewers}
           exportBase={`/api/admin/exports/applications?${exportQuery}`}
         />
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
-          <span>
-            Page {page} · {total.value} matching applications
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!cursorHistory.length}
-              render={
-                <Link
-                  href={`?${new URLSearchParams({ ...params, cursors: cursorHistory.slice(0, -1).join(",") } as Record<string, string>)}`}
-                />
-              }
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!nextCursor}
-              render={
-                <Link
-                  href={`?${new URLSearchParams({ ...params, cursors: [...cursorHistory, nextCursor ?? ""].filter(Boolean).join(",") } as Record<string, string>)}`}
-                />
-              }
-            >
-              Next
-            </Button>
-          </div>
+        <div className="border-t px-4 pb-4">
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={total.value}
+            shown={rows.length}
+            previousHref={
+              cursorHistory.length
+                ? cursorHref(cursorHistory.slice(0, -1))
+                : undefined
+            }
+            nextHref={
+              nextCursor
+                ? cursorHref([...cursorHistory, nextCursor])
+                : undefined
+            }
+          />
         </div>
       </div>
     </>

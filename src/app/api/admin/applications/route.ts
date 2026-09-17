@@ -1,3 +1,4 @@
+import { administrativeSubmissions } from "@/server/dal/application-visibility";
 import {
   and,
   asc,
@@ -12,7 +13,6 @@ import {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
   type SQL,
@@ -94,10 +94,7 @@ export async function GET(request: Request) {
       status: applications.workflowStatus,
       category: applications.categoryNameSnapshot,
     }[input.sort];
-    const filters: SQL[] = [
-      ne(applications.workflowStatus, "uploading"),
-      isNotNull(applications.submittedAt),
-    ];
+    const filters: SQL[] = [administrativeSubmissions()];
     if (input.deleted === "only")
       filters.push(isNotNull(applications.deletedAt));
     else if (input.deleted !== "include")

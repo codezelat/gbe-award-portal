@@ -78,6 +78,7 @@ bun run db:bootstrap-admin
 - Award-cycle data, fee settings, legal text, categories, programme copy and opening status are business-controlled content. Do not silently alter them during technical work. Ask for explicit direction when a change goes beyond the requested scope.
 - References must remain opaque, non-sequential and unique. Do not replace their random six-digit suffix with a count or predictable ID.
 - Normal nomination queries must exclude soft-deleted records. Reuse `src/server/dal/application-visibility.ts`: `nonDeletedApplications()` for ownership/linked views and `submittedApplications()` for submitted dashboards and summaries. Preserve explicit Deleted exports and audit history as separate scopes. Deletion/restoration must invalidate both admin and portal layouts so counts and linked views refresh together.
+- A checkout recovery record is not a received nomination. `completedSubmission()` excludes unpaid card checkouts (including a switch to bank transfer before proof), while preserving settled and refunded history. `administrativeSubmissions()` also retains deleted checkout records for explicit archive/recovery views; apply the selected deletion filter separately. These pending records appear in In-progress as Awaiting payment. Do not erase payment attempts, references or evidence to hide them. Queue nomination notifications through `queueNominationReceived` on verified card settlement or accepted bank proof, using the existing unique outbox keys. Pending checkouts cannot use nomination workflow transitions.
 
 ### Files and exports
 
@@ -123,6 +124,7 @@ bun run db:bootstrap-admin
 ## 6. UI, accessibility and responsive behavior
 
 - Reuse existing shared components and design tokens. Avoid new one-off design systems or heavy dependencies for a local change.
+- Admin list pagination uses `TablePagination` or the server-side `OffsetPagination` wrapper. Show the visible record range, matching total and current/total pages; preserve filters, handle stale pages and prevent duplicate pending navigation. Keep cursor pagination for Applications. Use `AdminPageHeader` for standard admin section headings and hide desktop-only table structure for empty results.
 - Keep the interface clear, minimal and touch-friendly. Test compact navigation, forms, tables, bulk actions and pagination on phone and tablet widths; desktop layouts must not force horizontal page overflow.
 - Match each route’s loading boundary to its actual layout. Do not replace tailored skeletons with a generic unrelated placeholder.
 - Preserve semantic labels, keyboard flow, visible focus, error summaries, skip link, sufficient touch targets and `aria-*` relationships. For public-flow changes, use the existing Axe/Playwright coverage as a baseline.

@@ -9,11 +9,14 @@ import {
 } from "vitest";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
 import { createHash } from "node:crypto";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/server/jobs/schedule-email-delivery", () => ({
+  scheduleEmailOutboxProcessing: vi.fn(),
+}));
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: async () => "https://storage.example.test/test-upload",
 }));
@@ -68,6 +71,11 @@ let createCount = 0;
 let failCreate = false;
 const { startCardCheckout, reconcileCardAttempt } =
   await import("../../src/server/services/card-payments");
+const { submittedApplications, pendingCardPayment, administrativeSubmissions } =
+  await import("../../src/server/dal/application-visibility");
+const { getInProgress } = await import("../../src/server/dal/in-progress");
+const { getDashboardApplications } =
+  await import("../../src/server/dal/dashboard-applications");
 const { POST: paymentAction } =
   await import("../../src/app/api/public/payments/[applicationId]/route");
 const { POST: webhook } =
@@ -393,6 +401,18 @@ describe("durable Genie reconciliation", () => {
   });
   it("settles once, keeps one receipt, and ignores a delayed pending response", async () => {
     const { app, payment } = await fixture();
+    const [detail] = await db
+      .select({ pending: pendingCardPayment() })
+      .from(schema.applications)
+      .where(eq(schema.applications.id, app.id));
+    expect(detail.pending).toBe(true);
+    expect(
+      (await getDashboardApplications(eq(schema.applications.id, app.id)))
+        .counts.total,
+    ).toBe(0);
+    expect(
+      (await getInProgress({ cycleId })).rows.some((row) => row.id === app.id),
+    ).toBe(true);
     await startCardCheckout(app.id);
     const row = await attempt(payment.id);
     remote.get(row.transactionId!)!.state = "CONFIRMED";
@@ -428,6 +448,80 @@ describe("durable Genie reconciliation", () => {
       )[0].receiptReference,
     ).toBe(paid.receiptReference);
     expect((await attempt(payment.id)).state).toBe("CONFIRMED");
+    expect(
+      (await getDashboardApplications(eq(schema.applications.id, app.id)))
+        .counts.total,
+    ).toBe(1);
+    expect(
+      (await getInProgress({ cycleId })).rows.some((row) => row.id === app.id),
+    ).toBe(false);
+    expect(
+      await db
+        .select()
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.applicationId, app.id)),
+    ).toHaveLength(2);
+  });
+  it("keeps abandoned checkouts separate, including a switch to bank before proof", async () => {
+    const { app, payment } = await fixture();
+    const visible = () =>
+      db
+        .select({ id: schema.applications.id })
+        .from(schema.applications)
+        .where(submittedApplications(eq(schema.applications.id, app.id)));
+    expect(await visible()).toHaveLength(0);
+    await db
+      .update(schema.payments)
+      .set({ status: "under_review" })
+      .where(eq(schema.payments.id, payment.id));
+    expect(await visible()).toHaveLength(0);
+    await db
+      .update(schema.payments)
+      .set({ method: "bank_transfer" })
+      .where(eq(schema.payments.id, payment.id));
+    expect(await visible()).toHaveLength(0);
+    expect(
+      (await getInProgress({ cycleId })).rows.some((row) => row.id === app.id),
+    ).toBe(true);
+    await db
+      .update(schema.payments)
+      .set({ status: "proof_submitted" })
+      .where(eq(schema.payments.id, payment.id));
+    expect(await visible()).toHaveLength(1);
+    await db
+      .update(schema.payments)
+      .set({ method: "card", status: "refunded", verifiedAt: new Date() })
+      .where(eq(schema.payments.id, payment.id));
+    expect(await visible()).toHaveLength(1);
+    await db
+      .update(schema.applications)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.applications.id, app.id));
+    expect(await visible()).toHaveLength(0);
+    expect(
+      (await getInProgress({ cycleId })).rows.some((row) => row.id === app.id),
+    ).toBe(false);
+  });
+  it("retains a deleted unpaid checkout in the explicit archive for recovery", async () => {
+    const { app } = await fixture();
+    await db
+      .update(schema.applications)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.applications.id, app.id));
+    expect(
+      await db
+        .select()
+        .from(schema.applications)
+        .where(
+          and(administrativeSubmissions(), eq(schema.applications.id, app.id)),
+        ),
+    ).toHaveLength(1);
+    expect(
+      await db
+        .select()
+        .from(schema.applications)
+        .where(submittedApplications(eq(schema.applications.id, app.id))),
+    ).toHaveLength(0);
   });
   it("blocks mismatched amounts and does not verify an authorisation", async () => {
     const { app, payment } = await fixture();
