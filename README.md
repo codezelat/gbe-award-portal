@@ -68,6 +68,14 @@ Supporting documents and payment proof are independently limited to **5 MB per f
 
 Normal dashboards, review queues, applicant views and nomination exports exclude soft-deleted nominations. Submitted totals and summaries also exclude unfinished upload shells and unpaid card checkouts. The explicit **Deleted** application view and its exports retain recovery access; audit and delivery history remain available. Deleting or restoring a nomination refreshes the linked admin and applicant workspaces.
 
+### Bulk application actions
+
+Select nominations in **Applications**, then choose **Update status**, **Assign** or **Message**. Each action opens a focused confirmation dialog; message templates show the exact email copy before sending. Selection applies only to the current page (up to 100 records) and resets when filters or pagination change. Selected exports remain available separately.
+
+Status updates follow the same permissions and workflow rules as individual nominations. Payment verification is required before confirming an entry; rejection and archive require an internal reason. Outcome emails respect each cycle's results release date. Corrections stay on the individual nomination because they need specific editable fields or document requests.
+
+The server locks and validates the complete selection before making changes. Deleted, unpaid, inaccessible or stale records block the batch rather than silently producing partial updates. A stable request ID and durable audit record make retries safe without duplicate status history or messages. Approval prepares portal access after the status transaction; any account/invitation failure is shown separately with links to the affected nominations. Multiple nominations for one pending applicant share the existing valid invitation. No new environment variables, database migration or scheduled job is needed.
+
 ### In-progress nominations
 
 **In-progress**, immediately above **Applications**, shows saved but unsubmitted forms to staff and super admins. Continue saves the completed step and uploads its selected attachments directly to private R2 storage. No email, account, official reference or receipt is created by saving a draft. Search by name, email, category or nomination; open a record for its full saved details and protected attachment previews.

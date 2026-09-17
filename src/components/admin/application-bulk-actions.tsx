@@ -222,8 +222,8 @@ export function ApplicationBulkActions({
             <>
               <p role="status">{result.message}</p>
               <p className="text-sm text-muted-foreground">
-                Portal access needs attention for these nominations. Open each
-                and retry the invitation.
+              Portal access needs attention for these nominations. Open each
+              to review the applicant account or invitation.
               </p>
               <ul className="max-h-48 space-y-2 overflow-y-auto">
                 {result.warnings.map((row) => (

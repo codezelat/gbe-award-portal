@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
+import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { activatableInvitationStatuses } from "@/lib/domain/invitations";
 import {
   applications,
@@ -109,7 +110,7 @@ export async function acceptInvitationAction(formData: FormData) {
           lastActivityAt: now,
         })
         .where(
-          and(
+          nonDeletedApplications(
             eq(applications.ownerProfileId, profile.id),
             inArray(applications.accountAccessStatus, [
               "invited",

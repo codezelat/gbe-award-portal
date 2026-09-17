@@ -34,6 +34,15 @@ export async function createOrRefreshApplicantInvitation(
   // password-setup links. Accepted/revoked/expired invites never qualify.
   async function linkPendingInvitation(profileId: string) {
     return db.transaction(async (tx) => {
+      if (["suspended", "revoked"].includes(application.accountAccessStatus))
+        return false;
+      const [accountOwner] = await tx
+        .select({ banned: user.banned })
+        .from(user)
+        .innerJoin(profiles, eq(profiles.authUserId, user.id))
+        .where(eq(profiles.id, profileId))
+        .limit(1);
+      if (!accountOwner || accountOwner.banned) return false;
       const [invite] = await tx
         .select({ id: invitations.id })
         .from(invitations)
@@ -65,19 +74,17 @@ export async function createOrRefreshApplicantInvitation(
         .returning({ id: applications.id });
       if (!updated.length)
         throw new Error("The nomination changed. Refresh and try again.");
-      await tx
-        .insert(auditLogs)
-        .values({
-          actorProfileId,
-          actorType: "staff",
-          action: "approved application linked to pending invitation",
-          entityType: "application",
-          entityId: applicationId,
-          applicationId,
-          afterRedacted: { ownerProfileId: profileId },
-          metadataRedacted: { invitationId: invite.id },
-          requestId: crypto.randomUUID(),
-        });
+      await tx.insert(auditLogs).values({
+        actorProfileId,
+        actorType: "staff",
+        action: "approved application linked to pending invitation",
+        entityType: "application",
+        entityId: applicationId,
+        applicationId,
+        afterRedacted: { ownerProfileId: profileId },
+        metadataRedacted: { invitationId: invite.id },
+        requestId: crypto.randomUUID(),
+      });
       return true;
     });
   }

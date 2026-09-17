@@ -247,7 +247,7 @@ export function ApplicationsTable({
                   onClick={(event) => {
                     if (
                       !(event.target as HTMLElement).closest(
-                        "a,button,input,select,textarea,label",
+                        'a,button,input,select,textarea,label,[role="checkbox"]',
                       )
                     )
                       router.push(`/admin/applications/${row.original.id}`);
@@ -262,7 +262,14 @@ export function ApplicationsTable({
                   data-state={row.getIsSelected() ? "selected" : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      onClick={
+                        cell.column.id === "select"
+                          ? (event) => event.stopPropagation()
+                          : undefined
+                      }
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

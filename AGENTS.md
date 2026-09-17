@@ -73,6 +73,8 @@ bun run db:bootstrap-admin
 
 ### Domain rules
 
+- Applications bulk actions use `src/server/actions/application-bulk-update.ts` and the shared options in `src/lib/domain/bulk-applications.ts`. Keep the 100-record bound, server-side target permissions, submitted/assignment scope, timestamp checks, stable lock order and atomic validation. The client request UUID is the batch audit primary key; retries must compare actor and payload fingerprint before returning an already-applied result. Preserve idempotent message outbox keys. Approval invitation failures are reported separately from committed status changes; never tell staff an approved batch was rolled back. Pending applicants with several nominations reuse one valid invitation without reactivating suspended/banned accounts. Corrections and applicant resubmission are not generic bulk transitions.
+
 - Preserve `src/lib/domain/application-status.ts` and the transition service as the source of truth for nomination status changes. Do not update workflow state from arbitrary UI code.
 - Internal access has two levels: `staff` for the complete nomination workflow and `super_admin` for people/system governance. Permission checks use `src/lib/domain/permissions.ts` and `src/config/permissions.ts`; do not rely on hidden navigation or client rendering as access control.
 - Award-cycle data, fee settings, legal text, categories, programme copy and opening status are business-controlled content. Do not silently alter them during technical work. Ask for explicit direction when a change goes beyond the requested scope.

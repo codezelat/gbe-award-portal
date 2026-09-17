@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApplicationBulkActions } from "@/components/admin/application-bulk-actions";
+import { ApplicationsTable } from "@/components/admin/applications-table";
 import {
   bulkStatusIssue,
   bulkStatusOptions,
@@ -17,13 +18,14 @@ import {
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   refresh: vi.fn(),
+  push: vi.fn(),
   toast: vi.fn(),
 }));
 vi.mock("@/server/actions/application-bulk-update", () => ({
   updateSelectedApplications: mocks.update,
 }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: mocks.refresh }),
+  useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }),
 }));
 vi.mock("sonner", () => ({ toast: { success: mocks.toast } }));
 const row: BulkSelection = {
@@ -85,6 +87,36 @@ function setup(rows = [row]) {
   return clear;
 }
 describe("bulk action dialogs", () => {
+  it("selects a row without navigating, including clicks in the selection cell", () => {
+    const { container } = render(
+      <ApplicationsTable
+        rows={[
+          {
+            ...row,
+            designation: null,
+            categoryNameSnapshot: "Business",
+            awardNomination: "Test nomination",
+            emailDisplay: "test@example.test",
+            phoneDisplay: "+94 77 123 4567",
+            submittedLabel: "18 Sep 2026",
+            reviewerName: "Staff",
+            updatedLabel: "18 Sep 2026",
+          },
+        ]}
+        reviewers={[]}
+        permissions={permissions}
+        exportBase="/export?"
+      />,
+    );
+    const checkbox = container.querySelector('tbody [role="checkbox"]')!;
+    fireEvent.click(checkbox);
+    expect(checkbox).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    fireEvent.click(checkbox.closest("td")!);
+    expect(mocks.push).not.toHaveBeenCalled();
+    fireEvent.click(container.querySelector("tbody tr")!);
+    expect(mocks.push).toHaveBeenCalledWith(`/admin/applications/${row.id}`);
+  });
   it("shows status updates directly and blocks an incompatible mixed selection", async () => {
     setup([
       row,
@@ -132,7 +164,9 @@ describe("bulk action dialogs", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Confirm update" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("button", { name: /Saving/ })).toBeDisabled();
+    expect(
+      await screen.findByRole("button", { name: /Saving/ }),
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     const first = mocks.update.mock.calls[0][0];
     await act(async () => resolve({ ok: false, message: "Please retry" }));

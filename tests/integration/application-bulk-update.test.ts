@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import postgres from "postgres";
+import { createHash } from "node:crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
 import * as schema from "../../src/lib/db/schema";
@@ -8,6 +9,13 @@ import { hasPermission } from "../../src/lib/domain/permissions";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ getDb: () => db }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+vi.mock("@/lib/auth", () => ({ getAuth: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  redirect: () => {
+    throw new Error("TEST_REDIRECT");
+  },
+}));
 vi.mock("@/server/dal/auth", () => ({
   requireStaff: async () => ({ profile: { id: staffId }, membership }),
   hasPermission,
@@ -27,6 +35,11 @@ const { updateSelectedApplications } =
   await import("../../src/server/actions/application-bulk-update");
 const { createOrRefreshApplicantInvitation } =
   await import("../../src/server/services/invitation-service");
+const realInvitationService = await vi.importActual<
+  typeof import("../../src/server/services/invitation-service")
+>("../../src/server/services/invitation-service");
+const { acceptInvitationAction } =
+  await import("../../src/server/actions/invitation-actions");
 let staffId: string, cycleId: string, categoryId: string;
 let membership: { role: string; permissions: Record<string, boolean> };
 beforeEach(async () => {
@@ -159,6 +172,160 @@ const mail = (rows: Row[]) =>
     );
 
 describe("atomic bulk nomination updates", () => {
+  it("shares a valid pending invitation across approved nominations and activates both on acceptance", async () => {
+    const authId = crypto.randomUUID();
+    await db.insert(schema.user).values({
+      id: authId,
+      name: "Pending applicant",
+      email: "pending-bulk@example.test",
+    });
+    await db.insert(schema.account).values({
+      id: crypto.randomUUID(),
+      accountId: authId,
+      providerId: "credential",
+      userId: authId,
+      password: "disposable-test-value",
+    });
+    const [profile] = await db
+      .insert(schema.profiles)
+      .values({
+        authUserId: authId,
+        accountKind: "applicant",
+        displayName: "Pending applicant",
+        isActive: false,
+      })
+      .returning();
+    const first = await fixture({
+      workflowStatus: "approved",
+      emailNormalised: "pending-bulk@example.test",
+      ownerProfileId: profile.id,
+      accountAccessStatus: "invited",
+    });
+    const second = await fixture({
+      workflowStatus: "approved",
+      emailNormalised: "pending-bulk@example.test",
+    });
+    const removed = await fixture({
+      workflowStatus: "approved",
+      ownerProfileId: profile.id,
+      accountAccessStatus: "invited",
+      deletedAt: new Date(),
+    });
+    const token = "disposable-bulk-invitation-token";
+    const [invite] = await db
+      .insert(schema.invitations)
+      .values({
+        emailNormalised: "pending-bulk@example.test",
+        applicationId: first.id,
+        profileId: profile.id,
+        type: "applicant",
+        status: "pending",
+        tokenHash: createHash("sha256").update(token).digest("hex"),
+        expiresAt: new Date(Date.now() + 3600000),
+        createdBy: staffId,
+      })
+      .returning();
+    expect(
+      await realInvitationService.createOrRefreshApplicantInvitation(
+        second.id,
+        staffId,
+      ),
+    ).toEqual({ linked: true });
+    expect((await stored([second]))[0]).toMatchObject({
+      ownerProfileId: profile.id,
+      accountAccessStatus: "invited",
+    });
+    expect(await mail([first, second])).toHaveLength(0);
+    const form = new FormData();
+    form.set("token", `${invite.id}.${token}`);
+    form.set("password", "Local-Only-Bulk-Test-2026!");
+    form.set("confirmPassword", "Local-Only-Bulk-Test-2026!");
+    await expect(acceptInvitationAction(form)).rejects.toThrow("TEST_REDIRECT");
+    expect(
+      (await stored([first, second])).every(
+        (row) => row.accountAccessStatus === "active",
+      ),
+    ).toBe(true);
+    expect((await stored([removed]))[0].accountAccessStatus).toBe("invited");
+  });
+  it("never reopens an expired, revoked or accepted invitation for an inactive account", async () => {
+    const authId = crypto.randomUUID();
+    const email = `${authId}@example.test`;
+    await db
+      .insert(schema.user)
+      .values({ id: authId, name: "Inactive applicant", email });
+    const [profile] = await db
+      .insert(schema.profiles)
+      .values({
+        authUserId: authId,
+        accountKind: "applicant",
+        displayName: "Inactive applicant",
+        isActive: false,
+      })
+      .returning();
+    const row = await fixture({
+      workflowStatus: "approved",
+      emailNormalised: email,
+    });
+    for (const status of ["revoked", "accepted", "expired"] as const)
+      await db.insert(schema.invitations).values({
+        emailNormalised: email,
+        applicationId: row.id,
+        profileId: profile.id,
+        type: "applicant",
+        status,
+        expiresAt: new Date(Date.now() + 3600000),
+        createdBy: staffId,
+      });
+    await db.insert(schema.invitations).values({
+      emailNormalised: email,
+      applicationId: row.id,
+      profileId: profile.id,
+      type: "applicant",
+      status: "pending",
+      expiresAt: new Date(Date.now() - 1000),
+      createdBy: staffId,
+    });
+    await expect(
+      realInvitationService.createOrRefreshApplicantInvitation(row.id, staffId),
+    ).rejects.toThrow(/suspended/);
+    expect((await stored([row]))[0].ownerProfileId).toBeNull();
+  });
+  it("does not link a valid pending invite to a banned applicant", async () => {
+    const authId = crypto.randomUUID();
+    const email = `${authId}@example.test`;
+    await db
+      .insert(schema.user)
+      .values({ id: authId, name: "Suspended applicant", email, banned: true });
+    const [profile] = await db
+      .insert(schema.profiles)
+      .values({
+        authUserId: authId,
+        accountKind: "applicant",
+        displayName: "Suspended applicant",
+        isActive: false,
+      })
+      .returning();
+    const row = await fixture({
+      workflowStatus: "approved",
+      emailNormalised: email,
+    });
+    await db
+      .insert(schema.invitations)
+      .values({
+        emailNormalised: email,
+        applicationId: row.id,
+        profileId: profile.id,
+        type: "applicant",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 3600000),
+        createdBy: staffId,
+      });
+    await expect(
+      realInvitationService.createOrRefreshApplicantInvitation(row.id, staffId),
+    ).rejects.toThrow(/suspended/);
+    expect((await stored([row]))[0].ownerProfileId).toBeNull();
+  });
   it("updates mixed eligible statuses with history, outbox and a durable batch audit", async () => {
     const rows = [
       await fixture(),
