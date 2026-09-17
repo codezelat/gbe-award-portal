@@ -247,16 +247,15 @@ export default async function ApplicationsPage({
       .where(eq(awardCategories.isActive, true))
       .orderBy(asc(awardCategories.displayOrder)),
     db
-      .select({ id: profiles.id, name: profiles.displayName })
+      .select({
+        id: profiles.id,
+        name: profiles.displayName,
+        active: profiles.isActive,
+        suspendedAt: staffMemberships.suspendedAt,
+      })
       .from(profiles)
       .innerJoin(staffMemberships, eq(staffMemberships.profileId, profiles.id))
-      .where(
-        and(
-          eq(profiles.accountKind, "staff"),
-          eq(profiles.isActive, true),
-          isNull(staffMemberships.suspendedAt),
-        ),
-      )
+      .where(eq(profiles.accountKind, "staff"))
       .orderBy(asc(profiles.displayName)),
     db
       .select({ id: awardCycles.id, name: awardCycles.name })
@@ -576,7 +575,9 @@ export default async function ApplicationsPage({
               "dd MMM yyyy, HH:mm",
             ),
           }))}
-          reviewers={reviewers}
+          reviewers={reviewers
+            .filter((reviewer) => reviewer.active && !reviewer.suspendedAt)
+            .map(({ id, name }) => ({ id, name }))}
           exportBase={`/api/admin/exports/applications?${exportQuery}`}
         />
         <div className="border-t px-4 pb-4">

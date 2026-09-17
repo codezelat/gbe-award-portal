@@ -108,7 +108,15 @@ export async function acceptInvitationAction(formData: FormData) {
           updatedAt: now,
           lastActivityAt: now,
         })
-        .where(eq(applications.id, invite.applicationId));
+        .where(
+          and(
+            eq(applications.ownerProfileId, profile.id),
+            inArray(applications.accountAccessStatus, [
+              "invited",
+              "pending_invite",
+            ]),
+          ),
+        );
     await tx.insert(auditLogs).values({
       actorProfileId: profile.id,
       actorType: profile.accountKind,

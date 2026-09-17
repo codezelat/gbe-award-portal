@@ -238,15 +238,13 @@ describe("atomic bulk nomination updates", () => {
   });
   it("rejects unpaid card recovery records", async () => {
     const row = await fixture();
-    await db
-      .insert(schema.payments)
-      .values({
-        applicationId: row.id,
-        method: "card",
-        status: "awaiting_payment",
-        expectedAmountMinor: 6500000,
-        currency: "LKR",
-      });
+    await db.insert(schema.payments).values({
+      applicationId: row.id,
+      method: "card",
+      status: "awaiting_payment",
+      expectedAmountMinor: 6500000,
+      currency: "LKR",
+    });
     expect((await updateSelectedApplications(input([row]))).ok).toBe(false);
     expect(await history([row])).toHaveLength(0);
   });

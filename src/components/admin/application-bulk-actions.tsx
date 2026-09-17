@@ -245,10 +245,10 @@ export function ApplicationBulkActions({
             </>
           ) : (
             <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submit(new FormData(event.currentTarget));
-            }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submit(new FormData(event.currentTarget));
+              }}
               className="min-w-0 space-y-4"
               aria-busy={pending}
             >
@@ -504,7 +504,9 @@ export function ApplicationBulkActions({
                   }
                   className="min-h-11"
                 >
-                  {pending && <Spinner aria-hidden="true" data-icon="inline-start" />}
+                  {pending && (
+                    <Spinner aria-hidden="true" data-icon="inline-start" />
+                  )}
                   {pending
                     ? "Saving..."
                     : dialog?.action === "status"

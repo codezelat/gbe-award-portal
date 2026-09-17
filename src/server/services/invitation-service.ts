@@ -1,7 +1,8 @@
 import "server-only";
 import { randomBytes, createHash } from "node:crypto";
 import { headers } from "next/headers";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, ne } from "drizzle-orm";
+import { activatableInvitationStatuses } from "@/lib/domain/invitations";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { nonDeletedApplications } from "@/server/dal/application-visibility";
@@ -28,12 +29,70 @@ export async function createOrRefreshApplicantInvitation(
     .limit(1);
   if (!application || application.workflowStatus !== "approved")
     throw new Error("Only an approved application can receive portal access.");
+  // Several approved nominations can share one applicant. An unaccepted invite
+  // is not a suspended account; reuse its access instead of issuing competing
+  // password-setup links. Accepted/revoked/expired invites never qualify.
+  async function linkPendingInvitation(profileId: string) {
+    return db.transaction(async (tx) => {
+      const [invite] = await tx
+        .select({ id: invitations.id })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.profileId, profileId),
+            eq(invitations.emailNormalised, application.emailNormalised),
+            eq(invitations.type, "applicant"),
+            inArray(invitations.status, activatableInvitationStatuses),
+            gt(invitations.expiresAt, new Date()),
+          ),
+        )
+        .limit(1)
+        .for("update");
+      if (!invite) return false;
+      const updated = await tx
+        .update(applications)
+        .set({
+          ownerProfileId: profileId,
+          accountAccessStatus: "invited",
+          updatedAt: new Date(),
+        })
+        .where(
+          nonDeletedApplications(
+            eq(applications.id, applicationId),
+            eq(applications.workflowStatus, "approved"),
+          ),
+        )
+        .returning({ id: applications.id });
+      if (!updated.length)
+        throw new Error("The nomination changed. Refresh and try again.");
+      await tx
+        .insert(auditLogs)
+        .values({
+          actorProfileId,
+          actorType: "staff",
+          action: "approved application linked to pending invitation",
+          entityType: "application",
+          entityId: applicationId,
+          applicationId,
+          afterRedacted: { ownerProfileId: profileId },
+          metadataRedacted: { invitationId: invite.id },
+          requestId: crypto.randomUUID(),
+        });
+      return true;
+    });
+  }
   if (application.ownerProfileId) {
     const [owner] = await db
       .select()
       .from(profiles)
       .where(eq(profiles.id, application.ownerProfileId))
       .limit(1);
+    if (
+      owner?.accountKind === "applicant" &&
+      !owner.isActive &&
+      (await linkPendingInvitation(owner.id))
+    )
+      return { linked: true };
     if (!owner || owner.accountKind !== "applicant" || !owner.isActive)
       throw new Error(
         "The linked applicant account is unavailable and must be reviewed.",
@@ -85,6 +144,11 @@ export async function createOrRefreshApplicantInvitation(
       throw new Error(
         "This email belongs to a staff account. A super administrator must resolve the identity conflict.",
       );
+    if (
+      !existingProfile.profile.isActive &&
+      (await linkPendingInvitation(existingProfile.profile.id))
+    )
+      return { linked: true };
     if (!existingProfile.profile.isActive)
       throw new Error(
         "The existing applicant account is suspended and cannot be linked until reactivated.",
