@@ -152,6 +152,13 @@ export async function POST(
         .from(payments)
         .where(eq(payments.id, payment.id))
         .for("update");
+      const [application] = await tx
+        .select({ deletedAt: applications.deletedAt })
+        .from(applications)
+        .where(eq(applications.id, applicationId))
+        .for("update");
+      if (!application || application.deletedAt)
+        throw new Error("This nomination is no longer available.");
       const [active] = await tx
         .select({ id: paymentAttempts.id })
         .from(paymentAttempts)

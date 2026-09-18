@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, getTableColumns } from "drizzle-orm";
 import { z } from "zod";
 import { formatInTimeZone } from "date-fns-tz";
 import { getDb } from "@/lib/db";
@@ -10,6 +10,10 @@ import {
   nominationDrafts,
   specialInvites,
   specialInviteBatches,
+  applicationFiles,
+  files,
+  payments,
+  paymentAttempts,
 } from "@/lib/db/schema";
 import { inviteState } from "@/lib/domain/special-invite";
 import {
@@ -23,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DeleteDraftButton } from "@/components/admin/delete-draft-button";
 import { ProtectedFilePreview } from "@/components/admin/protected-file-preview";
+import { pendingCardPayment } from "@/server/dal/application-visibility";
+import { CardPaymentCheck } from "@/components/admin/card-payment-check";
 
 export default async function DraftPage({
   params,
@@ -35,7 +41,11 @@ export default async function DraftPage({
   if (!hasPermission(membership, "applications.view_all")) notFound();
   const id = z.uuid().safeParse((await params).draftId).data;
   if (!id) notFound();
-  const source = (await searchParams).source === "upload" ? "upload" : "draft";
+  const requestedSource = (await searchParams).source;
+  const source =
+    requestedSource === "card" || requestedSource === "upload"
+      ? requestedSource
+      : "draft";
   const db = getDb();
   const [draft] =
     source === "draft"
@@ -52,14 +62,39 @@ export default async function DraftPage({
   if (draft?.submittedAt && draft.applicationId)
     redirect(`/admin/applications/${draft.applicationId}`);
   const [legacy] =
-    source === "upload"
+    source !== "draft"
       ? await db
-          .select()
+          .select({
+            ...getTableColumns(applications),
+            pending: pendingCardPayment(),
+          })
           .from(applications)
           .where(and(eq(applications.id, id), isNull(applications.deletedAt)))
       : [];
-  if (legacy?.submittedAt) redirect(`/admin/applications/${legacy.id}`);
-  if (!draft && (!legacy || legacy.workflowStatus !== "uploading")) notFound();
+  if (legacy?.submittedAt && !legacy.pending)
+    redirect(`/admin/applications/${legacy.id}`);
+  if (legacy?.submittedAt && legacy.pending && source !== "card")
+    redirect(`/admin/in-progress/${legacy.id}?source=card`);
+  if (
+    !draft &&
+    (!legacy ||
+      (source === "card"
+        ? !legacy.pending || !legacy.submittedAt
+        : legacy.workflowStatus !== "uploading"))
+  )
+    notFound();
+  const [payment] =
+    source === "card"
+      ? await db.select().from(payments).where(eq(payments.applicationId, id))
+      : [];
+  const [latestAttempt] = payment
+    ? await db
+        .select()
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.paymentId, payment.id))
+        .orderBy(desc(paymentAttempts.createdAt))
+        .limit(1)
+    : [];
   const data = draft
     ? draftDataSchema.parse(draft.payload)
     : {
@@ -70,7 +105,7 @@ export default async function DraftPage({
         businessWebsite: legacy!.businessWebsite,
         awardNomination: legacy!.awardNomination,
         categoryId: legacy!.categoryId,
-        paymentMethod: undefined,
+        paymentMethod: payment?.method ?? undefined,
       };
   const [category] = data.categoryId
     ? await db
@@ -78,7 +113,20 @@ export default async function DraftPage({
         .from(awardCategories)
         .where(eq(awardCategories.id, data.categoryId))
     : [];
-  const linked = draft ? await draftFileRows(draft.id) : [];
+  const linked = draft
+    ? await draftFileRows(draft.id)
+    : source === "card"
+      ? await db
+          .select({ file: files, link: applicationFiles })
+          .from(applicationFiles)
+          .innerJoin(files, eq(files.id, applicationFiles.fileId))
+          .where(
+            and(
+              eq(applicationFiles.applicationId, id),
+              eq(applicationFiles.isCurrent, true),
+            ),
+          )
+      : [];
   const [invite] = draft
     ? await db
         .select({
@@ -117,7 +165,9 @@ export default async function DraftPage({
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Badge variant="outline">
-              {draftStepLabels[draft?.savedStep ?? 3]} saved
+              {source === "card"
+                ? "Awaiting payment"
+                : `${draftStepLabels[draft?.savedStep ?? 3]} saved`}
             </Badge>
             <p className="text-xs text-foreground/75">
               {formatInTimeZone(
@@ -129,7 +179,7 @@ export default async function DraftPage({
           </div>
         </div>
         {hasPermission(membership, "applications.edit") &&
-        (draft || membership.role === "super_admin") ? (
+        (draft || source === "card" || membership.role === "super_admin") ? (
           <DeleteDraftButton
             id={id}
             source={source}
@@ -138,6 +188,26 @@ export default async function DraftPage({
           />
         ) : null}
       </header>
+      {source === "card" ? (
+        <section className="surface flex min-w-0 flex-col gap-3 rounded-xl p-4 sm:p-6">
+          <p className="text-sm text-muted-foreground">
+            Not submitted. Awaiting payment or a bank-transfer receipt.
+          </p>
+          {payment?.expectedAmountMinor ? (
+            <p className="text-lg font-semibold">
+              {payment.currency}{" "}
+              {(payment.expectedAmountMinor / 100).toLocaleString("en-GB")}
+            </p>
+          ) : null}
+          {latestAttempt && hasPermission(membership, "payments.verify") ? (
+            <CardPaymentCheck
+              applicationId={id}
+              attemptId={latestAttempt.id}
+              needsTransactionId={!latestAttempt.transactionId}
+            />
+          ) : null}
+        </section>
+      ) : null}
       {Object.entries(data).some(
         ([key, value]) => key !== "nomineeName" && Boolean(value),
       ) ? (

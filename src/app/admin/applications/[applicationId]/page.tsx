@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { desc, eq, getTableColumns } from "drizzle-orm";
 import { pendingCardPayment } from "@/server/dal/application-visibility";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import {
   ArrowLeft,
@@ -74,6 +74,8 @@ export default async function AdminApplicationDetail({
     application.assignedReviewerId !== staffProfile.id
   )
     notFound();
+  if (application.checkoutPending && !application.deletedAt)
+    redirect(`/admin/in-progress/${applicationId}?source=card`);
   const [
     payment,
     linkedFiles,

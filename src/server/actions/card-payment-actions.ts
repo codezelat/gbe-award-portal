@@ -48,6 +48,8 @@ export async function checkCardPaymentAction(
     revalidatePath("/admin/payments");
     revalidatePath(`/admin/applications/${input.applicationId}`);
     revalidatePath("/portal/payment");
+    revalidatePath("/admin", "layout");
+    revalidatePath("/portal", "layout");
     return { ok: true, message: "Payment status checked with Genie." };
   } catch (error) {
     return { ok: false, message: paymentErrorMessage(error) };

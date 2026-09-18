@@ -48,8 +48,8 @@ export default async function InProgressPage({
       <form className="surface mb-5 flex flex-wrap items-center gap-3 rounded-xl p-3 sm:p-4">
         <DebouncedApplicationSearch
           defaultValue={search}
-          label="Search drafts"
-          placeholder="Search name, email or nomination"
+          label="Search in-progress nominations"
+          placeholder="Search name, phone, email or nomination"
         />
         <Button variant="outline" className="h-11" type="submit">
           Search
@@ -81,6 +81,7 @@ export default async function InProgressPage({
         </Empty>
       ) : (
         <InProgressTable
+          key={`${cycleId ?? "all"}:${search ?? ""}:${result.page}`}
           rows={result.rows.map((row) => ({
             ...row,
             stepLabel:
@@ -95,6 +96,7 @@ export default async function InProgressPage({
             canDelete:
               hasPermission(membership, "applications.edit") &&
               (row.source === "draft" ||
+                row.source === "card" ||
                 (row.source === "upload" && membership.role === "super_admin")),
           }))}
         />

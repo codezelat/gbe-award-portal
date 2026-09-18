@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { cardCheckoutAmount } from "@/lib/domain/card-checkout-amount";
+import { checkoutRemovalAction } from "./in-progress-checkouts";
 import {
   assertGenieMatch,
   isGenieTerminalFailure,
@@ -130,10 +131,44 @@ export async function reconcileCardAttempt(
       return;
     }
     const [application] = await tx
-      .select({ cycleId: applications.cycleId, year: awardCycles.year })
+      .select({
+        cycleId: applications.cycleId,
+        year: awardCycles.year,
+        deletedAt: applications.deletedAt,
+      })
       .from(applications)
       .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
-      .where(eq(applications.id, payment.applicationId));
+      .where(eq(applications.id, payment.applicationId))
+      .for("update", { of: applications });
+    const [removal] = application.deletedAt
+      ? await tx
+          .select({ id: auditLogs.id })
+          .from(auditLogs)
+          .where(
+            and(
+              eq(auditLogs.applicationId, payment.applicationId),
+              eq(auditLogs.action, checkoutRemovalAction),
+              sql`${auditLogs.afterRedacted}->>'deletedAt' = ${application.deletedAt.toISOString()}`,
+            ),
+          )
+          .limit(1)
+      : [];
+    // Only undo our pending-checkout removal, never an unrelated administrative deletion.
+    if (removal) {
+      await tx
+        .update(applications)
+        .set({ deletedAt: null, deletedBy: null })
+        .where(eq(applications.id, payment.applicationId));
+      await tx.insert(auditLogs).values({
+        actorType: "system",
+        action: "pending checkout restored after verified payment",
+        entityType: "application",
+        entityId: payment.applicationId,
+        applicationId: payment.applicationId,
+        metadataRedacted: { attemptId: id },
+        requestId: crypto.randomUUID(),
+      });
+    }
     await tx
       .insert(cycleSequences)
       .values({ cycleId: application.cycleId, nextReceiptNumber: 2 })
@@ -208,6 +243,13 @@ export async function startCardCheckout(applicationId: string) {
       !payment.currency
     )
       throw new Error("This nomination is not eligible for online checkout.");
+    const [available] = await tx
+      .select({ deletedAt: applications.deletedAt })
+      .from(applications)
+      .where(eq(applications.id, applicationId))
+      .for("update");
+    if (!available || available.deletedAt)
+      throw new Error("Payment is not available for this nomination.");
     if (payment.status === "verified") return { settled: true } as const;
     if (!["awaiting_payment", "rejected"].includes(payment.status))
       throw new Error(

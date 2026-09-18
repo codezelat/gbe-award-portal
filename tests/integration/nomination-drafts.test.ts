@@ -104,7 +104,7 @@ const { POST: initiate } =
   await import("../../src/app/api/public/applications/initiate/route");
 const { POST: draftRequest } =
   await import("../../src/app/api/public/drafts/route");
-const { deleteInProgress } =
+const { deleteInProgress, deleteInProgressBatch } =
   await import("../../src/server/actions/draft-actions");
 const { getInProgress } = await import("../../src/server/dal/in-progress");
 const { getNominationOffer, saveNominationOffer, nominationOfferKey } =
@@ -1127,6 +1127,96 @@ describe("durable in-progress nominations", () => {
     expect((await deleteInProgress({ id: key.id, source: "draft" })).ok).toBe(
       false,
     );
+    expect((await getInProgress({ cycleId })).total).toBe(1);
+  });
+  it("searches saved contact numbers with spaces and local prefixes", async () => {
+    const key = credential();
+    const saved = await save(key);
+    await save(key, saved.version, 1, {
+      ...contact(),
+      phone: "+94 77 123 4567",
+    });
+    for (const search of ["+94 77 123 4567", "0771234567", "123-4567"])
+      expect(
+        (await getInProgress({ cycleId, search })).rows.map((row) => row.id),
+      ).toContain(key.id);
+  });
+  it("bulk deletes eligible drafts while explicitly reporting submitted records", async () => {
+    const { key, input } = await prepared(true);
+    const session = await initiateDraftSubmission(input);
+    expect((await finish(session)).status).toBe(200);
+    const other = credential();
+    await save(other);
+    const result = await deleteInProgressBatch([
+      { id: key.id, source: "draft" },
+      { id: other.id, source: "draft" },
+    ]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.deleted.map((row) => row.id)).toEqual([other.id]);
+    expect(result.failed.map((row) => row.id)).toEqual([key.id]);
+    expect(result.failed[0].message).toMatch(/submitted/);
+    expect((await getInProgress({ cycleId })).total).toBe(0);
+  });
+  it("rejects duplicate, oversized and unauthorized bulk deletion before mutation", async () => {
+    const key = credential();
+    await save(key);
+    const item = { id: key.id, source: "draft" };
+    expect((await deleteInProgressBatch([item, item])).ok).toBe(false);
+    expect(
+      (
+        await deleteInProgressBatch(
+          Array.from({ length: 101 }, () => ({
+            id: crypto.randomUUID(),
+            source: "draft",
+          })),
+        )
+      ).ok,
+    ).toBe(false);
+    staffAllowed = false;
+    expect((await deleteInProgressBatch([item])).ok).toBe(false);
+    expect((await getInProgress({ cycleId })).total).toBe(1);
+  });
+  it("lets staff delete a mixed selection of drafts and unpaid card records", async () => {
+    const { input } = await prepared();
+    const session = await initiateDraftSubmission(input);
+    expect((await finish(session)).status).toBe(200);
+    const applicationId = session.sessionToken.split(".")[0];
+    const key = credential();
+    await save(key);
+    const result = await deleteInProgressBatch([
+      { id: key.id, source: "draft" },
+      { id: applicationId, source: "card" },
+    ]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    expect(result.deleted).toHaveLength(2);
+    expect(result.failed).toHaveLength(0);
+    expect((await getInProgress({ cycleId })).total).toBe(0);
+    expect(
+      await db
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.applicationId, applicationId)),
+    ).toHaveLength(1);
+    expect(
+      await db
+        .select()
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.applicationId, applicationId)),
+    ).toHaveLength(0);
+  });
+  it("refuses a staff batch containing legacy uploads before deleting any drafts", async () => {
+    const key = credential();
+    await save(key);
+    expect(
+      (
+        await deleteInProgressBatch([
+          { id: key.id, source: "draft" },
+          { id: crypto.randomUUID(), source: "upload" },
+        ])
+      ).ok,
+    ).toBe(false);
     expect((await getInProgress({ cycleId })).total).toBe(1);
   });
   it("refuses legacy cleanup of a draft-linked nomination", async () => {

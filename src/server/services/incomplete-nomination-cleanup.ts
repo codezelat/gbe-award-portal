@@ -53,6 +53,19 @@ export async function purgeIncompleteNominationShell(
       .limit(1);
     if (draft)
       throw new Error("Remove this saved form from In-progress instead.");
+    // Public finalization claims the upload session first. Wait for it before
+    // inspecting evidence or removing staged objects, including in bulk cleanup.
+    await tx
+      .select({ id: uploadSessions.id })
+      .from(uploadSessions)
+      .where(eq(uploadSessions.applicationId, applicationId))
+      .orderBy(uploadSessions.id)
+      .for("update");
+    await tx
+      .select({ id: payments.id })
+      .from(payments)
+      .where(eq(payments.applicationId, applicationId))
+      .for("update");
     const [record] = await tx
       .select({
         application: applications,
@@ -63,7 +76,8 @@ export async function purgeIncompleteNominationShell(
       .innerJoin(payments, eq(payments.applicationId, applications.id))
       .innerJoin(awardCycles, eq(awardCycles.id, applications.cycleId))
       .where(eq(applications.id, applicationId))
-      .limit(1);
+      .limit(1)
+      .for("update", { of: applications });
     if (!record)
       throw new Error("The incomplete nomination is no longer available.");
     const [attempt] = await tx

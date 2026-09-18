@@ -40,6 +40,9 @@ export async function getInProgress({
       email: sql<string | null>`${nominationDrafts.payload}->>'email'`.as(
         "email",
       ),
+      phone: sql<string | null>`${nominationDrafts.payload}->>'phone'`.as(
+        "phone",
+      ),
       nomination: sql<
         string | null
       >`${nominationDrafts.payload}->>'awardNomination'`.as("nomination"),
@@ -65,6 +68,7 @@ export async function getInProgress({
       source: sql<string>`'upload'`,
       nomineeName: applications.nomineeName,
       email: applications.emailDisplay,
+      phone: applications.phoneDisplay,
       nomination: applications.awardNomination,
       category: applications.categoryNameSnapshot,
       step: sql<number>`3`,
@@ -91,6 +95,7 @@ export async function getInProgress({
       source: sql<string>`'card'`,
       nomineeName: applications.nomineeName,
       email: applications.emailDisplay,
+      phone: applications.phoneDisplay,
       nomination: applications.awardNomination,
       category: applications.categoryNameSnapshot,
       step: sql<number>`3`,
@@ -106,12 +111,20 @@ export async function getInProgress({
       ),
     );
   const all = unionAll(drafts, legacy, awaitingCard).as("in_progress");
+  const phoneDigits =
+    search && /^[+\d\s().-]+$/.test(search)
+      ? search.replace(/\D/g, "").replace(/^0+/, "")
+      : "";
   const where = search
     ? or(
         ilike(all.nomineeName, `%${search}%`),
         ilike(all.email, `%${search}%`),
         ilike(all.nomination, `%${search}%`),
         ilike(all.category, `%${search}%`),
+        ilike(all.phone, `%${search}%`),
+        phoneDigits.length >= 3
+          ? sql`regexp_replace(${all.phone}, '[^0-9]', '', 'g') like ${`%${phoneDigits}%`}`
+          : undefined,
       )
     : undefined;
   const [{ value: total }] = await db

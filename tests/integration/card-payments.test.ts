@@ -65,6 +65,7 @@ const client = postgres(process.env.TEST_DATABASE_URL!, { max: 8 });
 const db = drizzle(client, { schema });
 let cycleId: string;
 let categoryId: string;
+let actorId: string;
 let nextId = 1;
 const remote = new Map<string, Record<string, unknown>>();
 let createCount = 0;
@@ -74,6 +75,8 @@ const { startCardCheckout, reconcileCardAttempt } =
 const { submittedApplications, pendingCardPayment, administrativeSubmissions } =
   await import("../../src/server/dal/application-visibility");
 const { getInProgress } = await import("../../src/server/dal/in-progress");
+const { removeUnpaidCheckout, checkoutRemovalAction } =
+  await import("../../src/server/services/in-progress-checkouts");
 const { getDashboardApplications } =
   await import("../../src/server/dal/dashboard-applications");
 const { POST: paymentAction } =
@@ -84,6 +87,22 @@ const { POST: proofAction } =
   await import("../../src/app/api/public/payments/[applicationId]/proof/route");
 
 beforeAll(async () => {
+  const authUserId = crypto.randomUUID();
+  await db.insert(schema.user).values({
+    id: authUserId,
+    email: "checkout-delete@example.test",
+    name: "Checkout tests",
+  });
+  const [actor] = await db
+    .insert(schema.profiles)
+    .values({
+      authUserId,
+      accountKind: "staff",
+      displayName: "Checkout tests",
+      isActive: true,
+    })
+    .returning();
+  actorId = actor.id;
   const [cycle] = await db
     .insert(schema.awardCycles)
     .values({
@@ -199,6 +218,129 @@ async function attempt(paymentId: string) {
   ).at(-1)!;
 }
 describe("durable Genie reconciliation", () => {
+  it("finds unpaid checkouts by formatted, local and partial contact numbers", async () => {
+    const { app } = await fixture();
+    for (const search of ["+94 77 123 4567", "077-123-4567", "1234567"])
+      expect(
+        (await getInProgress({ cycleId, search })).rows.some(
+          (row) => row.id === app.id,
+        ),
+      ).toBe(true);
+  });
+  it("removes an unpaid checkout idempotently, keeps gateway history and blocks further checkout", async () => {
+    const { app, payment } = await fixture();
+    await startCardCheckout(app.id);
+    const row = await attempt(payment.id);
+    await removeUnpaidCheckout(app.id, actorId);
+    await removeUnpaidCheckout(app.id, actorId);
+    expect(
+      (await getInProgress({ cycleId })).rows.some(
+        (item) => item.id === app.id,
+      ),
+    ).toBe(false);
+    expect((await attempt(payment.id)).id).toBe(row.id);
+    expect(
+      await db
+        .select()
+        .from(schema.auditLogs)
+        .where(
+          and(
+            eq(schema.auditLogs.applicationId, app.id),
+            eq(schema.auditLogs.action, checkoutRemovalAction),
+          ),
+        ),
+    ).toHaveLength(1);
+    await expect(startCardCheckout(app.id)).rejects.toThrow(/not available/);
+  });
+  it("restores a removed checkout exactly once when a late payment is verified", async () => {
+    const { app, payment } = await fixture();
+    await startCardCheckout(app.id);
+    const row = await attempt(payment.id);
+    await removeUnpaidCheckout(app.id, actorId);
+    remote.get(row.transactionId!)!.state = "CONFIRMED";
+    await Promise.all([
+      reconcileCardAttempt(row.id),
+      reconcileCardAttempt(row.id),
+    ]);
+    const [restored] = await db
+      .select()
+      .from(schema.applications)
+      .where(eq(schema.applications.id, app.id));
+    expect(restored.deletedAt).toBeNull();
+    expect(restored.deletedBy).toBeNull();
+    expect(restored.paymentStatus).toBe("verified");
+    expect(
+      await db
+        .select()
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.applicationId, app.id)),
+    ).toHaveLength(2);
+    await expect(removeUnpaidCheckout(app.id, actorId)).rejects.toThrow(
+      /evidence/,
+    );
+  });
+  it("protects settled or submitted payments and does not restore unrelated administrative deletions", async () => {
+    const { app, payment } = await fixture();
+    for (const status of [
+      "proof_submitted",
+      "verified",
+      "waived",
+      "refunded",
+    ] as const) {
+      await db
+        .update(schema.payments)
+        .set({ status })
+        .where(eq(schema.payments.id, payment.id));
+      await expect(removeUnpaidCheckout(app.id, actorId)).rejects.toThrow(
+        /evidence/,
+      );
+    }
+    await db
+      .update(schema.payments)
+      .set({ status: "awaiting_payment" })
+      .where(eq(schema.payments.id, payment.id));
+    await startCardCheckout(app.id);
+    const row = await attempt(payment.id);
+    await db
+      .update(schema.applications)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.applications.id, app.id));
+    remote.get(row.transactionId!)!.state = "CONFIRMED";
+    await reconcileCardAttempt(row.id);
+    const [removed] = await db
+      .select()
+      .from(schema.applications)
+      .where(eq(schema.applications.id, app.id));
+    expect(removed.deletedAt).not.toBeNull();
+  });
+  it("serializes deletion with settlement without hiding a completed payment", async () => {
+    const { app, payment } = await fixture();
+    await startCardCheckout(app.id);
+    const row = await attempt(payment.id);
+    remote.get(row.transactionId!)!.state = "CONFIRMED";
+    await Promise.allSettled([
+      removeUnpaidCheckout(app.id, actorId),
+      reconcileCardAttempt(row.id),
+    ]);
+    const [final] = await db
+      .select()
+      .from(schema.applications)
+      .where(eq(schema.applications.id, app.id));
+    expect(final.deletedAt).toBeNull();
+    expect(final.paymentStatus).toBe("verified");
+  });
+  it("rejects a bank-transfer switch after deletion even with an earlier valid session", async () => {
+    const { app } = await fixture();
+    await removeUnpaidCheckout(app.id, actorId);
+    const response = await paymentAction(
+      new Request("https://example.test", {
+        method: "POST",
+        body: JSON.stringify({ action: "bank_transfer" }),
+      }),
+      { params: Promise.resolve({ applicationId: app.id }) },
+    );
+    expect(response.status).toBe(400);
+  });
   it("uses the saved nomination fee for both payment methods", async () => {
     const { app, payment } = await fixture();
     await startCardCheckout(app.id);
@@ -331,6 +473,45 @@ describe("durable Genie reconciliation", () => {
           .where(eq(schema.payments.id, payment.id))
       )[0].method,
     ).toBe("bank_transfer");
+  });
+  it("does not accept an in-flight proof upload after its unpaid checkout was removed", async () => {
+    const { app, payment } = await fixture();
+    await db
+      .update(schema.payments)
+      .set({ method: "bank_transfer" })
+      .where(eq(schema.payments.id, payment.id));
+    const call = (body: object) =>
+      proofAction(
+        new Request("https://example.test", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+        { params: Promise.resolve({ applicationId: app.id }) },
+      );
+    const prepared = await call({
+      action: "prepare",
+      name: "proof.pdf",
+      type: "application/pdf",
+      size: 31,
+    });
+    expect(prepared.status).toBe(200);
+    const { data } = await prepared.json();
+    await removeUnpaidCheckout(app.id, actorId);
+    expect(
+      (await call({ action: "complete", fileId: data.fileId })).status,
+    ).toBe(400);
+    expect(
+      await db
+        .select()
+        .from(schema.applicationFiles)
+        .where(eq(schema.applicationFiles.applicationId, app.id)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.applicationId, app.id)),
+    ).toHaveLength(0);
   });
   it("rejects forged webhooks and ignores payload state even with valid headers", async () => {
     const { app, payment } = await fixture();

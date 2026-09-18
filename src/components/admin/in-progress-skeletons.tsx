@@ -14,7 +14,12 @@ export function InProgressSkeleton() {
         <Skeleton className="h-11 w-24" />
       </div>
       <div className="surface overflow-hidden rounded-xl">
-        <div className="hidden grid-cols-[30%_1fr_11rem_8rem] gap-4 border-b p-4 xl:grid">
+        <div className="flex h-15 items-center gap-3 border-b px-4">
+          <Skeleton className="size-4" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+        <div className="hidden grid-cols-[2rem_30%_1fr_11rem_8rem] gap-4 border-b p-4 xl:grid">
+          <Skeleton className="size-4" />
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-4 w-20" />
           ))}
@@ -22,11 +27,13 @@ export function InProgressSkeleton() {
         {Array.from({ length: 5 }, (_, i) => (
           <div
             key={i}
-            className="grid gap-4 border-b p-4 last:border-0 xl:grid-cols-[30%_1fr_11rem_8rem]"
+            className="grid gap-4 border-b p-4 last:border-0 xl:grid-cols-[2rem_30%_1fr_11rem_8rem]"
           >
+            <Skeleton className="size-4" />
             <div>
               <Skeleton className="h-5 w-4/5" />
               <Skeleton className="mt-2 h-3 w-3/5" />
+              <Skeleton className="mt-2 h-3 w-2/5" />
             </div>
             <div>
               <Skeleton className="h-3 w-3/4" />

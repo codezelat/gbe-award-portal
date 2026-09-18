@@ -4,18 +4,24 @@ import {
   render,
   screen,
   cleanup,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import userEvent from "@testing-library/user-event";
 
 const navigation = vi.hoisted(() => ({
   search: new URLSearchParams("page=2"),
   replace: vi.fn(),
+  refresh: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin/in-progress",
   useSearchParams: () => navigation.search,
-  useRouter: () => ({ replace: navigation.replace }),
+  useRouter: () => ({
+    replace: navigation.replace,
+    refresh: navigation.refresh,
+  }),
 }));
 import { DebouncedApplicationSearch } from "@/components/admin/debounced-application-search";
 import { Table } from "@/components/ui/table";
@@ -23,7 +29,9 @@ import { InProgressTable } from "@/components/admin/in-progress-table";
 
 vi.mock("@/server/actions/draft-actions", () => ({
   deleteInProgress: vi.fn(),
+  deleteInProgressBatch: vi.fn(),
 }));
+import { deleteInProgressBatch } from "@/server/actions/draft-actions";
 
 afterEach(() => {
   cleanup();
@@ -33,6 +41,70 @@ afterEach(() => {
 });
 
 describe("admin list UX", () => {
+  const pendingRows = ["First", "Second"].map((name, index) => ({
+    id: `checkout-${index}`,
+    source: "card",
+    nomineeName: name,
+    email: `${name}@example.test`,
+    phone: "+94 77 123 4567",
+    category: "Business",
+    nomination: "Excellence",
+    stepLabel: "Awaiting payment",
+    updatedLabel: "19 Sep 2026",
+    canDelete: true,
+  }));
+  it("selects individual records without opening them and links unpaid records to In-progress", async () => {
+    const { container } = render(<InProgressTable rows={pendingRows} />);
+    const card = within(container.querySelector("article")!);
+    await userEvent.click(card.getByRole("checkbox", { name: "Select First" }));
+    expect(card.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(card.getByRole("link", { name: "First" })).toHaveAttribute(
+      "href",
+      "/admin/in-progress/checkout-0?source=card",
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "Select all on this page" }),
+    ).toHaveAttribute("aria-checked", "mixed");
+  });
+  it("confirms bulk deletion, blocks duplicate clicks and reports records that were not deleted", async () => {
+    let resolve!: (
+      value: Awaited<ReturnType<typeof deleteInProgressBatch>>,
+    ) => void;
+    vi.mocked(deleteInProgressBatch).mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    render(<InProgressTable rows={pendingRows} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Select all on this page" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
+    const dialog = within(screen.getByRole("alertdialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "Delete" }));
+    expect(dialog.getByRole("button", { name: "Deleting" })).toBeDisabled();
+    expect(deleteInProgressBatch).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      resolve({
+        ok: true,
+        deleted: [{ id: "checkout-0", source: "card" }],
+        failed: [
+          {
+            id: "checkout-1",
+            source: "card",
+            message: "Payment completed. Refresh the list.",
+          },
+        ],
+      }),
+    );
+    expect(dialog.getByRole("alert")).toHaveTextContent("Second");
+    expect(dialog.getByRole("alert")).toHaveTextContent("Payment completed");
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    expect(navigation.refresh).toHaveBeenCalled();
+  });
   it("keeps draft links, nomination details and permission-aware actions in mobile cards", () => {
     const { container } = render(
       <InProgressTable
@@ -42,6 +114,7 @@ describe("admin list UX", () => {
             source: "draft",
             nomineeName: "Long Trading Company",
             email: "trading@example.test",
+            phone: "+94 77 123 4567",
             category: "Business",
             nomination: "International growth",
             stepLabel: "Payment",
