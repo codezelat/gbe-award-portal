@@ -14,6 +14,26 @@ import { getR2, r2ObjectKey } from "../src/lib/r2/client";
 for (const provider of ["database", "r2", "auth", "email"] as const)
   requireProvider(provider);
 await getDb().execute(sql`select 1 as ok`);
+const ticketTables = [
+  "ticket_sales",
+  "ticket_bookings",
+  "ticket_payment_attempts",
+  "guest_tickets",
+];
+for (const table of ticketTables) {
+  const result = await getDb().execute(
+    sql`select to_regclass(${`public.${table}`}) as name`,
+  );
+  if (!result.rows[0]?.name)
+    throw new Error(
+      "Apply guest ticket migrations 0014 and 0015 before deploying ticket sales.",
+    );
+  const permissions = await getDb().execute(
+    sql`select has_table_privilege(current_user, ${`public.${table}`}, 'SELECT') and has_table_privilege(current_user, ${`public.${table}`}, 'INSERT') and has_table_privilege(current_user, ${`public.${table}`}, 'UPDATE') as allowed`,
+  );
+  if (permissions.rows[0]?.allowed !== true)
+    throw new Error(`Grant runtime SELECT, INSERT and UPDATE on ${table}.`);
+}
 const drafts = await getDb().execute(sql`select
   to_regclass('public.nomination_drafts') as drafts,
   to_regclass('public.nomination_draft_files') as files`);

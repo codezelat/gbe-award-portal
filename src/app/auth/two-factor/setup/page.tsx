@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default async function SetupMfa() {
   const { session, profile } = await requirePortalSession();
   if (profile.accountKind !== "staff") redirect("/portal");
-  if (session.user.twoFactorEnabled) redirect("/admin");
+  if (session.user.twoFactorEnabled) redirect("/auth/continue");
   return (
     <main
       id="main-content"
@@ -25,7 +25,7 @@ export default async function SetupMfa() {
           Multi-factor authentication is mandatory before production
           administration data can be opened.
         </p>
-        <TwoFactorSetup />
+        <TwoFactorSetup redirectTo="/auth/continue" />
       </section>
     </main>
   );

@@ -16,10 +16,12 @@ export function Turnstile({
   onToken,
   action = turnstileActions.nomination,
   resetSignal = 0,
+  compact = false,
 }: {
   onToken: (token: string) => void;
   action?: string;
   resetSignal?: number;
+  compact?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const widget = useRef<string | undefined>(undefined);
@@ -36,11 +38,12 @@ export function Turnstile({
         "1x00000000000000000000AA",
       action,
       theme: "light",
+      size: compact ? "compact" : "normal",
       callback: (token: string) => onTokenRef.current(token),
       "expired-callback": () => onTokenRef.current(""),
       "error-callback": () => onTokenRef.current(""),
     });
-  }, [action]);
+  }, [action, compact]);
   useEffect(() => {
     render();
     return () => {

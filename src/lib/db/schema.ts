@@ -950,3 +950,164 @@ export const rateLimitBuckets = pgTable(
   },
   (t) => [index("rate_limit_buckets_reset_idx").on(t.resetAt)],
 );
+
+// Guest ticketing is deliberately separate from nomination and payment evidence.
+export const ticketSales = pgTable(
+  "ticket_sales",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .unique()
+      .references(() => awardCycles.id),
+    title: text("title").notNull(),
+    status: text("status", { enum: ["draft", "open", "paused", "closed"] })
+      .notNull()
+      .default("draft"),
+    unitPriceMinor: integer("unit_price_minor").notNull().default(0),
+    currency: char("currency", { length: 3 }).notNull().default("LKR"),
+    capacity: integer("capacity").notNull().default(0),
+    maxPerBooking: integer("max_per_booking").notNull().default(10),
+    eventAt: timestamp("event_at", { withTimezone: true }),
+    venue: text("venue").notNull().default(""),
+    revision: integer("revision").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    check(
+      "ticket_sales_bounds",
+      sql`${t.capacity} between 0 and 100000 and ${t.unitPriceMinor} between 0 and 100000000 and ${t.maxPerBooking} between 1 and 20`,
+    ),
+    check(
+      "ticket_sales_status",
+      sql`${t.status} in ('draft','open','paused','closed')`,
+    ),
+    check(
+      "ticket_sales_open_ready",
+      sql`${t.status} <> 'open' or (${t.unitPriceMinor} > 0 and ${t.capacity} > 0 and ${t.eventAt} is not null and length(trim(${t.venue})) > 0)`,
+    ),
+    uniqueIndex("ticket_sales_one_open_idx")
+      .on(t.status)
+      .where(sql`${t.status} = 'open'`),
+  ],
+);
+
+export const ticketBookings = pgTable(
+  "ticket_bookings",
+  {
+    id: uuid("id").primaryKey(),
+    salesId: uuid("sales_id")
+      .notNull()
+      .references(() => ticketSales.id),
+    applicationId: uuid("application_id").references(() => applications.id),
+    reference: text("reference").notNull().unique(),
+    accessHash: text("access_hash").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone").notNull(),
+    businessName: text("business_name"),
+    quantity: integer("quantity").notNull(),
+    unitPriceMinor: integer("unit_price_minor").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    eventTitle: text("event_title").notNull(),
+    eventAt: timestamp("event_at", { withTimezone: true }).notNull(),
+    venue: text("venue").notNull(),
+    status: text("status", {
+      enum: [
+        "pending",
+        "paid",
+        "issued",
+        "expired",
+        "cancelled",
+        "review",
+        "refunded",
+      ],
+    })
+      .notNull()
+      .default("pending"),
+    source: text("source", { enum: ["public", "staff"] })
+      .notNull()
+      .default("public"),
+    issuedBy: uuid("issued_by").references(() => profiles.id),
+    internalReason: text("internal_reason"),
+    holdUntil: timestamp("hold_until", { withTimezone: true }).notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    emailRevision: integer("email_revision").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    index("ticket_bookings_sales_status_idx").on(
+      t.salesId,
+      t.status,
+      t.createdAt,
+    ),
+    index("ticket_bookings_email_idx").on(t.email),
+    index("ticket_bookings_application_idx").on(t.applicationId),
+    check(
+      "ticket_bookings_bounds",
+      sql`${t.quantity} between 1 and 20 and ${t.unitPriceMinor} >= 0 and ${t.amountMinor} = ${t.quantity} * ${t.unitPriceMinor}`,
+    ),
+    check(
+      "ticket_bookings_status",
+      sql`${t.status} in ('pending','paid','issued','expired','cancelled','review','refunded')`,
+    ),
+    check("ticket_bookings_source", sql`${t.source} in ('public','staff')`),
+    check(
+      "ticket_bookings_complimentary",
+      sql`${t.source} <> 'staff' or (${t.applicationId} is not null and ${t.issuedBy} is not null and ${t.amountMinor} = 0)`,
+    ),
+  ],
+);
+
+export const ticketPaymentAttempts = pgTable(
+  "ticket_payment_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .unique()
+      .references(() => ticketBookings.id),
+    environment: text("environment", {
+      enum: ["sandbox", "production"],
+    }).notNull(),
+    transactionId: text("transaction_id").unique(),
+    checkoutUrl: text("checkout_url"),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    state: text("state").notNull().default("CREATING"),
+    active: boolean("active").notNull().default(true),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("ticket_attempts_pending_idx").on(t.active, t.updatedAt),
+    check("ticket_attempts_amount", sql`${t.amountMinor} > 0`),
+  ],
+);
+
+export const guestTickets = pgTable(
+  "guest_tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => ticketBookings.id),
+    code: text("code").notNull().unique(),
+    position: integer("position").notNull(),
+    checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+    checkedInBy: uuid("checked_in_by").references(() => profiles.id),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("guest_tickets_booking_position_idx").on(
+      t.bookingId,
+      t.position,
+    ),
+  ],
+);

@@ -141,6 +141,39 @@ export function ApplicationsTable({
         ),
       },
       {
+        id: "email",
+        header: "Email",
+        cell: ({ row }) => (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <a
+                  href={`mailto:${row.original.emailDisplay}`}
+                  className="block truncate py-2 text-xs hover:text-primary hover:underline"
+                />
+              }
+            >
+              {row.original.emailDisplay}
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[min(28rem,calc(100vw-2rem))] [overflow-wrap:anywhere]">
+              {row.original.emailDisplay}
+            </TooltipContent>
+          </Tooltip>
+        ),
+      },
+      {
+        id: "phone",
+        header: "Phone",
+        cell: ({ row }) => (
+          <a
+            href={`tel:${row.original.phoneDisplay.replace(/[^+\d]/g, "")}`}
+            className="inline-flex min-h-10 items-center text-xs hover:text-primary hover:underline"
+          >
+            {row.original.phoneDisplay}
+          </a>
+        ),
+      },
+      {
         id: "state",
         header: "Status",
         cell: ({ row }) => (
@@ -206,8 +239,8 @@ export function ApplicationsTable({
           Select this page
         </label>
       )}
-      <div className="hidden xl:block">
-        <Table className="table-fixed">
+      <div className="hidden min-w-0 max-w-full xl:block">
+        <Table className="min-w-[1200px] table-fixed" aria-label="Applications">
           <TableHeader className="sticky top-0 z-10 bg-white">
             {table.getHeaderGroups().map((group) => (
               <TableRow key={group.id}>
@@ -218,12 +251,18 @@ export function ApplicationsTable({
                       header.id === "select"
                         ? "w-10"
                         : header.id === "nomination"
-                          ? "w-[28%]"
-                          : header.id === "state"
-                            ? "w-40"
-                            : header.id === "submitted"
-                              ? "w-40"
-                              : undefined
+                          ? "w-60"
+                          : header.id === "nomination-summary"
+                            ? "w-64"
+                            : header.id === "email"
+                              ? "w-56"
+                              : header.id === "phone"
+                                ? "w-40"
+                                : header.id === "state"
+                                  ? "w-40"
+                                  : header.id === "submitted"
+                                    ? "w-40"
+                                    : undefined
                     }
                   >
                     {header.isPlaceholder
@@ -325,6 +364,20 @@ export function ApplicationsTable({
                     {row.original.awardNomination}
                   </p>
                 </div>
+              </div>
+              <div className="mt-2 flex min-w-0 flex-col items-start pl-7 text-xs text-muted-foreground">
+                <a
+                  href={`mailto:${row.original.emailDisplay}`}
+                  className="max-w-full py-2 [overflow-wrap:anywhere] hover:text-primary hover:underline"
+                >
+                  {row.original.emailDisplay}
+                </a>
+                <a
+                  href={`tel:${row.original.phoneDisplay.replace(/[^+\d]/g, "")}`}
+                  className="py-2 hover:text-primary hover:underline"
+                >
+                  {row.original.phoneDisplay}
+                </a>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 pl-7">
                 <StatusBadge status={row.original.workflowStatus} />

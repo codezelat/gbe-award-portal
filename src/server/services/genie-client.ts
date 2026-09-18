@@ -62,10 +62,36 @@ export function createGenieTransaction(input: {
   currency: string;
   expiresAt: Date;
 }) {
-  const returnUrl = new URL(
+  return createHostedTransaction(
+    input,
     `/apply/payment/${input.applicationId}`,
-    publicEnv.NEXT_PUBLIC_APP_URL,
-  ).href;
+    "/api/webhooks/genie",
+  );
+}
+export function createGenieTicketTransaction(input: {
+  id: string;
+  bookingId: string;
+  amountMinor: number;
+  currency: string;
+  expiresAt: Date;
+}) {
+  return createHostedTransaction(
+    input,
+    `/tickets/booking/${input.bookingId}`,
+    "/api/webhooks/genie-tickets",
+  );
+}
+function createHostedTransaction(
+  input: {
+    id: string;
+    amountMinor: number;
+    currency: string;
+    expiresAt: Date;
+  },
+  returnPath: string,
+  webhookPath: string,
+) {
+  const returnUrl = new URL(returnPath, publicEnv.NEXT_PUBLIC_APP_URL).href;
   const webhookBase =
     env.GENIE_WEBHOOK_BASE_URL ?? publicEnv.NEXT_PUBLIC_APP_URL;
   return request("/public/v2/transactions", {
@@ -74,7 +100,7 @@ export function createGenieTransaction(input: {
     localId: input.id,
     redirectUrl: returnUrl,
     paymentAttemptFailureUrl: returnUrl,
-    webhook: new URL("/api/webhooks/genie", webhookBase).href,
+    webhook: new URL(webhookPath, webhookBase).href,
     expires: input.expiresAt.toISOString(),
     provider: "card_payments",
     allowRetry: false,

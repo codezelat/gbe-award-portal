@@ -1,0 +1,4 @@
+ALTER TABLE "ticket_bookings" ADD COLUMN "application_id" uuid;--> statement-breakpoint
+ALTER TABLE "ticket_bookings" ADD CONSTRAINT "ticket_bookings_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "ticket_bookings_application_idx" ON "ticket_bookings" USING btree ("application_id");--> statement-breakpoint
+ALTER TABLE "ticket_bookings" ADD CONSTRAINT "ticket_bookings_complimentary" CHECK ("ticket_bookings"."source" <> 'staff' or ("ticket_bookings"."application_id" is not null and "ticket_bookings"."issued_by" is not null and "ticket_bookings"."amount_minor" = 0));

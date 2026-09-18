@@ -39,6 +39,7 @@ async function AdminWorkspace({ children }: { children: React.ReactNode }) {
     "/admin/applications": "applications.view",
     "/admin/applicants": "applicants.manage",
     "/admin/payments": "payments.view",
+    "/admin/tickets": "payments.view",
     "/admin/special-invites": "payments.view",
     "/admin/files": "files.view",
     "/admin/communications": "applications.view_all",

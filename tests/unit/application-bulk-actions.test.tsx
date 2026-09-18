@@ -114,6 +114,18 @@ describe("bulk action dialogs", () => {
     expect(screen.getByText("1 selected")).toBeInTheDocument();
     fireEvent.click(checkbox.closest("td")!);
     expect(mocks.push).not.toHaveBeenCalled();
+    const table = container.querySelector("table")!;
+    expect(table).toHaveClass("min-w-[1200px]");
+    expect(table.parentElement).toHaveClass("overflow-x-auto");
+    const email = table.querySelector('a[href^="mailto:"]')!;
+    const phone = table.querySelector('a[href^="tel:"]')!;
+    expect(email).toHaveTextContent("@example.test");
+    expect(phone).toHaveAttribute("href", "tel:+94771234567");
+    phone.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(phone);
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(container.querySelector('article a[href^="mailto:"]')).toBeTruthy();
+    expect(container.querySelector('article a[href^="tel:"]')).toBeTruthy();
     fireEvent.click(container.querySelector("tbody tr")!);
     expect(mocks.push).toHaveBeenCalledWith(`/admin/applications/${row.id}`);
   });

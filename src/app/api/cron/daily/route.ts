@@ -8,6 +8,7 @@ import {
 import { processEmailOutbox } from "@/server/jobs/email-outbox";
 import { runTrackedJob } from "@/server/jobs/tracked-job";
 import { reconcilePendingCardPayments } from "@/server/services/card-payments";
+import { reconcilePendingTicketPayments } from "@/server/services/ticket-payments";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
 
   const jobs: Array<[string, () => Promise<Record<string, unknown>>]> = [
     ["card-payments", reconcilePendingCardPayments],
+    ["ticket-payments", reconcilePendingTicketPayments],
     ["cleanup-uploads", cleanupStaleUploads],
     ["cleanup-exports", cleanupExpiredExports],
     ["cleanup-retention", cleanupRetention],

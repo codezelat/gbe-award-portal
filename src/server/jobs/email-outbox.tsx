@@ -139,10 +139,30 @@ export async function processEmailOutbox(limit = 25) {
         message: "There is an important update in your GBE Awards portal.",
         actionLabel: "Open secure portal",
       };
-      const title = payload.title ?? defaults.title;
+      const ticketMail =
+        item.templateKey === "guest_tickets"
+          ? await (
+              await import("@/server/services/ticket-email")
+            ).prepareTicketEmail(payload.bookingId)
+          : undefined;
+      if (ticketMail === null) {
+        await db
+          .update(emailOutbox)
+          .set({ status: "cancelled" })
+          .where(eq(emailOutbox.id, item.id));
+        continue;
+      }
+      const title = ticketMail
+        ? "Your GBE Awards guest tickets"
+        : (payload.title ?? defaults.title);
       const message = payload.message ?? defaults.message;
-      const html =
-        item.templateKey === "nomination_received"
+      const html = ticketMail
+        ? renderEmail({
+            title: "Your tickets are confirmed",
+            content: `<p>Hi ${escapeHtml(ticketMail.booking.name)},</p><p>Your ${ticketMail.booking.quantity} guest ${ticketMail.booking.quantity === 1 ? "ticket is" : "tickets are"} attached.</p><p><strong>${escapeHtml(ticketMail.booking.eventTitle)}</strong><br>${escapeHtml(ticketMail.date)}<br>${escapeHtml(ticketMail.booking.venue)}</p><p>Show each QR ticket at the entrance. Keep your tickets private.</p>`,
+            action: { label: "View tickets", url: ticketMail.url },
+          })
+        : item.templateKey === "nomination_received"
           ? renderEmail({
               title: "Nomination received",
               content: `<p>Dear ${escapeHtml(payload.nomineeName ?? "Applicant")},</p><p>Thank you. Your nomination has been received and is now in the GBE Awards administrative review queue.</p><p style="border-radius:10px;background:#f4ecd8;padding:14px 18px;font-family:monospace;font-size:18px;font-weight:700">${escapeHtml(payload.reference ?? "")}</p><p>No portal account has been created at this stage. If the nomination is approved, we will send a secure invitation separately.</p>`,
@@ -168,6 +188,14 @@ export async function processEmailOutbox(limit = 25) {
           subject: title,
           html,
           text,
+          attachments: ticketMail
+            ? [
+                {
+                  filename: `${ticketMail.booking.reference}-tickets.pdf`,
+                  path: ticketMail.attachmentUrl,
+                },
+              ]
+            : undefined,
           headers: { "X-Entity-Ref-ID": item.id },
         },
         { idempotencyKey: item.id },

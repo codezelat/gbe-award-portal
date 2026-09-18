@@ -72,6 +72,8 @@ Normal dashboards, review queues, applicant views and nomination exports exclude
 
 Select nominations in **Applications**, then choose **Update status**, **Assign** or **Message**. Each action opens a focused confirmation dialog; message templates show the exact email copy before sending. Selection applies only to the current page (up to 100 records) and resets when filters or pagination change. Selected exports remain available separately.
 
+The Applications table includes clickable email and phone details. On desktop, wider columns scroll inside the table without widening the page; mobile uses contact-friendly cards. Long nomination text remains available through the existing focused tooltip.
+
 Status updates follow the same permissions and workflow rules as individual nominations. Payment verification is required before confirming an entry; rejection and archive require an internal reason. Outcome emails respect each cycle's results release date. Corrections stay on the individual nomination because they need specific editable fields or document requests.
 
 The server locks and validates the complete selection before making changes. Deleted, unpaid, inaccessible or stale records block the batch rather than silently producing partial updates. A stable request ID and durable audit record make retries safe without duplicate status history or messages. Approval prepares portal access after the status transaction; any account/invitation failure is shown separately with links to the affected nominations. Multiple nominations for one pending applicant share the existing valid invitation. No new environment variables, database migration or scheduled job is needed.
@@ -98,6 +100,38 @@ Deleted draft payloads are cleared, an audit tombstone is retained, and removed 
 4. Deploy the application. No new environment variables, provider accounts, Redis or cron schedules are needed. Never add `DATABASE_URL_DIRECT` to the Vercel runtime.
 
 Rollback: restore the previous code deployment while retaining the additive tables and saved data. Do not drop the tables or reverse existing nomination/payment data to roll back the UI.
+
+### Guest tickets
+
+`/tickets` is a separate, login-free guest booking flow. The first page shows event information, availability and a quantity selector. **Continue** opens `/tickets/checkout` for a name, email, contact number and optional business name, then proceeds directly to Genie's hosted card checkout. Tickets never create nominations, applicant accounts or nomination receipts.
+
+Under **Operations > Tickets** (`/admin/tickets`):
+
+- A super admin sets the event name, Colombo date/time, venue, ticket price, total capacity and per-booking limit. Sales start as Draft. Choose **Open for bookings** only when ready to launch. Only one cycle can sell publicly at a time.
+- Increase **Total capacity** to release more seats. Existing bookings retain their price. Capacity cannot fall below issued tickets plus active reservations. Event details lock after reservations or issued tickets exist; price and capacity remain editable.
+- Staff can search bookings by name, email, phone, booking reference or ticket code, inspect payment state, download tickets and resend the ticket email. Sales can be paused or closed without cancelling existing bookings.
+- **Complimentary tickets** require an existing, non-deleted submitted application from the selected cycle. Contact details come from that application, not arbitrary manual recipients. Issuance requires an internal note and respects capacity. Unused complimentary bookings can be cancelled; checked-in ones cannot.
+- Paid bookings can be linked from their detail page to a submitted application in the same cycle. The link covers the whole booking, not individual tickets; several bookings can link to the same application. Staff can change or remove a paid booking's link without altering its contact details, price, QR codes or admission history. Complimentary bookings keep their original application. Changes are audited and reject stale edits.
+- Each guest has an independent random QR ticket in the attached PDF, with the booking name, email and business name (when provided) printed above its privacy footer. Contact details are not embedded in the QR itself.
+- **Event check-in** (`/admin/tickets/scan`) is restricted to staff and super admins with `payments.verify`. Start the camera or scan a screenshot locally, review the guest and linked application, then **Confirm check-in**. The result includes contact details, booking reference and paid/complimentary type. Linked nominee, category and nomination details appear only with application permission; long nominations expand on any screen size. **Scan next** resumes the camera. Already-used and invalid tickets are clearly flagged. Simultaneous check-ins cannot admit the same ticket twice. Camera access is allowed only on this route and requires HTTPS (localhost also works); denied camera access has a screenshot fallback. No image is uploaded or stored.
+- A phone's own camera can also open `/admin/tickets/check-in/[id]`. Staff sign-in and MFA are required, with a strictly allowlisted return path through login. A scan alone never changes state. Refunds/reversals invalidate tickets. Do not admit a guest while a network error leaves confirmation uncertain; rescan to check the saved admission state.
+
+#### Payment and reservation safeguards
+
+The details step has a server-signed five-minute window and a compact red countdown. Refreshing availability keeps entered details while loading the current price; merely viewing the form does not reserve stock. Pressing Pay creates a five-minute reservation, then Genie receives a separate fixed 15-minute checkout expiry. Retries never extend either saved deadline. The private payment page shows its countdown and checks the gateway once at expiry. Unstarted expired reservations release automatically in availability calculations. An uncertain or active gateway payment continues reserving capacity until an authenticated Genie response resolves it; never free seats merely because a local timer or network request timed out. Signed gateway callbacks and the existing daily job reconcile abandoned payments. Buyers can check payment on their private booking page; staff can supply a missing Genie transaction ID from the merchant dashboard for verified recovery.
+
+Only a fetched `CONFIRMED` transaction with the matching app, local payment ID, currency and amount issues tickets. Duplicate clicks, webhooks and issuance retries do not generate extra tickets or initial emails. A late successful payment that exceeds capacity becomes **Needs review**, without overselling: increase capacity and check payment again, or refund in Genie. Paid bookings are not manually marked refunded. Use the merchant dashboard, then **Check payment** to synchronize the reversal.
+
+Ticket mail uses the durable outbox with a PDF attachment and a private booking link. Resend fetches that attachment from a stable, separately signed private download URL, keeping retry payloads identical. The URL must be reachable by Resend over HTTPS after deployment. Resends retain the same ticket codes. Delivery failures remain visible under the booking and in Communications. No PDF bytes are stored in the database or R2; bounded ticket PDFs are generated on demand. Keep `BETTER_AUTH_SECRET` stable because it signs email access links and attachment URLs. QR admission IDs remain random database identifiers.
+
+#### Deploying guest tickets
+
+1. Create a Neon restore point or backup branch. Review and apply additive migrations `0014_new_mother_askani.sql` and `0015_naive_taskmaster.sql` with `bun run db:migrate` and the local migration-owner URL. They create new tables and do not change existing nomination data.
+2. Grant the existing least-privilege runtime role `SELECT`, `INSERT`, and `UPDATE` on `public.ticket_sales`, `public.ticket_bookings`, `public.ticket_payment_attempts`, and `public.guest_tickets`. Existing audit and email-outbox permissions are also required. `bun run providers:verify` checks the new tables and privileges.
+3. No new environment variables are required. The feature reuses `GENIE_ENABLED`, `GENIE_ENVIRONMENT`, `GENIE_APP_ID`, `GENIE_API_KEY`, `GENIE_WEBHOOK_BASE_URL` (if configured), the public app URL, Turnstile, Resend and `BETTER_AUTH_SECRET`. The new signed callback is `/api/webhooks/genie-tickets`, supplied on each ticket transaction. Use Turnstile action `gbe_ticket_booking` with the existing allowed hostname.
+4. Deploy with sales closed, verify the new routes, then test a controlled Genie UAT payment and ticket email before launching. The daily dispatcher handles bounded reconciliation; there is no new cron schedule or Redis dependency.
+
+For rollback, close sales first, retain booking/payment/ticket records and restore the previous application build only when no ticket checkout is active. Do not drop ticket tables or erase payment evidence. Production migrations and release remain explicit owner actions.
 
 ## 🏗️ Architecture
 
