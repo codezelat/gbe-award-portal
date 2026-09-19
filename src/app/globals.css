@@ -17,6 +17,9 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-payment-action: var(--payment-action);
+  --color-payment-action-hover: var(--payment-action-hover);
+  --color-payment-action-foreground: var(--payment-action-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted-surface);
@@ -61,6 +64,9 @@
   --popover-foreground: #171713;
   --primary: #171713;
   --primary-foreground: #fffdf8;
+  --payment-action: #16804a;
+  --payment-action-hover: #116b3d;
+  --payment-action-foreground: #ffffff;
   --secondary: #fbfaf6;
   --secondary-foreground: #171713;
   --muted-surface: #f2efe8;

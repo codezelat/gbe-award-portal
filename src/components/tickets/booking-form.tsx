@@ -42,7 +42,7 @@ export function TicketBookingForm({
   } | null>(null);
   return (
     <form
-      className="min-w-0 rounded-2xl border bg-card p-5 shadow-sm sm:p-7"
+      className="min-w-0 rounded-2xl border bg-card p-3 shadow-sm min-[375px]:p-4 sm:p-7"
       onSubmit={async (event) => {
         event.preventDefault();
         if (lock.current) return;
@@ -202,16 +202,19 @@ export function TicketBookingForm({
           action="gbe_ticket_booking"
           onToken={setToken}
           resetSignal={reset}
-          compact
+          responsive
         />
         <FieldError>{error}</FieldError>
         <Button
           type="submit"
-          className="h-12 min-h-12 w-full rounded-xl"
+          variant="payment"
+          className="h-14 min-h-14 w-full gap-3 rounded-xl px-5"
+          loading={busy}
+          loadingLabel="Opening checkout"
           disabled={busy || !token || expired || refreshing}
         >
-          {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : null}
-          Pay securely by card{!busy && <ArrowRight aria-hidden />}
+          Pay securely by card
+          <ArrowRight aria-hidden data-icon="inline-end" />
         </Button>
         <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <ShieldCheck aria-hidden className="size-4" />

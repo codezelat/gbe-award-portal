@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { TicketCountdown } from "./countdown";
@@ -112,14 +112,15 @@ export function TicketPaymentControls({
       />
       {canPay && now < deadline && (
         <Button
-          className="h-12 min-h-12 rounded-xl"
+          variant="payment"
+          className="h-14 min-h-14 gap-3 rounded-xl px-5"
+          loading={busy === "checkout"}
+          loadingLabel="Opening checkout"
           disabled={!!busy}
           onClick={() => run("checkout")}
         >
-          {busy === "checkout" && (
-            <LoaderCircle aria-hidden className="animate-spin" />
-          )}
           Pay securely by card
+          <ArrowRight aria-hidden data-icon="inline-end" />
         </Button>
       )}
       <Button

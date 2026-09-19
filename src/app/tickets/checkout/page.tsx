@@ -38,7 +38,7 @@ export default async function TicketCheckout({
     acceptedUnitPriceMinor: sale.unitPriceMinor,
   });
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="-mx-1 sm:mx-auto sm:max-w-xl">
       <Link
         href={`/tickets?quantity=${quantity}`}
         className="mb-5 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
