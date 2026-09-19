@@ -1,5 +1,16 @@
 import "server-only";
-import { and, asc, eq, isNotNull, lt } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { TICKET_CHECKOUT_MS } from "@/lib/domain/ticket-timing";
@@ -255,33 +266,121 @@ export async function checkTicketPayment(
   }
   return reconcileTicketPayment(attempt.id, transactionId, actorId);
 }
-export async function reconcilePendingTicketPayments() {
-  const expired = await expireTicketHolds();
+// Share the automatic-check lease across requests and Vercel instances. Only
+// this reconciliation timestamp is claimed here; inventory changes still use
+// the sale -> booking -> attempt lock order inside reconcileTicketPayment.
+const AUTOMATIC_CHECK_INTERVAL_MS = 60_000;
+async function reconcileTicketBatch(salesId?: string) {
+  const cutoff = new Date(Date.now() - AUTOMATIC_CHECK_INTERVAL_MS);
+  const eligible = () =>
+    and(
+      eq(ticketPaymentAttempts.active, true),
+      eq(ticketPaymentAttempts.environment, env.GENIE_ENVIRONMENT),
+      isNotNull(ticketPaymentAttempts.transactionId),
+      or(
+        isNull(ticketPaymentAttempts.checkedAt),
+        lte(ticketPaymentAttempts.checkedAt, cutoff),
+        // A check just before expiry must not suppress the first expiry check.
+        salesId
+          ? lt(ticketPaymentAttempts.checkedAt, ticketPaymentAttempts.expiresAt)
+          : undefined,
+      ),
+    );
   const attempts = await getDb()
-    .select({
-      id: ticketPaymentAttempts.id,
-      transactionId: ticketPaymentAttempts.transactionId,
-    })
+    .select({ id: ticketPaymentAttempts.id })
     .from(ticketPaymentAttempts)
+    .innerJoin(
+      ticketBookings,
+      eq(ticketBookings.id, ticketPaymentAttempts.bookingId),
+    )
     .where(
       and(
-        eq(ticketPaymentAttempts.active, true),
-        isNotNull(ticketPaymentAttempts.transactionId),
-        lt(ticketPaymentAttempts.updatedAt, new Date(Date.now() - 60_000)),
+        eligible(),
+        eq(ticketBookings.status, "pending"),
+        salesId ? eq(ticketBookings.salesId, salesId) : undefined,
+        salesId
+          ? lte(ticketPaymentAttempts.expiresAt, new Date())
+          : lt(ticketPaymentAttempts.updatedAt, cutoff),
       ),
     )
-    .orderBy(asc(ticketPaymentAttempts.updatedAt))
-    .limit(5);
+    .orderBy(
+      asc(
+        sql`coalesce(${ticketPaymentAttempts.checkedAt}, ${ticketPaymentAttempts.createdAt})`,
+      ),
+      asc(ticketPaymentAttempts.id),
+    )
+    .limit(salesId ? 10 : 20);
   let checked = 0;
   let failed = 0;
-  for (const attempt of attempts) {
-    if (!attempt.transactionId) continue;
-    try {
-      await reconcileTicketPayment(attempt.id);
-      checked++;
-    } catch {
-      failed++;
-    }
+  // Bounded concurrency keeps one slow provider response from serially blocking
+  // every expired reservation. No provider call runs inside a DB transaction.
+  for (let offset = 0; offset < attempts.length; offset += 5) {
+    await Promise.all(
+      attempts.slice(offset, offset + 5).map(async (attempt) => {
+        const [claimed] = await getDb()
+          .update(ticketPaymentAttempts)
+          .set({ checkedAt: new Date() })
+          .where(and(eq(ticketPaymentAttempts.id, attempt.id), eligible()))
+          .returning({ id: ticketPaymentAttempts.id });
+        if (!claimed) return;
+        try {
+          await reconcileTicketPayment(attempt.id);
+          checked++;
+        } catch {
+          // Retain uncertain capacity. The claimed timestamp also backs off failed
+          // attempts so an unavailable transaction cannot starve later bookings.
+          failed++;
+        }
+      }),
+    );
   }
+  return { checked, failed };
+}
+
+export async function refreshExpiredTicketBookings(salesId: string) {
+  await expireTicketHolds(salesId);
+  return reconcileTicketBatch(salesId);
+}
+
+export async function getTicketAvailability(salesId: string) {
+  await refreshExpiredTicketBookings(salesId);
+  const [stock, [next]] = await Promise.all([
+    ticketInventory(getDb(), salesId),
+    getDb()
+      .select({
+        refreshAt: sql<
+          number | null
+        >`(extract(epoch from min(coalesce(${ticketPaymentAttempts.expiresAt}, ${ticketBookings.holdUntil}))) * 1000)::double precision`,
+      })
+      .from(ticketBookings)
+      .leftJoin(
+        ticketPaymentAttempts,
+        eq(ticketPaymentAttempts.bookingId, ticketBookings.id),
+      )
+      .where(
+        and(
+          eq(ticketBookings.salesId, salesId),
+          eq(ticketBookings.status, "pending"),
+          or(
+            isNull(ticketPaymentAttempts.id),
+            eq(ticketPaymentAttempts.active, true),
+          ),
+          gt(
+            sql`coalesce(${ticketPaymentAttempts.expiresAt}, ${ticketBookings.holdUntil})`,
+            sql`now()`,
+          ),
+        ),
+      ),
+  ]);
+  return {
+    ...stock,
+    refreshAt: next?.refreshAt ?? null,
+    serverNow: Date.now(),
+  };
+}
+
+export async function reconcilePendingTicketPayments() {
+  const expired = await expireTicketHolds();
+  const { checked, failed } = await reconcileTicketBatch();
   return { expired: expired.length, checked, failed };
 }

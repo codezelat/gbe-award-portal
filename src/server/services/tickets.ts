@@ -596,7 +596,7 @@ export async function resendTicketEmail(
     });
   });
 }
-export async function expireTicketHolds() {
+export async function expireTicketHolds(salesId?: string) {
   const sales = await getDb()
     .selectDistinct({ id: ticketBookings.salesId })
     .from(ticketBookings)
@@ -604,6 +604,13 @@ export async function expireTicketHolds() {
       and(
         eq(ticketBookings.status, "pending"),
         lt(ticketBookings.holdUntil, new Date()),
+        salesId ? eq(ticketBookings.salesId, salesId) : undefined,
+        notExists(
+          getDb()
+            .select({ id: ticketPaymentAttempts.id })
+            .from(ticketPaymentAttempts)
+            .where(eq(ticketPaymentAttempts.bookingId, ticketBookings.id)),
+        ),
       ),
     )
     .limit(20);

@@ -4,7 +4,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { getDb } from "@/lib/db";
 import { ticketSales } from "@/lib/db/schema";
-import { ticketInventory } from "@/server/services/tickets";
+import { getTicketAvailability } from "@/server/services/ticket-payments";
 import { genieAvailable } from "@/server/services/genie-client";
 import { TicketBookingForm } from "@/components/tickets/booking-form";
 import { createTicketDetailsSession } from "@/server/security/ticket-details";
@@ -26,7 +26,7 @@ export default async function TicketCheckout({
     .limit(1);
   if (!sale || sale.id !== query.sale || !genieAvailable())
     redirect("/tickets");
-  const stock = await ticketInventory(getDb(), sale.id);
+  const stock = await getTicketAvailability(sale.id);
   if (
     quantity >
     Math.min(sale.maxPerBooking, sale.capacity - stock.held - stock.issued)

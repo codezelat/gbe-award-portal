@@ -361,6 +361,147 @@ describe("guest ticket inventory and checkout", () => {
     ]);
     expect(created).toBe(1);
   });
+  it("automatically clears overdue gateway-cancelled reservations before availability", async () => {
+    const data = await checkout(4);
+    data.transaction.state = "CANCELLED";
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({
+        expiresAt: new Date(Date.now() - 1000),
+        checkedAt: new Date(Date.now() - 2000),
+      })
+      .where(eq(schema.ticketPaymentAttempts.id, data.attempt!.id));
+    const stock = await payments.getTicketAvailability(saleId);
+    expect(stock).toMatchObject({ issued: 0, held: 0, refreshAt: null });
+    const result = await service.getTicketBooking(data.booking.id);
+    expect(result.booking.status).toBe("cancelled");
+    expect(result.attempt!.active).toBe(false);
+    expect(result.attempt!.transactionId).toBe(data.attempt!.transactionId);
+    expect(result.tickets).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(schema.emailOutbox)
+        .where(eq(schema.emailOutbox.templateKey, "guest_tickets")),
+    ).toHaveLength(0);
+  });
+  it("expires unstarted bookings and schedules one refresh for a future checkout", async () => {
+    const abandoned = await service.reserveTickets(request(2));
+    await db
+      .update(schema.ticketBookings)
+      .set({ holdUntil: new Date(Date.now() - 1000) })
+      .where(eq(schema.ticketBookings.id, abandoned.id));
+    const data = await checkout(3);
+    const fetch = vi.mocked(globalThis.fetch);
+    fetch.mockClear();
+    const stock = await payments.getTicketAvailability(saleId);
+    expect(stock).toMatchObject({
+      issued: 0,
+      held: 3,
+      refreshAt: data.attempt!.expiresAt.getTime(),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await service.getTicketBooking(abandoned.id)).booking.status).toBe(
+      "expired",
+    );
+  });
+  it("settles an overdue confirmed payment instead of cancelling its seats", async () => {
+    const data = await checkout(3);
+    data.transaction.state = "CONFIRMED";
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({ expiresAt: new Date(Date.now() - 1000), checkedAt: null })
+      .where(eq(schema.ticketPaymentAttempts.id, data.attempt!.id));
+    expect(await payments.getTicketAvailability(saleId)).toMatchObject({
+      issued: 3,
+      held: 0,
+    });
+    expect(
+      (await service.getTicketBooking(data.booking.id)).tickets,
+    ).toHaveLength(3);
+  });
+  it("retains uncertain overdue seats and backs off failed or still-pending checks", async () => {
+    const data = await checkout(2);
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({ expiresAt: new Date(Date.now() - 1000), checkedAt: null })
+      .where(eq(schema.ticketPaymentAttempts.id, data.attempt!.id));
+    remote.delete(data.attempt!.transactionId!);
+    expect(await payments.refreshExpiredTicketBookings(saleId)).toEqual({
+      checked: 0,
+      failed: 1,
+    });
+    expect(await payments.refreshExpiredTicketBookings(saleId)).toEqual({
+      checked: 0,
+      failed: 0,
+    });
+    expect((await service.ticketInventory(db, saleId)).held).toBe(2);
+    expect(
+      (await service.getTicketBooking(data.booking.id)).booking.status,
+    ).toBe("pending");
+    remote.set(data.attempt!.transactionId!, data.transaction);
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({ checkedAt: null })
+      .where(eq(schema.ticketPaymentAttempts.id, data.attempt!.id));
+    expect(await payments.refreshExpiredTicketBookings(saleId)).toEqual({
+      checked: 1,
+      failed: 0,
+    });
+    expect(await payments.refreshExpiredTicketBookings(saleId)).toEqual({
+      checked: 0,
+      failed: 0,
+    });
+    expect((await service.ticketInventory(db, saleId)).held).toBe(2);
+  });
+  it("claims overdue gateway checks once across concurrent page loads", async () => {
+    const data = await checkout();
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({ expiresAt: new Date(Date.now() - 1000), checkedAt: null })
+      .where(eq(schema.ticketPaymentAttempts.id, data.attempt!.id));
+    const fetch = vi.mocked(globalThis.fetch);
+    fetch.mockClear();
+    const result = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        payments.refreshExpiredTicketBookings(saleId),
+      ),
+    );
+    expect(result.reduce((sum, entry) => sum + entry.checked, 0)).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("bounds reconciliation and advances past failures without crossing sale or environment", async () => {
+    await service.saveTicketSale(
+      { ...settings(), capacity: 30, revision: 1 },
+      actorId,
+    );
+    const ids: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const data = await checkout();
+      ids.push(data.attempt!.id);
+      data.transaction.state = "CANCELLED";
+      if (i === 0) remote.delete(data.attempt!.transactionId!);
+    }
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({ expiresAt: new Date(Date.now() - 1000), checkedAt: null });
+    await db
+      .update(schema.ticketPaymentAttempts)
+      .set({ environment: "production" })
+      .where(eq(schema.ticketPaymentAttempts.id, ids[11]));
+    expect(
+      await payments.refreshExpiredTicketBookings(crypto.randomUUID()),
+    ).toEqual({ checked: 0, failed: 0 });
+    expect(await payments.refreshExpiredTicketBookings(saleId)).toEqual({
+      checked: 9,
+      failed: 1,
+    });
+    expect(await payments.refreshExpiredTicketBookings(saleId)).toEqual({
+      checked: 1,
+      failed: 0,
+    });
+    expect((await service.ticketInventory(db, saleId)).held).toBe(2);
+  });
   it("issues unique QR tickets and one email for duplicate confirmations", async () => {
     const data = await checkout(3);
     data.transaction.state = "CONFIRMED";
@@ -545,6 +686,12 @@ describe("complimentary tickets and admission", () => {
       actorId,
       "No longer needed",
     );
+    const cancelled = await service.getTicketBooking(booking.id);
+    expect(cancelled.booking.status).toBe("cancelled");
+    expect(cancelled.tickets.every((ticket) => !!ticket.voidedAt)).toBe(true);
+    await expect(
+      service.checkInTicket(cancelled.tickets[0].id, actorId),
+    ).rejects.toThrow("not valid");
     expect((await service.ticketInventory(db, saleId)).issued).toBe(0);
     const other = await service.issueComplimentaryTickets(
       complimentary(),
@@ -555,6 +702,20 @@ describe("complimentary tickets and admission", () => {
     await expect(
       service.cancelComplimentaryTickets(other.id, actorId, "No longer needed"),
     ).rejects.toThrow("already checked in");
+  });
+  it("refuses complimentary cancellation for a card-paid booking", async () => {
+    const data = await settle(2);
+    await expect(
+      service.cancelComplimentaryTickets(
+        data.booking.id,
+        actorId,
+        "Not attending",
+      ),
+    ).rejects.toThrow("Only unused complimentary");
+    const unchanged = await service.getTicketBooking(data.booking.id);
+    expect(unchanged.booking.status).toBe("paid");
+    expect(unchanged.tickets.every((ticket) => !ticket.voidedAt)).toBe(true);
+    expect((await service.ticketInventory(db, saleId)).issued).toBe(2);
   });
   it("generates a real multi-page PDF and scoped email access tokens", async () => {
     const data = await settle(2);
@@ -766,6 +927,34 @@ describe("ticket webhooks, private downloads and mail", () => {
     expect(
       (await service.getTicketBooking(data.booking.id)).tickets,
     ).toHaveLength(0);
+  });
+  it("automatically invalidates all tickets and releases seats for a verified refund callback", async () => {
+    const data = await settle(3);
+    await service.checkInTicket(data.tickets[0].id, actorId);
+    remote.get(data.attempt!.transactionId!)!.state = "REFUNDED";
+    for (let i = 0; i < 2; i++) {
+      expect(
+        (
+          await ticketWebhook(
+            webhookRequest(data.attempt!.transactionId!, data.attempt!.id),
+          )
+        ).status,
+      ).toBe(200);
+    }
+    const result = await service.getTicketBooking(data.booking.id);
+    expect(result.booking.status).toBe("refunded");
+    expect(result.booking.confirmedAt).toBeTruthy();
+    expect(result.tickets).toHaveLength(3);
+    expect(result.tickets.every((ticket) => !!ticket.voidedAt)).toBe(true);
+    expect(result.tickets[0].checkedInAt).toBeTruthy();
+    expect((await service.ticketInventory(db, saleId)).issued).toBe(0);
+    expect(
+      (await service.getTicketAdmission(result.tickets[1].id)).status,
+    ).toBe("invalid");
+    await expect(
+      service.checkInTicket(result.tickets[1].id, actorId),
+    ).rejects.toThrow("not valid");
+    await expect(buildGuestTicketPdf(data.booking.id)).rejects.toThrow();
   });
   it("requires the booking credential and returns a private PDF download", async () => {
     const data = await settle();

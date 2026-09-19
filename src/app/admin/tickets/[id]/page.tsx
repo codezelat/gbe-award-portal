@@ -10,6 +10,7 @@ import { nonDeletedApplications } from "@/server/dal/application-visibility";
 import { TicketApplicationLink } from "@/components/admin/ticket-application-link";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
 import { getTicketBooking } from "@/server/services/tickets";
+import { refreshExpiredTicketBookings } from "@/server/services/ticket-payments";
 import { ticketMoney, ticketStatusLabel } from "@/lib/domain/tickets";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { TicketBookingActions } from "@/components/admin/ticket-controls";
@@ -24,8 +25,12 @@ export default async function TicketDetail({
   if (!hasPermission(membership, "payments.view")) notFound();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const data = await getTicketBooking(id.data).catch(() => null);
+  let data = await getTicketBooking(id.data).catch(() => null);
   if (!data) notFound();
+  if (data.booking.status === "pending") {
+    await refreshExpiredTicketBookings(data.booking.salesId);
+    data = await getTicketBooking(id.data);
+  }
   const { booking, tickets, attempt } = data;
   const [[sale], applicationRows] = await Promise.all([
     getDb()

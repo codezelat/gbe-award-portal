@@ -3,7 +3,8 @@ import { Ticket } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { getDb } from "@/lib/db";
 import { ticketSales } from "@/lib/db/schema";
-import { ticketInventory } from "@/server/services/tickets";
+import { getTicketAvailability } from "@/server/services/ticket-payments";
+import { TicketAvailabilityRefresh } from "@/components/tickets/availability-refresh";
 import { genieAvailable } from "@/server/services/genie-client";
 import { TicketQuantity } from "@/components/tickets/ticket-quantity";
 import { Progress } from "@/components/ui/progress";
@@ -40,10 +41,14 @@ export default async function TicketsPage({
         </a>
       </section>
     );
-  const stock = await ticketInventory(getDb(), sale.id);
+  const stock = await getTicketAvailability(sale.id);
   const available = Math.max(0, sale.capacity - stock.issued - stock.held);
   return (
     <div className="grid items-start gap-8 md:grid-cols-[.85fr_1.15fr] md:gap-12">
+      <TicketAvailabilityRefresh
+        refreshAt={stock.refreshAt}
+        serverNow={stock.serverNow}
+      />
       <section className="min-w-0 md:sticky md:top-28">
         <span className="text-xs font-semibold uppercase tracking-widest text-antique-gold">
           GBE Awards

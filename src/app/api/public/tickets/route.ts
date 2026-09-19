@@ -9,7 +9,10 @@ import { enforceRateLimit } from "@/server/security/rate-limit";
 import { verifyTurnstile } from "@/server/security/turnstile";
 import { setTicketSession } from "@/server/security/ticket-session";
 import { requireGenie } from "@/server/services/genie-client";
-import { startTicketCheckout } from "@/server/services/ticket-payments";
+import {
+  refreshExpiredTicketBookings,
+  startTicketCheckout,
+} from "@/server/services/ticket-payments";
 import { verifyTicketDetails } from "@/server/security/ticket-details";
 
 export async function POST(request: Request) {
@@ -48,6 +51,7 @@ export async function POST(request: Request) {
     await enforceRateLimit(`ticket-ip:${fingerprint(ip)}`, 10, 900);
     await enforceRateLimit(`ticket-email:${fingerprint(raw.email)}`, 5, 900);
     await verifyTurnstile(raw.turnstileToken, ip, "gbe_ticket_booking");
+    await refreshExpiredTicketBookings(raw.salesId);
     const booking = await reserveTickets(raw);
     await setTicketSession(booking.id, raw.secret);
     const checkout = await startTicketCheckout(booking.id).catch(() => null);

@@ -12,7 +12,8 @@ import {
   ticketSales,
 } from "@/lib/db/schema";
 import { hasPermission, requireStaff } from "@/server/dal/auth";
-import { ticketInventory } from "@/server/services/tickets";
+import { getTicketAvailability } from "@/server/services/ticket-payments";
+import { TicketAvailabilityRefresh } from "@/components/tickets/availability-refresh";
 import {
   ticketMoney,
   ticketStatuses,
@@ -64,8 +65,8 @@ export default async function AdminTicketsPage({
     .where(eq(ticketSales.cycleId, cycle.id))
     .limit(1);
   const stock = sale
-    ? await ticketInventory(getDb(), sale.id)
-    : { issued: 0, held: 0 };
+    ? await getTicketAvailability(sale.id)
+    : { issued: 0, held: 0, refreshAt: null, serverNow: 0 };
   const available = Math.max(
     0,
     (sale?.capacity ?? 0) - stock.issued - stock.held,
@@ -107,6 +108,10 @@ export default async function AdminTicketsPage({
     `/admin/tickets?${new URLSearchParams({ ...(search ? { search } : {}), ...(status ? { status } : {}), page: String(page) })}`;
   return (
     <div className="min-w-0 space-y-6">
+      <TicketAvailabilityRefresh
+        refreshAt={stock.refreshAt}
+        serverNow={stock.serverNow}
+      />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <AdminPageHeader title="Tickets" description={cycle.name} />
         <div className="flex flex-wrap gap-2">

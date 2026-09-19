@@ -3,13 +3,15 @@ import { revalidatePath } from "next/cache";
 import { and, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
-import { applications } from "@/lib/db/schema";
+import { applications, ticketSales } from "@/lib/db/schema";
+import { ticketSettingsSchema } from "@/lib/domain/tickets";
 import { requireStaff, hasPermission } from "@/server/dal/auth";
 import { submittedApplications } from "@/server/dal/application-visibility";
 import { assertSameOrigin } from "@/server/security/request";
 import { enforceRateLimit } from "@/server/security/rate-limit";
 import {
   cancelComplimentaryTickets,
+  complimentarySchema,
   checkInTicket,
   getTicketAdmission,
   linkTicketBooking,
@@ -18,7 +20,10 @@ import {
   saveTicketSale,
   TicketError,
 } from "@/server/services/tickets";
-import { checkTicketPayment } from "@/server/services/ticket-payments";
+import {
+  checkTicketPayment,
+  refreshExpiredTicketBookings,
+} from "@/server/services/ticket-payments";
 import { scheduleEmailOutboxProcessing } from "@/server/jobs/schedule-email-delivery";
 async function staff(permission: string, admission = false) {
   await assertSameOrigin();
@@ -52,7 +57,14 @@ export async function saveTicketSettings(input: unknown) {
     const {
       profile: { id: actor },
     } = await staff("configuration.manage");
-    await saveTicketSale(input, actor);
+    const parsed = ticketSettingsSchema.parse(input);
+    const [sale] = await getDb()
+      .select({ id: ticketSales.id })
+      .from(ticketSales)
+      .where(eq(ticketSales.cycleId, parsed.cycleId))
+      .limit(1);
+    if (sale) await refreshExpiredTicketBookings(sale.id);
+    await saveTicketSale(parsed, actor);
     refresh();
     return { ok: true as const };
   } catch (error) {
@@ -64,7 +76,9 @@ export async function issueGuestTickets(input: unknown) {
     const {
       profile: { id: actor },
     } = await staff("payments.verify");
-    const booking = await issueComplimentaryTickets(input, actor);
+    const parsed = complimentarySchema.parse(input);
+    await refreshExpiredTicketBookings(parsed.salesId);
+    const booking = await issueComplimentaryTickets(parsed, actor);
     scheduleEmailOutboxProcessing();
     refresh();
     return { ok: true as const, id: booking.id };
