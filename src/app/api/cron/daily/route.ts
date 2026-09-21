@@ -6,6 +6,7 @@ import {
   cleanupStaleUploads,
 } from "@/server/jobs/cleanup";
 import { processEmailOutbox } from "@/server/jobs/email-outbox";
+import { cleanupTicketEmailSnapshots } from "@/server/jobs/ticket-email-cleanup";
 import { runTrackedJob } from "@/server/jobs/tracked-job";
 import { reconcilePendingCardPayments } from "@/server/services/card-payments";
 import { reconcilePendingTicketPayments } from "@/server/services/ticket-payments";
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
     ["cleanup-exports", cleanupExpiredExports],
     ["cleanup-retention", cleanupRetention],
     ["email-outbox", () => processEmailOutbox(100)],
+    ["cleanup-ticket-emails", cleanupTicketEmailSnapshots],
   ];
   const results: Record<string, unknown> = {};
   for (const [key, run] of jobs) {

@@ -7,6 +7,8 @@ import { env, requireProvider } from "@/lib/env";
 import { getFeatureFlags } from "@/server/services/feature-flags";
 import { getEmailTemplateCopies } from "@/server/services/email-template-service";
 
+class TicketEmailReviewRequired extends Error {}
+
 function htmlToPlainText(html: string) {
   return html
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
@@ -180,26 +182,90 @@ export async function processEmailOutbox(limit = 25) {
                   : undefined,
               });
       const text = htmlToPlainText(html);
-      const result = await resend.emails.send(
-        {
-          from: env.EMAIL_FROM,
-          to: item.recipientEmail,
-          replyTo: env.EMAIL_REPLY_TO,
-          subject: title,
-          html,
-          text,
-          attachments: ticketMail
-            ? [
+      const baseMessage = {
+        from: env.EMAIL_FROM,
+        to: item.recipientEmail,
+        replyTo: env.EMAIL_REPLY_TO,
+        subject: title,
+        html,
+        text,
+        headers: { "X-Entity-Ref-ID": item.id },
+      };
+      let providerMessage = baseMessage;
+      if (ticketMail) {
+        if (
+          item.attemptCount > 0 &&
+          payload.ticketDeliveryVersion !== "attachment-v1"
+        )
+          throw new TicketEmailReviewRequired(
+            "Previous link-based send needs staff review before a new email is requested.",
+          );
+        if (!payload.ticketDeliveryVersion) {
+          payload.ticketDeliveryVersion = "attachment-v1";
+          await db
+            .update(emailOutbox)
+            .set({ payload })
+            .where(eq(emailOutbox.id, item.id));
+        }
+        const startedAt = payload.ticketDeliveryStartedAt;
+        // Resend retains idempotency keys for 24 hours. An uncertain send outside
+        // that window must not be retried automatically with a fresh key.
+        if (
+          startedAt &&
+          (!Number.isFinite(Date.parse(startedAt)) ||
+            Date.now() - Date.parse(startedAt) >= 23 * 60 * 60 * 1000)
+        )
+          throw new TicketEmailReviewRequired(
+            "Ticket email delivery needs staff review before retrying.",
+          );
+        const { getTicketEmailSnapshot } =
+          await import("@/server/services/ticket-email-snapshot");
+        providerMessage = await getTicketEmailSnapshot(
+          item.id,
+          payload.ticketEmailSnapshot === "v1",
+          async () => {
+            const { buildGuestTicketPdf } =
+              await import("@/server/services/ticket-document");
+            const pdf = await buildGuestTicketPdf(ticketMail.booking.id);
+            return {
+              ...baseMessage,
+              attachments: [
                 {
                   filename: `${ticketMail.booking.reference}-tickets.pdf`,
-                  path: ticketMail.attachmentUrl,
+                  content: pdf.toString("base64"),
+                  contentType: "application/pdf",
                 },
-              ]
-            : undefined,
-          headers: { "X-Entity-Ref-ID": item.id },
-        },
-        { idempotencyKey: item.id },
-      );
+              ],
+            };
+          },
+        );
+        await db
+          .update(emailOutbox)
+          .set({
+            payload: {
+              ...payload,
+              ticketDeliveryVersion: "attachment-v1",
+              ticketEmailSnapshot: "v1",
+              ticketDeliveryStartedAt: startedAt ?? new Date().toISOString(),
+            },
+          })
+          .where(eq(emailOutbox.id, item.id));
+        // Cancellation/refund may have happened while preparing the attachment.
+        if (
+          !(await (
+            await import("@/server/services/ticket-email")
+          ).prepareTicketEmail(ticketMail.booking.id))
+        ) {
+          await db
+            .update(emailOutbox)
+            .set({ status: "cancelled" })
+            .where(eq(emailOutbox.id, item.id));
+          continue;
+        }
+      }
+      const result = await resend.emails.send(providerMessage, {
+        idempotencyKey: item.id,
+      });
       if (result.error) throw new Error(result.error.message);
       await db
         .update(emailOutbox)
@@ -237,11 +303,17 @@ export async function processEmailOutbox(limit = 25) {
       await db
         .update(emailOutbox)
         .set({
-          status: attempts >= 5 ? "failed" : "queued",
+          status:
+            attempts >= 5 || error instanceof TicketEmailReviewRequired
+              ? "failed"
+              : "queued",
           nextAttemptAt: new Date(
             Date.now() + Math.min(3600, 60 * 2 ** attempts) * 1000,
           ),
-          lastErrorCode: "SEND_FAILED",
+          lastErrorCode:
+            error instanceof TicketEmailReviewRequired
+              ? "TICKET_EMAIL_REVIEW_REQUIRED"
+              : "SEND_FAILED",
           lastErrorSummary:
             error instanceof Error
               ? error.message.slice(0, 300)

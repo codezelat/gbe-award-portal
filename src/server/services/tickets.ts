@@ -252,7 +252,10 @@ export async function issueBookingTickets(tx: Tx, booking: TicketBooking) {
       templateKey: "guest_tickets",
       recipientEmail: booking.email,
       applicationId: booking.applicationId,
-      payload: { bookingId: booking.id },
+      payload: {
+        bookingId: booking.id,
+        ticketDeliveryVersion: "attachment-v1",
+      },
       idempotencyKey: `guest-tickets:${booking.id}:initial`,
     })
     .onConflictDoNothing({ target: emailOutbox.idempotencyKey });
@@ -583,7 +586,7 @@ export async function resendTicketEmail(
         templateKey: "guest_tickets",
         recipientEmail: locked.email,
         applicationId: locked.applicationId,
-        payload: { bookingId: id },
+        payload: { bookingId: id, ticketDeliveryVersion: "attachment-v1" },
         idempotencyKey: `guest-tickets:${id}:resend:${z.uuid().parse(requestId)}`,
       })
       .onConflictDoNothing({ target: emailOutbox.idempotencyKey });

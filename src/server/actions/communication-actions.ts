@@ -38,6 +38,10 @@ export async function retryEmailAction(formData: FormData) {
       .from(emailOutbox)
       .where(eq(emailOutbox.id, id))
       .limit(1);
+    if (item?.templateKey === "guest_tickets")
+      throw new Error(
+        "Open the ticket booking and use Resend email to request a new ticket email.",
+      );
     const retried = await tx
       .update(emailOutbox)
       .set({

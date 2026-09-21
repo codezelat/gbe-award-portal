@@ -1,6 +1,7 @@
 import "server-only";
 import React from "react";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import {
   Document,
   Font,
@@ -25,14 +26,16 @@ export async function buildGuestTicketPdf(id: string) {
     throw new TicketError("Tickets are not available for this booking.");
   Font.register({
     family: "Ticket Sans",
-    src: path.join(
-      process.cwd(),
-      "node_modules",
-      "@expo-google-fonts",
-      "noto-sans",
-      "400Regular",
-      "NotoSans_400Regular.ttf",
-    ),
+    src: `data:font/ttf;base64,${readFileSync(
+      path.join(
+        process.cwd(),
+        "node_modules",
+        "@expo-google-fonts",
+        "noto-sans",
+        "400Regular",
+        "NotoSans_400Regular.ttf",
+      ),
+    ).toString("base64")}`,
   });
   const codes = await Promise.all(
     tickets.map((ticket) =>

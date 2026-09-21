@@ -11,10 +11,21 @@ import postgres from "postgres";
 import { createHash } from "node:crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { and, eq } from "drizzle-orm";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import * as schema from "../../src/lib/db/schema";
 
 vi.mock("server-only", () => ({}));
 const emailSend = vi.hoisted(() => vi.fn());
+const storedEmails = new Map<string, Buffer>();
+const r2Send = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/r2/client", () => ({
+  getR2: () => ({ send: r2Send }),
+  r2ObjectKey: (key: string) => `e2e/ticket-email/${key}`,
+}));
 vi.mock("resend", () => ({
   Resend: class {
     emails = { send: emailSend };
@@ -39,6 +50,7 @@ vi.mock("@/lib/env", () => ({
     APP_ENV: "local",
     EMAIL_FROM: "GBE Test <test@example.test>",
     EMAIL_REPLY_TO: "support@example.test",
+    R2_PRIVATE_BUCKET: "isolated-test-bucket",
     BETTER_AUTH_SECRET: "isolated-ticket-tests-only-not-production",
   },
   publicEnv: { NEXT_PUBLIC_APP_URL: "http://localhost:3102" },
@@ -57,6 +69,8 @@ const { prepareTicketEmail } =
   await import("../../src/server/services/ticket-email");
 const { processEmailOutbox } =
   await import("../../src/server/jobs/email-outbox");
+const { cleanupTicketEmailSnapshots } =
+  await import("../../src/server/jobs/ticket-email-cleanup");
 const { POST: ticketWebhook } =
   await import("../../src/app/api/webhooks/genie-tickets/route");
 const { GET: ticketDownload } =
@@ -166,6 +180,30 @@ beforeEach(async () => {
   cookieValues.clear();
   emailSend.mockReset();
   emailSend.mockResolvedValue({ data: { id: "local-email-id" }, error: null });
+  storedEmails.clear();
+  r2Send.mockReset();
+  r2Send.mockImplementation(
+    async (
+      command: GetObjectCommand | PutObjectCommand | DeleteObjectCommand,
+    ) => {
+      const key = command.input.Key!;
+      if (command instanceof GetObjectCommand) {
+        const body = storedEmails.get(key);
+        if (!body) throw { $metadata: { httpStatusCode: 404 } };
+        return {
+          ContentLength: body.length,
+          Body: { transformToByteArray: async () => body },
+        };
+      }
+      if (command instanceof DeleteObjectCommand) {
+        storedEmails.delete(key);
+        return {};
+      }
+      if (storedEmails.has(key)) throw { $metadata: { httpStatusCode: 412 } };
+      storedEmails.set(key, Buffer.from(command.input.Body as Uint8Array));
+      return {};
+    },
+  );
   await db.delete(schema.guestTickets);
   await db.delete(schema.ticketPaymentAttempts);
   await db
@@ -986,13 +1024,17 @@ describe("ticket webhooks, private downloads and mail", () => {
     expect(sent).toBeTruthy();
     expect(sent.html).toContain("2 guest tickets");
     expect(sent.html).toContain("View tickets");
-    expect(sent.attachments[0].path).toContain(
-      `/api/public/tickets/${data.booking.id}/download`,
-    );
-    const attachment = await ticketDownload(
-      new Request(sent.attachments[0].path),
-      { params: Promise.resolve({ id: data.booking.id }) },
-    );
+    expect(sent.attachments[0].path).toBeUndefined();
+    expect(sent.attachments[0].contentType).toBe("application/pdf");
+    const attachedPdf = Buffer.from(sent.attachments[0].content, "base64");
+    expect(attachedPdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(
+      attachedPdf.toString("latin1").match(/\/Type \/Page\b/g)?.length,
+    ).toBe(2);
+    const downloadUrl = `http://localhost:3102/api/public/tickets/${data.booking.id}/download?token=${ticketDocumentToken(data.booking.id)}`;
+    const attachment = await ticketDownload(new Request(downloadUrl), {
+      params: Promise.resolve({ id: data.booking.id }),
+    });
     expect(attachment.status).toBe(200);
     expect(
       Buffer.from(await attachment.arrayBuffer())
@@ -1007,7 +1049,7 @@ describe("ticket webhooks, private downloads and mail", () => {
     ).toBe(false);
     const badAttachment = await ticketDownload(
       new Request(
-        sent.attachments[0].path.replace(
+        downloadUrl.replace(
           ticketDocumentToken(data.booking.id),
           "a".repeat(64),
         ),
@@ -1028,6 +1070,130 @@ describe("ticket webhooks, private downloads and mail", () => {
     const count = emailSend.mock.calls.length;
     await processEmailOutbox(1000);
     expect(emailSend.mock.calls.length).toBe(count);
+  });
+  it("retries the identical attached PDF and provider request after an uncertain send", async () => {
+    await settle(2);
+    emailSend.mockRejectedValueOnce(
+      new Error("Provider connection interrupted"),
+    );
+    await processEmailOutbox(1000);
+    const first = emailSend.mock.calls[0];
+    const [queued] = await db
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    expect(queued.status).toBe("queued");
+    expect(queued.payload).toMatchObject({ ticketEmailSnapshot: "v1" });
+    expect(JSON.stringify(queued.payload)).not.toContain(
+      first[0].attachments[0].content,
+    );
+    await db
+      .update(schema.emailOutbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.emailOutbox.id, queued.id));
+    await processEmailOutbox(1000);
+    expect(emailSend.mock.calls[1]).toEqual(first);
+    expect(
+      r2Send.mock.calls.filter(
+        ([command]) => command instanceof PutObjectCommand,
+      ),
+    ).toHaveLength(1);
+  });
+  it("does not send when private snapshot storage fails", async () => {
+    await settle();
+    r2Send.mockRejectedValue(new Error("Storage unavailable"));
+    await processEmailOutbox(1000);
+    expect(emailSend).not.toHaveBeenCalled();
+    const [email] = await db
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    expect(email.status).toBe("queued");
+    expect(email.lastErrorSummary).toBe(
+      "Ticket email attachment could not be prepared. Retry later.",
+    );
+  });
+  it("never regenerates an attachment after an uncertain send if its saved copy is missing", async () => {
+    await settle();
+    emailSend.mockRejectedValueOnce(new Error("timeout"));
+    await processEmailOutbox(1000);
+    storedEmails.clear();
+    await db
+      .update(schema.emailOutbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    await processEmailOutbox(1000);
+    expect(emailSend).toHaveBeenCalledTimes(1);
+  });
+  it("leaves previously failed emails untouched and pauses uncertain legacy sends", async () => {
+    const data = await settle();
+    await db
+      .update(schema.emailOutbox)
+      .set({
+        status: "failed",
+        attemptCount: 1,
+        payload: { bookingId: data.booking.id },
+      })
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    await processEmailOutbox(1000);
+    expect(emailSend).not.toHaveBeenCalled();
+    await db
+      .update(schema.emailOutbox)
+      .set({ status: "queued", nextAttemptAt: new Date(0) })
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    await processEmailOutbox(1000);
+    expect(emailSend).not.toHaveBeenCalled();
+    const [email] = await db
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    expect(email.status).toBe("failed");
+    expect(email.lastErrorCode).toBe("TICKET_EMAIL_REVIEW_REQUIRED");
+  });
+  it("does not repeat uncertain sends outside the provider idempotency window", async () => {
+    await settle();
+    emailSend.mockRejectedValueOnce(new Error("timeout"));
+    await processEmailOutbox(1000);
+    const [email] = await db
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    await db
+      .update(schema.emailOutbox)
+      .set({
+        nextAttemptAt: new Date(0),
+        payload: {
+          ...(email.payload as object),
+          ticketDeliveryStartedAt: new Date(
+            Date.now() - 24 * 3600000,
+          ).toISOString(),
+        },
+      })
+      .where(eq(schema.emailOutbox.id, email.id));
+    await processEmailOutbox(1000);
+    expect(emailSend).toHaveBeenCalledTimes(1);
+    const [result] = await db
+      .select()
+      .from(schema.emailOutbox)
+      .where(eq(schema.emailOutbox.id, email.id));
+    expect(result.status).toBe("failed");
+    expect(result.lastErrorCode).toBe("TICKET_EMAIL_REVIEW_REQUIRED");
+  });
+  it("cleans terminal email snapshots after 30 days without removing ticket records", async () => {
+    const data = await settle();
+    await processEmailOutbox(1000);
+    expect(storedEmails.size).toBe(1);
+    expect(await cleanupTicketEmailSnapshots()).toEqual({ removed: 0 });
+    await db
+      .update(schema.emailOutbox)
+      .set({ createdAt: new Date(Date.now() - 31 * 86400000) })
+      .where(eq(schema.emailOutbox.templateKey, "guest_tickets"));
+    expect(await cleanupTicketEmailSnapshots()).toEqual({ removed: 1 });
+    expect(storedEmails.size).toBe(0);
+    expect(
+      (await service.getTicketBooking(data.booking.id)).tickets,
+    ).toHaveLength(1);
+    expect(await cleanupTicketEmailSnapshots()).toEqual({ removed: 0 });
   });
   it("cancels queued mail after a refund instead of sending invalid tickets", async () => {
     const data = await settle();

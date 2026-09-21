@@ -2,6 +2,7 @@ import { OffsetPagination } from "@/components/shared/offset-pagination";
 import { parsePage } from "@/lib/domain/pagination";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import Link from "next/link";
+import { z } from "zod";
 import {
   and,
   count,
@@ -30,6 +31,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 const pageSizes = [25, 50, 100] as const;
+
+function ticketEmailHref(payload: unknown) {
+  const parsed = z.object({ bookingId: z.uuid() }).safeParse(payload);
+  return parsed.success
+    ? `/admin/tickets/${parsed.data.bookingId}`
+    : "/admin/tickets";
+}
 
 export default async function CommunicationsPage({
   searchParams,
@@ -263,7 +271,20 @@ export default async function CommunicationsPage({
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        {["failed", "cancelled"].includes(email.status) ? (
+                        {email.templateKey === "guest_tickets" ? (
+                          hasPermission(membership, "payments.view") ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              nativeButton={false}
+                              render={
+                                <Link href={ticketEmailHref(email.payload)} />
+                              }
+                            >
+                              View booking
+                            </Button>
+                          ) : null
+                        ) : ["failed", "cancelled"].includes(email.status) ? (
                           <form action={retryEmailAction}>
                             <input
                               type="hidden"
