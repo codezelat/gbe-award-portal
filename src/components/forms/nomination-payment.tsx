@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, CreditCard, Landmark, LoaderCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MAX_FILE_SIZE, paymentTypes } from "@/lib/validation/application";
@@ -228,14 +228,11 @@ export function NominationPayment({
             {cardEnabled && (
               <Button
                 disabled={Boolean(busy)}
+                loading={busy === "checkout"}
                 onClick={() => void act("checkout")}
                 className="h-auto min-h-14 gap-2 whitespace-normal px-5 py-3 leading-6"
               >
-                {busy === "checkout" ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <CreditCard />
-                )}{" "}
+                <CreditCard aria-hidden data-icon="inline-start" />
                 {waiting ? "Continue card checkout" : "Pay securely by card"}
               </Button>
             )}
@@ -243,14 +240,11 @@ export function NominationPayment({
               <Button
                 variant="outline"
                 disabled={Boolean(busy) || payment.method === "bank_transfer"}
+                loading={busy === "bank_transfer"}
                 onClick={() => void act("bank_transfer")}
                 className="h-auto min-h-14 gap-2 whitespace-normal px-5 py-3 leading-6"
               >
-                {busy === "bank_transfer" ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <Landmark />
-                )}{" "}
+                <Landmark aria-hidden data-icon="inline-start" />
                 Bank transfer
               </Button>
             )}
@@ -312,9 +306,9 @@ export function NominationPayment({
               <Button
                 className="mt-4 h-auto min-h-14 w-full gap-2 whitespace-normal px-6 py-3 text-base font-semibold leading-6 sm:w-auto"
                 disabled={Boolean(busy) || !file}
+                loading={busy === "upload"}
                 onClick={() => void uploadProof()}
               >
-                {busy === "upload" && <LoaderCircle className="animate-spin" />}
                 Submit payment proof
               </Button>
             </div>
@@ -332,9 +326,9 @@ export function NominationPayment({
             variant="ghost"
             className="h-auto min-h-11 whitespace-normal px-4 py-2"
             disabled={Boolean(busy)}
+            loading={busy === "status"}
             onClick={() => void act("status")}
           >
-            {busy === "status" && <LoaderCircle className="animate-spin" />}
             Check payment status
           </Button>
           {pollingEnded && (

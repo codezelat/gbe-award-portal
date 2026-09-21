@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useActionState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({
@@ -32,6 +33,40 @@ describe("pending interaction feedback", () => {
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toHaveAttribute("data-pending", "true");
+    expect(button.querySelectorAll('[data-slot="button-spinner"]')).toHaveLength(
+      1,
+    );
+  });
+
+  it("shows one spinner when explicit and native form pending overlap", async () => {
+    let complete!: (value: number) => void;
+    const request = new Promise<number>((resolve) => {
+      complete = resolve;
+    });
+    const action = vi.fn(() => request);
+    function Form() {
+      const [, submit, pending] = useActionState(action, 0);
+      return (
+        <form action={submit}>
+          <Button loading={pending}>Check payment</Button>
+          <Button type="button">Other action</Button>
+        </form>
+      );
+    }
+    render(<Form />);
+    const button = screen.getByRole("button", { name: "Check payment" });
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute("aria-busy", "true"));
+    expect(button.querySelectorAll("svg")).toHaveLength(1);
+    expect(button).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Other action" }),
+    ).not.toHaveAttribute("aria-busy");
+    fireEvent.click(button);
+    expect(action).toHaveBeenCalledTimes(1);
+    await act(async () => complete(1));
+    expect(button).toBeEnabled();
+    expect(button.querySelector("svg")).toBeNull();
   });
 
   it("delays navigation feedback, locks the clicked link and clears on arrival", () => {

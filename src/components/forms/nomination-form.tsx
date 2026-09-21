@@ -11,7 +11,6 @@ import {
   ChevronsUpDown,
   CreditCard,
   Landmark,
-  LoaderCircle,
   LockKeyhole,
   RotateCcw,
   X,
@@ -1270,14 +1269,10 @@ export function NominationForm({
             <Button
               type="submit"
               disabled={busy || unavailable}
+              loading={busy}
               className="ceremonial-button h-auto min-h-14 flex-none gap-3 whitespace-normal px-6 py-3 text-base font-semibold leading-6 sm:flex-1"
             >
-              {busy ? (
-                <LoaderCircle
-                  className="animate-spin"
-                  data-icon="inline-start"
-                />
-              ) : stage === "upload_failed" || stage === "completion_failed" ? (
+              {stage === "upload_failed" || stage === "completion_failed" ? (
                 <RotateCcw data-icon="inline-start" />
               ) : null}
               {stage === "upload_failed"
@@ -1356,11 +1351,9 @@ export function NominationForm({
             type="button"
             className="h-11"
             disabled={unavailable || busy}
+            loading={savingStep || restoring}
             onClick={() => void moveToNextStep()}
           >
-            {savingStep || restoring ? (
-              <LoaderCircle aria-hidden className="animate-spin" />
-            ) : null}
             {savingStep ? "Saving" : restoring ? "Loading" : "Continue"}
             <ArrowRight data-icon="inline-end" />
           </Button>

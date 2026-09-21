@@ -1,7 +1,6 @@
 "use client";
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { checkCardPaymentAction } from "@/server/actions/card-payment-actions";
@@ -46,8 +45,8 @@ export function CardPaymentCheck({
       ) : (
         <input name="transactionId" type="hidden" value="" />
       )}
-      <Button size="sm" variant="outline" disabled={pending}>
-        {pending && <LoaderCircle className="animate-spin" />}Check Genie status
+      <Button size="sm" variant="outline" loading={pending}>
+        Check Genie status
       </Button>
       {state.message && (
         <p

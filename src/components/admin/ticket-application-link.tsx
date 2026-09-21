@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Link2, LoaderCircle, Search } from "lucide-react";
+import { Link2, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
   findTicketApplications,
@@ -140,12 +140,9 @@ export function TicketApplicationLink({
                 className="size-11 shrink-0"
                 aria-label="Search applications"
                 disabled={busy}
+                loading={busy}
               >
-                {busy ? (
-                  <LoaderCircle aria-hidden className="animate-spin" />
-                ) : (
-                  <Search aria-hidden />
-                )}
+                <Search aria-hidden data-icon="inline-start" />
               </Button>
             </form>
             <div className="space-y-2">
@@ -194,9 +191,9 @@ export function TicketApplicationLink({
             <Button
               className="h-12 min-h-12"
               disabled={busy}
+              loading={busy}
               onClick={() => void save(selected.id || null)}
             >
-              {busy && <LoaderCircle aria-hidden className="animate-spin" />}
               {selected.id ? "Link booking" : "Remove link"}
             </Button>
             <Button

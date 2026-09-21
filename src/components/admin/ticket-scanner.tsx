@@ -271,13 +271,10 @@ export function TicketScanner() {
             variant="outline"
             className="min-h-12 shrink-0 sm:flex-1"
             disabled={busy || starting}
+            loading={busy && !open}
             onClick={() => upload.current?.click()}
           >
-            {busy && !open ? (
-              <LoaderCircle aria-hidden className="animate-spin" />
-            ) : (
-              <ImageUp aria-hidden />
-            )}
+            <ImageUp aria-hidden data-icon="inline-start" />
             Scan screenshot
           </Button>
           <input
@@ -372,9 +369,9 @@ export function TicketScanner() {
               <Button
                 className="h-12 min-h-12"
                 disabled={busy}
+                loading={busy}
                 onClick={() => void admit()}
               >
-                {busy && <LoaderCircle aria-hidden className="animate-spin" />}
                 Confirm check-in
               </Button>
             )}

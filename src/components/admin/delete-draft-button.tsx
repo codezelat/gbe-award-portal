@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteInProgress,
@@ -187,16 +187,9 @@ export function DeleteInProgressButton({
             className="h-11"
             type="button"
             disabled={pending || !records.length}
-            aria-busy={pending}
+            loading={pending}
             onClick={() => void remove()}
           >
-            {pending ? (
-              <LoaderCircle
-                aria-hidden="true"
-                className="animate-spin"
-                data-icon="inline-start"
-              />
-            ) : null}
             {pending
               ? "Deleting"
               : failures.length

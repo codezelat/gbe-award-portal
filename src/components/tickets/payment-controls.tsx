@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { TicketCountdown } from "./countdown";
@@ -128,10 +128,8 @@ export function TicketPaymentControls({
         variant="outline"
         disabled={!!busy}
         onClick={() => run("check")}
+        loading={busy === "check"}
       >
-        {busy === "check" && (
-          <LoaderCircle aria-hidden className="animate-spin" />
-        )}
         Check payment status
       </Button>
       <FieldError>{error}</FieldError>

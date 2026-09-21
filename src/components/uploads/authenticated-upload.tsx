@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { FileUp, LoaderCircle, CheckCircle2 } from "lucide-react";
+import { FileUp, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 export function AuthenticatedUpload({
@@ -103,10 +103,9 @@ export function AuthenticatedUpload({
         type="button"
         onClick={upload}
         disabled={!file || state !== "idle"}
+        loading={state === "uploading"}
       >
-        {state === "uploading" ? (
-          <LoaderCircle className="animate-spin" data-icon="inline-start" />
-        ) : state === "complete" ? (
+        {state === "complete" ? (
           <CheckCircle2 data-icon="inline-start" />
         ) : (
           <FileUp data-icon="inline-start" />

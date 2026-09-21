@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -132,9 +132,9 @@ export function TicketBookingForm({
           variant="outline"
           className="mb-5 h-12 min-h-12 w-full"
           disabled={refreshing || busy}
+          loading={refreshing}
           onClick={() => startRefresh(() => router.refresh())}
         >
-          {refreshing && <LoaderCircle aria-hidden className="animate-spin" />}
           Refresh availability
         </Button>
       )}

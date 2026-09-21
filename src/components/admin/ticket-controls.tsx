@@ -2,7 +2,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
-import { LoaderCircle, Search, Settings2, TicketPlus } from "lucide-react";
+import { Search, Settings2, TicketPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -212,8 +212,8 @@ export function TicketSettings({
               type="submit"
               className="h-11 min-h-11 w-full"
               disabled={busy}
+              loading={busy}
             >
-              {busy && <LoaderCircle aria-hidden className="animate-spin" />}
               Save settings
             </Button>
           </fieldset>
@@ -313,13 +313,10 @@ export function ComplimentaryTickets({
                 size="icon"
                 aria-label="Search applications"
                 disabled={busy}
+                loading={busy}
                 className="size-10 shrink-0"
               >
-                {busy ? (
-                  <LoaderCircle aria-hidden className="animate-spin" />
-                ) : (
-                  <Search aria-hidden />
-                )}
+                <Search aria-hidden data-icon="inline-start" />
               </Button>
             </form>
             <div className="space-y-2">
@@ -423,8 +420,8 @@ export function ComplimentaryTickets({
                 type="submit"
                 className="h-11 min-h-11 w-full"
                 disabled={busy}
+                loading={busy}
               >
-                {busy && <LoaderCircle aria-hidden className="animate-spin" />}
                 Issue and email tickets
               </Button>
             </fieldset>
@@ -589,9 +586,9 @@ export function TicketBookingActions({
                 type="submit"
                 className="h-11 min-h-11 w-full"
                 disabled={busy}
+                loading={busy}
                 variant={action === "cancel" ? "destructive" : "default"}
               >
-                {busy && <LoaderCircle aria-hidden className="animate-spin" />}
                 {action === "cancel" ? "Cancel tickets" : "Confirm"}
               </Button>
             </fieldset>
@@ -611,6 +608,7 @@ export function AdmitTicket({ id }: { id: string }) {
       <Button
         className="h-12 min-h-12 w-full"
         disabled={busy}
+        loading={busy}
         onClick={async () => {
           if (lock.current) return;
           lock.current = true;
@@ -632,8 +630,7 @@ export function AdmitTicket({ id }: { id: string }) {
           }
         }}
       >
-        {busy && <LoaderCircle aria-hidden className="animate-spin" />}Confirm
-        check-in
+        Confirm check-in
       </Button>
       <FieldError>{error}</FieldError>
     </div>

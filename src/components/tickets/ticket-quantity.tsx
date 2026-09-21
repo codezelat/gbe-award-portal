@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LoaderCircle, Minus, Plus } from "lucide-react";
+import { ArrowRight, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ticketMoney } from "@/lib/domain/tickets";
 export function TicketQuantity({
@@ -60,6 +60,7 @@ export function TicketQuantity({
       <Button
         className="mt-7 h-12 min-h-12 w-full rounded-xl"
         disabled={pending}
+        loading={pending}
         onClick={() =>
           startTransition(() =>
             router.push(
@@ -68,7 +69,6 @@ export function TicketQuantity({
           )
         }
       >
-        {pending ? <LoaderCircle aria-hidden className="animate-spin" /> : null}
         Continue{!pending && <ArrowRight aria-hidden />}
       </Button>
     </section>

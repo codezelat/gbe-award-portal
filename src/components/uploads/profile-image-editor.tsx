@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Cropper, { type Area } from "react-easy-crop";
-import { Camera, CheckCircle2, LoaderCircle, Trash2 } from "lucide-react";
+import { Camera, CheckCircle2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -173,10 +173,9 @@ export function ProfileImageEditor({
         type="button"
         onClick={save}
         disabled={!file || !pixels || state !== "idle"}
+        loading={state === "uploading"}
       >
-        {state === "uploading" ? (
-          <LoaderCircle className="animate-spin" data-icon="inline-start" />
-        ) : state === "complete" ? (
+        {state === "complete" ? (
           <CheckCircle2 data-icon="inline-start" />
         ) : (
           <Camera data-icon="inline-start" />

@@ -141,6 +141,7 @@ bun run db:bootstrap-admin
 ## 6. UI, accessibility and responsive behavior
 
 - Reuse existing shared components and design tokens. Avoid new one-off design systems or heavy dependencies for a local change.
+- Let the shared `Button` own action loading feedback: use its `loading` prop, never add a second spinner inside it. Native React form actions already receive pending feedback through `useFormStatus`. Keep standalone preview, upload-item and navigation indicators separate from button content.
 - Admin list pagination uses `TablePagination` or the server-side `OffsetPagination` wrapper. Show the visible record range, matching total and current/total pages; preserve filters, handle stale pages and prevent duplicate pending navigation. Keep cursor pagination for Applications. Use `AdminPageHeader` for standard admin section headings and hide desktop-only table structure for empty results.
 - Keep the interface clear, minimal and touch-friendly. Test compact navigation, forms, tables, bulk actions and pagination on phone and tablet widths; desktop layouts must not force horizontal page overflow.
 - Match each route’s loading boundary to its actual layout. Do not replace tailored skeletons with a generic unrelated placeholder.

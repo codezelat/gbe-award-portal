@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { Spinner } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
   bulkCommunicationTemplates,
@@ -497,6 +496,7 @@ export function ApplicationBulkActions({
                 <Button
                   type="submit"
                   disabled={pending || unavailable}
+                  loading={pending}
                   variant={
                     to === "rejected" || to === "withdrawn"
                       ? "destructive"
@@ -504,9 +504,6 @@ export function ApplicationBulkActions({
                   }
                   className="min-h-11"
                 >
-                  {pending && (
-                    <Spinner aria-hidden="true" data-icon="inline-start" />
-                  )}
                   {pending
                     ? "Saving..."
                     : dialog?.action === "status"
