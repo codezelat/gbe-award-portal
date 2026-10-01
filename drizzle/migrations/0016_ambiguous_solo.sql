@@ -1,0 +1,2 @@
+ALTER TABLE "ticket_bookings" DROP CONSTRAINT "ticket_bookings_complimentary";--> statement-breakpoint
+ALTER TABLE "ticket_bookings" ADD CONSTRAINT "ticket_bookings_complimentary" CHECK ("ticket_bookings"."source" <> 'staff' or ("ticket_bookings"."issued_by" is not null and "ticket_bookings"."amount_minor" = 0));

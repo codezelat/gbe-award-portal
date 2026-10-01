@@ -3,6 +3,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { Search, Settings2, TicketPlus } from "lucide-react";
+import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -237,12 +238,15 @@ export function ComplimentaryTickets({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ApplicationChoice[]>([]);
   const [selected, setSelected] = useState<ApplicationChoice | null>(null);
+  const [guestMode, setGuestMode] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lock = useRef(false);
   const requestId = useRef("");
   const router = useRouter();
+  const searchEmail = z.email().safeParse(query.trim()).success;
   return (
     <Dialog
       open={open}
@@ -253,6 +257,8 @@ export function ComplimentaryTickets({
             requestId.current = "";
             setSubmitted(false);
             setSelected(null);
+            setGuestMode(false);
+            setHasSearched(false);
             setResults([]);
             setQuery("");
             setError("");
@@ -268,10 +274,10 @@ export function ComplimentaryTickets({
         <DialogHeader>
           <DialogTitle>Issue guest tickets</DialogTitle>
           <DialogDescription>
-            Choose a submitted application. Tickets go to its saved email.
+            Find a submitted application or issue tickets directly to a guest.
           </DialogDescription>
         </DialogHeader>
-        {!selected ? (
+        {!selected && !guestMode ? (
           <>
             <form
               className="flex items-end gap-2"
@@ -284,8 +290,9 @@ export function ComplimentaryTickets({
                 try {
                   const found = await findTicketApplications(cycleId, query);
                   setResults(found);
-                  if (!found.length)
-                    setError("No matching submitted applications.");
+                  setHasSearched(true);
+                  if (!found.length && !searchEmail)
+                    setError("No match found. Enter a valid email to issue tickets to a guest.");
                 } catch {
                   setError("Search could not be completed.");
                 } finally {
@@ -304,7 +311,12 @@ export function ComplimentaryTickets({
                   maxLength={100}
                   required
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setResults([]);
+                    setHasSearched(false);
+                    setError("");
+                  }}
                 />
               </Field>
               <Button
@@ -339,6 +351,24 @@ export function ComplimentaryTickets({
                 </button>
               ))}
             </div>
+            {hasSearched && !results.length && searchEmail ? (
+              <div className="rounded-xl border bg-muted/50 p-4">
+                <p className="text-sm text-muted-foreground">
+                  No submitted application matches this email.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3 min-h-11"
+                  onClick={() => {
+                    setError("");
+                    setGuestMode(true);
+                  }}
+                >
+                  Continue with this email
+                </Button>
+              </div>
+            ) : null}
             <FieldError>{error}</FieldError>
           </>
         ) : (
@@ -357,7 +387,15 @@ export function ComplimentaryTickets({
                 const result = await issueGuestTickets({
                   requestId: requestId.current,
                   salesId,
-                  applicationId: selected.id,
+                  applicationId: guestMode ? null : selected?.id ?? null,
+                  ...(guestMode
+                    ? {
+                        name: data.get("guestName"),
+                        email: data.get("guestEmail"),
+                        phone: data.get("guestPhone"),
+                        businessName: data.get("guestBusinessName"),
+                      }
+                    : {}),
                   quantity: Number(data.get("quantity")),
                   reason: data.get("reason"),
                 });
@@ -377,24 +415,85 @@ export function ComplimentaryTickets({
               }
             }}
           >
-            <div className="rounded-xl bg-muted p-4">
-              <p className="font-medium [overflow-wrap:anywhere]">
-                {selected.name}
-              </p>
-              <p className="mt-1 text-sm [overflow-wrap:anywhere]">
-                {selected.email}
-              </p>
-              <Button
-                variant="link"
-                type="button"
-                className="mt-2 px-0"
-                disabled={busy || submitted}
-                onClick={() => setSelected(null)}
-              >
-                Change application
-              </Button>
-            </div>
             <fieldset disabled={busy} className="space-y-4">
+              {guestMode ? (
+                <div className="space-y-4">
+                  <div className="rounded-xl bg-muted p-4">
+                    <p className="text-sm text-muted-foreground">
+                      No application is linked to these tickets.
+                    </p>
+                    <Button
+                      variant="link"
+                      type="button"
+                      className="mt-2 min-h-11 px-0"
+                      disabled={submitted}
+                      onClick={() => setGuestMode(false)}
+                    >
+                      Back to search
+                    </Button>
+                  </div>
+                  <Labeled id="complimentary-guest-name" label="Guest name">
+                    <Input
+                      id="complimentary-guest-name"
+                      name="guestName"
+                      autoComplete="name"
+                      minLength={2}
+                      maxLength={160}
+                      required
+                    />
+                  </Labeled>
+                  <Labeled id="complimentary-guest-email" label="Email">
+                    <Input
+                      id="complimentary-guest-email"
+                      name="guestEmail"
+                      type="email"
+                      autoComplete="email"
+                      maxLength={254}
+                      defaultValue={query.trim().toLowerCase()}
+                      required
+                    />
+                  </Labeled>
+                  <Labeled id="complimentary-guest-phone" label="Phone">
+                    <Input
+                      id="complimentary-guest-phone"
+                      name="guestPhone"
+                      type="tel"
+                      autoComplete="tel"
+                      maxLength={40}
+                      required
+                    />
+                  </Labeled>
+                  <Labeled
+                    id="complimentary-guest-business"
+                    label="Business name (optional)"
+                  >
+                    <Input
+                      id="complimentary-guest-business"
+                      name="guestBusinessName"
+                      autoComplete="organization"
+                      maxLength={200}
+                    />
+                  </Labeled>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-muted p-4">
+                  <p className="font-medium [overflow-wrap:anywhere]">
+                    {selected?.name}
+                  </p>
+                  <p className="mt-1 text-sm [overflow-wrap:anywhere]">
+                    {selected?.email}
+                  </p>
+                  <Button
+                    variant="link"
+                    type="button"
+                    className="mt-2 min-h-11 px-0"
+                    disabled={submitted}
+                    onClick={() => setSelected(null)}
+                  >
+                    Change application
+                  </Button>
+                </div>
+              )}
               <Labeled id="complimentary-quantity" label="Tickets">
                 <Input
                   id="complimentary-quantity"

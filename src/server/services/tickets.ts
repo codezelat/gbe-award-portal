@@ -15,6 +15,7 @@ import {
   ticketSales,
 } from "@/lib/db/schema";
 import {
+  ticketContactSchema,
   ticketBookingSchema,
   ticketSettingsSchema,
 } from "@/lib/domain/tickets";
@@ -263,9 +264,21 @@ export async function issueBookingTickets(tx: Tx, booking: TicketBooking) {
 export const complimentarySchema = z.object({
   requestId: z.uuid(),
   salesId: z.uuid(),
-  applicationId: z.uuid(),
+  applicationId: z.uuid().nullable(),
+  name: ticketContactSchema.shape.name.optional(),
+  email: ticketContactSchema.shape.email.optional(),
+  phone: ticketContactSchema.shape.phone.optional(),
+  businessName: z.string().trim().max(200).optional(),
   quantity: z.number().int().min(1).max(20),
   reason: z.string().trim().min(3).max(300),
+}).superRefine((value, ctx) => {
+  if (value.applicationId !== null) return;
+  if (!value.name)
+    ctx.addIssue({ code: "custom", path: ["name"], message: "Enter the guest's name." });
+  if (!value.email)
+    ctx.addIssue({ code: "custom", path: ["email"], message: "Enter a valid email address." });
+  if (!value.phone)
+    ctx.addIssue({ code: "custom", path: ["phone"], message: "Enter a valid contact number." });
 });
 export async function issueComplimentaryTickets(raw: unknown, actorId: string) {
   const input = complimentarySchema.parse(raw);
@@ -288,18 +301,47 @@ export async function issueComplimentaryTickets(raw: unknown, actorId: string) {
       !sale.capacity
     )
       throw new TicketError("Set the event date, venue and capacity first.");
-    const [application] = await tx
-      .select()
-      .from(applications)
-      .where(
-        submittedApplications(
-          eq(applications.id, input.applicationId),
-          eq(applications.cycleId, sale.cycleId),
-        ),
-      )
-      .for("update");
-    if (!application)
-      throw new TicketError("Choose a submitted application from this cycle.");
+    let application: typeof applications.$inferSelect | null = null;
+    let contact: Pick<
+      typeof ticketBookings.$inferInsert,
+      "name" | "email" | "phone" | "businessName"
+    >;
+    if (input.applicationId !== null) {
+      const [found] = await tx
+        .select()
+        .from(applications)
+        .where(
+          submittedApplications(
+            eq(applications.id, input.applicationId),
+            eq(applications.cycleId, sale.cycleId),
+          ),
+        )
+        .for("update");
+      if (!found)
+        throw new TicketError("Choose a submitted application from this cycle.");
+      application = found;
+      contact = {
+        name: found.nomineeName,
+        email: found.emailNormalised,
+        phone: found.phoneE164 ?? found.phoneDisplay,
+        businessName: null,
+      };
+    } else {
+      const guest = ticketContactSchema
+        .omit({ quantity: true })
+        .parse({
+          name: input.name,
+          email: input.email,
+          phone: input.phone,
+          businessName: input.businessName,
+        });
+      contact = {
+        name: guest.name,
+        email: guest.email,
+        phone: guest.phone,
+        businessName: guest.businessName || null,
+      };
+    }
     await expireUnstarted(tx, sale.id);
     const stock = await ticketInventory(tx, sale.id);
     if (stock.issued + stock.held + input.quantity > sale.capacity)
@@ -309,13 +351,11 @@ export async function issueComplimentaryTickets(raw: unknown, actorId: string) {
       .values({
         id: input.requestId,
         salesId: sale.id,
-        applicationId: application.id,
+        applicationId: application?.id ?? null,
         reference: `GBT-${randomBytes(6).toString("hex").toUpperCase()}`,
         accessHash: ticketHash(randomBytes(32).toString("hex")),
         payloadHash,
-        name: application.nomineeName,
-        email: application.emailNormalised,
-        phone: application.phoneE164 ?? application.phoneDisplay,
+        ...contact,
         quantity: input.quantity,
         unitPriceMinor: 0,
         amountMinor: 0,
@@ -338,9 +378,12 @@ export async function issueComplimentaryTickets(raw: unknown, actorId: string) {
       action: "tickets.complimentary_issued",
       entityType: "ticket_booking",
       entityId: booking.id,
-      applicationId: application.id,
+      applicationId: application?.id ?? null,
       reason: input.reason,
-      afterRedacted: { quantity: input.quantity },
+      afterRedacted: {
+        quantity: input.quantity,
+        recipientType: application ? "application" : "guest",
+      },
     });
     return booking;
   });

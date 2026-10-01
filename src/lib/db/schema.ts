@@ -1056,7 +1056,7 @@ export const ticketBookings = pgTable(
     check("ticket_bookings_source", sql`${t.source} in ('public','staff')`),
     check(
       "ticket_bookings_complimentary",
-      sql`${t.source} <> 'staff' or (${t.applicationId} is not null and ${t.issuedBy} is not null and ${t.amountMinor} = 0)`,
+      sql`${t.source} <> 'staff' or (${t.issuedBy} is not null and ${t.amountMinor} = 0)`,
     ),
   ],
 );
