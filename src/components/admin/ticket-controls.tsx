@@ -403,7 +403,7 @@ export function ComplimentaryTickets({
                 else {
                   setOpen(false);
                   toast.success("Tickets issued and email queued");
-                  router.push(`/admin/tickets/${result.id}`);
+                  router.refresh();
                 }
               } catch {
                 setError(
